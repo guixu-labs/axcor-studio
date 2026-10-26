@@ -5,7 +5,8 @@ body { margin: 0; min-width: 1024px; }
 .boot-error { color: #fca5a5; } .boot-error pre { white-space: pre-wrap; }
 button { border: 1px solid #4b5563; border-radius: 5px; background: #1f2937; color: inherit; padding: 7px 12px; cursor: pointer; }
 button:hover { background: #374151; }
-.app-shell { min-height: 100vh; display: grid; grid-template-rows: 52px 1fr 150px; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 68px minmax(0, 1fr); }
+.app-content { min-width: 0; min-height: 100vh; display: grid; grid-template-rows: 52px 1fr 150px; }
 header { display: flex; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid #374151; }
 header strong { font-size: 16px; } header span { color: #9ca3af; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-grid { display: grid; grid-template-columns: 220px 1fr 300px; min-height: 0; }
@@ -14,3 +15,12 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #
 .file-entry { width: 100%; text-align: left; } .pane-title { display: flex; justify-content: space-between; align-items: center; }
 .pane-title div { display: flex; gap: 8px; } textarea { width: 100%; height: calc(100% - 45px); resize: none; border: 1px solid #374151; border-radius: 5px; background: #0b1220; color: #d1d5db; padding: 14px; font: 14px/1.6 ui-monospace, SFMono-Regular, monospace; }
 .event { padding: 8px 0; border-bottom: 1px solid #374151; display: flex; justify-content: space-between; gap: 8px; font-size: 12px; } .event small { color: #9ca3af; }
+.navigation-rail { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 14px 8px; background: #0b1220; border-right: 1px solid #374151; }
+.rail-brand { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #6366f1; border-radius: 10px; background: #312e81; color: #eef2ff; font-weight: 700; }
+.rail-items { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.rail-item { display: flex; width: 52px; min-height: 48px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 5px 2px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #9ca3af; }
+.rail-item:hover { background: #1f2937; color: #e5e7eb; }
+.rail-item.active { border-color: #4338ca; background: #312e81; color: #eef2ff; }
+.rail-icon { font-size: 17px; line-height: 1; }
+.rail-label { font-size: 9px; line-height: 1; }
+.rail-settings { margin-top: auto; }
