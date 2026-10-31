@@ -1,36 +1,134 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MockOpsbotClient } from './services/opsbotClient';
 import type { Run, RunEvent } from '../shared/protocol';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
 import { MarkdownEditor } from './components/MarkdownEditor';
 import { RunPanel } from './components/RunPanel';
-import { EvidencePanel } from './components/EvidencePanel';
+import { ResizeHandle } from './components/ResizeHandle';
+import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
+import type { EditorGroupOrientation } from './workbench/layout';
+import { createWorkbenchLayout, toggleWorkbenchPart } from './workbench/layoutService';
+import { loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
+import { createWorkbenchServices, WorkbenchCommandService } from './workbench/services';
+import { SettingsModal } from './components/SettingsModal';
+import type { FontId, ThemeId } from './components/SettingsModal';
+import { defaultFont, defaultTheme, fonts, themes } from './settings';
 
 const client = new MockOpsbotClient();
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
-  const [file, setFile] = useState('workflow.md');
-  const [content, setContent] = useState('# New workflow\n\nDescribe the workflow steps here.');
+  const [files, setFiles] = useState(['workflow.md']);
+  const [openFiles, setOpenFiles] = useState(() => loadWorkbenchState('workbench.openFiles', ['workflow.md']));
+  const [file, setFile] = useState(() => loadWorkbenchState('workbench.activeFile', 'workflow.md'));
+  const [contents, setContents] = useState<Record<string, string>>({ 'workflow.md': '# New workflow\n\nDescribe the workflow steps here.' });
   const [run, setRun] = useState<Run>();
   const [events, setEvents] = useState<RunEvent[]>([]);
-  const [activeNavigation, setActiveNavigation] = useState('workbench');
+  const [activeNavigation, setActiveNavigation] = useState('runs');
+  const [explorerWidth, setExplorerWidth] = useState(220);
+  const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>(() => loadWorkbenchState('workbench.theme', defaultTheme.id));
+  const [font, setFont] = useState<FontId>(() => loadWorkbenchState('workbench.font', defaultFont.id));
+  const services = useRef(createWorkbenchServices()).current;
+  const commands = services.get(WorkbenchCommandService);
+  const editorLayout = layout.editorLayout;
+  const splitDirection = editorLayout.groups.length > 1 ? editorLayout.orientation : 'none';
+  useEffect(() => saveWorkbenchState('workbench.layout', layout), [layout]);
+  useEffect(() => saveWorkbenchState('workbench.openFiles', openFiles), [openFiles]);
+  useEffect(() => saveWorkbenchState('workbench.activeFile', file), [file]);
+  useEffect(() => saveWorkbenchState('workbench.theme', theme), [theme]);
+  useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
+  useEffect(() => {
+    const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
+    const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
+    Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--' + name, value));
+    document.documentElement.style.setProperty('--app-font', selectedFont.family);
+    document.documentElement.style.setProperty('color-scheme', selectedTheme.colorScheme);
+  }, [font, theme]);
+  const splitEditor = (direction: 'none' | 'horizontal' | 'vertical'): void => {
+    commands.register('workbench.splitEditor', () => {
+      if (direction === 'none') {
+        setLayout(previous => ({ ...previous, editorLayout: createEditorGroupLayout() }));
+        return;
+      }
+      setLayout(previous => ({ ...previous, editorLayout: splitEditorGroup(previous.editorLayout, direction as EditorGroupOrientation) }));
+    });
+    commands.execute('workbench.splitEditor');
+  };
+  const navigate = (item: string): void => {
+    commands.register('workbench.navigate', () => { if (item === 'settings') { setSettingsOpen(true); return; } setActiveNavigation(item); });
+    commands.execute('workbench.navigate');
+  };
 
-  const chooseWorkspace = async (): Promise<void> => { const selected = await window.workbench.chooseWorkspace(); if (!selected) return; setWorkspace(selected); const files = await window.workbench.listMarkdownFiles(); if (files[0]) { setFile(files[0]); setContent(await window.workbench.readFile(files[0])); } };
+  const content = contents[file] ?? '';
+  const chooseWorkspace = async (): Promise<void> => {
+    const selected = await window.workbench.chooseWorkspace();
+    if (!selected) return;
+    const workspaceFiles = await window.workbench.listMarkdownFiles();
+    const initialFile = workspaceFiles[0] ?? 'workflow.md';
+    setWorkspace(selected);
+    setFiles(workspaceFiles.length ? workspaceFiles : ['workflow.md']);
+    setOpenFiles([initialFile]);
+    setFile(initialFile);
+    if (workspaceFiles[0]) {
+      const initialContent = await window.workbench.readFile(initialFile);
+      setContents(previous => ({ ...previous, [initialFile]: initialContent }));
+    }
+  };
+  const selectFile = async (nextFile: string): Promise<void> => {
+    setFile(nextFile);
+    setOpenFiles(previous => previous.includes(nextFile) ? previous : [...previous, nextFile]);
+    if (workspace && !Object.prototype.hasOwnProperty.call(contents, nextFile)) {
+      const nextContent = await window.workbench.readFile(nextFile);
+      setContents(previous => ({ ...previous, [nextFile]: nextContent }));
+    }
+  };
   const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
-  const startRun = async (): Promise<void> => { const created = await client.createRun({ workflowId: file, workspacePath: workspace, content }); setRun(created); setEvents([]); client.subscribeRunEvents(created.id, event => { setEvents(previous => [...previous, event]); void client.getRun(created.id).then(setRun); }); };
+  const startRun = async (): Promise<void> => { const created = await client.createRun({ workflowId: file, workspacePath: workspace, content }); setRun(created); setEvents([]); setActiveNavigation('runs'); client.subscribeRunEvents(created.id, event => { setEvents(previous => [...previous, event]); void client.getRun(created.id).then(setRun); }); };
+  const closeFile = (closedFile: string): void => {
+    if (openFiles.length === 1) return;
+    const nextFiles = openFiles.filter(openFile => openFile !== closedFile);
+    setOpenFiles(nextFiles);
+    if (file === closedFile) setFile(nextFiles[nextFiles.length - 1]);
+  };
+  const cancelRun = async (): Promise<void> => { if (run) await client.cancelRun(run.id); };
 
-  return <main className="app-shell">
-    <NavigationRail active={activeNavigation} onSelect={setActiveNavigation} />
-    <div className="app-content">
-      <header><strong>Agent Workbench</strong><button onClick={chooseWorkspace}>Open workspace</button><span>{workspace ?? 'No workspace selected'}</span></header>
-      <section className="workspace-grid">
-        <WorkspaceExplorer file={file} onSelect={setFile} />
-        <MarkdownEditor file={file} content={content} onChange={setContent} onSave={save} onRun={startRun} />
-        <RunPanel run={run} events={events} />
-      </section>
-      <EvidencePanel run={run} />
+  const leftWorkbenchWidth = (activeNavigation === 'workbench' && layout.sidebarVisible ? 52 + explorerWidth + 4 : 52) + 6;
+  return <main className="app-shell" style={{ gridTemplateColumns: leftWorkbenchWidth + 'px minmax(0, 1fr)' }}>
+      <header className="topbar">
+      <div className="topbar-brand" aria-label="Agent Workbench"><span className="brand-mark">A</span><span className="brand-name">Agent Workbench</span></div>
+        <div className="topbar-navigation">
+          <button className="icon-button" type="button" aria-label="Back" title="Back">‹</button>
+          <button className="icon-button" type="button" aria-label="Forward" title="Forward">›</button>
+          <button className="quick-search" type="button">Search files and commands</button>
+        </div>
+        <div className="topbar-actions">
+          <button className="icon-button" type="button" onClick={chooseWorkspace} aria-label="Open workspace" title="Open workspace">＋</button>
+          <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label="Toggle sidebar" title="Toggle sidebar">▥</button>
+          <span className="workspace-pill"><i aria-hidden="true" />{workspace ?? 'No workspace selected'}</span>
+        </div>
+      </header>
+    <div className="left-workbench" style={{ gridTemplateColumns: activeNavigation === 'workbench' && layout.sidebarVisible ? '52px minmax(0, 1fr) 4px' : '52px' }}>
+      <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} />
+      {activeNavigation === 'workbench' && layout.sidebarVisible && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} />}
+      {activeNavigation === 'workbench' && layout.sidebarVisible && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
+    <div className="app-content">
+      <div className="workbench-body">
+        <div className="workbench-main" style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
+          {activeNavigation === 'workbench' && <section className="workspace-grid">
+            <div className={'editor-groups split-' + splitDirection}>
+              <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} />
+              {splitDirection !== 'none' && <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} />}
+            </div>
+          </section>}
+          {activeNavigation === 'runs' && <section className="single-panel"><RunPanel run={run} events={events} onRun={startRun} onCancel={cancelRun} /></section>}
+        </div>
+      </div>
+    </div>
+    <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? 'Workspace ready' : 'No workspace'}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>Markdown</span></footer>
+    {settingsOpen && <SettingsModal theme={theme} font={font} onThemeChange={setTheme} onFontChange={setFont} onClose={() => setSettingsOpen(false)} />}
   </main>;
 }

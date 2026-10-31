@@ -6,12 +6,10 @@ interface NavigationRailProps {
 const items = [
   { id: 'workbench', label: 'Workbench', icon: '⌘' },
   { id: 'runs', label: 'Runs', icon: '▶' },
-  { id: 'evidence', label: 'Evidence', icon: '◇' },
 ];
 
 export function NavigationRail({ active, onSelect }: NavigationRailProps): JSX.Element {
   return <nav className="navigation-rail" aria-label="Primary navigation">
-    <div className="rail-brand" aria-label="Agent Workbench">A</div>
     <div className="rail-items">
       {items.map(item => <button
         className={'rail-item' + (active === item.id ? ' active' : '')}
