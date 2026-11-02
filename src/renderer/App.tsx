@@ -4,7 +4,7 @@ import type { Run, RunEvent } from '../shared/protocol';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
 import { MarkdownEditor } from './components/MarkdownEditor';
-import { RunPanel } from './components/RunPanel';
+import { RunDetail, RunsList } from './components/RunsPanel';
 import { ResizeHandle } from './components/ResizeHandle';
 import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
 import type { EditorGroupOrientation } from './workbench/layout';
@@ -24,8 +24,11 @@ export default function App(): JSX.Element {
   const [openFiles, setOpenFiles] = useState(() => loadWorkbenchState('workbench.openFiles', ['workflow.md']));
   const [file, setFile] = useState(() => loadWorkbenchState('workbench.activeFile', 'workflow.md'));
   const [contents, setContents] = useState<Record<string, string>>({ 'workflow.md': '# New workflow\n\nDescribe the workflow steps here.' });
-  const [run, setRun] = useState<Run>();
-  const [events, setEvents] = useState<RunEvent[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string>();
+  const [eventsByRun, setEventsByRun] = useState<Record<string, RunEvent[]>>({});
+  const selectedRun = runs.find(item => item.id === selectedRunId);
+  const selectedEvents = selectedRunId ? eventsByRun[selectedRunId] ?? [] : [];
   const [activeNavigation, setActiveNavigation] = useState('runs');
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
@@ -90,16 +93,33 @@ export default function App(): JSX.Element {
     }
   };
   const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
-  const startRun = async (): Promise<void> => { const created = await client.createRun({ workflowId: file, workspacePath: workspace, content }); setRun(created); setEvents([]); setActiveNavigation('runs'); client.subscribeRunEvents(created.id, event => { setEvents(previous => [...previous, event]); void client.getRun(created.id).then(setRun); }); };
+  const startRun = async (): Promise<void> => {
+    const created = await client.createRun({ workflowId: file, workspacePath: workspace, content });
+    setRuns(previous => [created, ...previous]);
+    setSelectedRunId(created.id);
+    setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
+    setActiveNavigation('runs');
+    setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
+    client.subscribeRunEvents(created.id, event => {
+      setEventsByRun(previous => ({ ...previous, [created.id]: [...(previous[created.id] ?? []), event] }));
+      void client.getRun(created.id).then(latest => setRuns(previous => previous.map(item => item.id === latest.id ? latest : item)));
+    });
+  };
   const closeFile = (closedFile: string): void => {
     if (openFiles.length === 1) return;
     const nextFiles = openFiles.filter(openFile => openFile !== closedFile);
     setOpenFiles(nextFiles);
     if (file === closedFile) setFile(nextFiles[nextFiles.length - 1]);
   };
-  const cancelRun = async (): Promise<void> => { if (run) await client.cancelRun(run.id); };
+  const cancelRun = async (): Promise<void> => {
+    if (!selectedRun) return;
+    await client.cancelRun(selectedRun.id);
+    const latest = await client.getRun(selectedRun.id);
+    setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
+  };
 
-  const leftWorkbenchWidth = (activeNavigation === 'workbench' && layout.sidebarVisible ? 52 + explorerWidth + 4 : 52) + 6;
+  const showSidebar = layout.sidebarVisible && (activeNavigation === 'workbench' || activeNavigation === 'runs');
+  const leftWorkbenchWidth = (showSidebar ? 52 + explorerWidth + 4 : 52) + 6;
   return <main className="app-shell" style={{ gridTemplateColumns: leftWorkbenchWidth + 'px minmax(0, 1fr)' }}>
       <header className="topbar">
       <div className="topbar-brand" aria-label={t.brand}><span className="brand-mark">A</span><span className="brand-name">{t.brand}</span></div>
@@ -114,10 +134,11 @@ export default function App(): JSX.Element {
           <span className="workspace-pill"><i aria-hidden="true" />{workspace ?? t.noWorkspace}</span>
         </div>
       </header>
-    <div className="left-workbench" style={{ gridTemplateColumns: activeNavigation === 'workbench' && layout.sidebarVisible ? '52px minmax(0, 1fr) 4px' : '52px' }}>
+    <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
-      {activeNavigation === 'workbench' && layout.sidebarVisible && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} messages={t} />}
-      {activeNavigation === 'workbench' && layout.sidebarVisible && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
+      {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} onRun={startRun} messages={t} />}
+      {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content">
       <div className="workbench-body">
@@ -128,7 +149,9 @@ export default function App(): JSX.Element {
               {splitDirection !== 'none' && <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} messages={t} />}
             </div>
           </section>}
-          {activeNavigation === 'runs' && <section className="single-panel"><RunPanel run={run} events={events} onRun={startRun} onCancel={cancelRun} messages={t} /></section>}
+          {activeNavigation === 'runs' && (selectedRun
+            ? <section className="single-panel"><RunDetail run={selectedRun} events={selectedEvents} onCancel={cancelRun} messages={t} /></section>
+            : <section className="single-panel"><section className="run-detail"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></section></section>)}
         </div>
       </div>
     </div>
