@@ -43,7 +43,7 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
     const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
-    Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--' + name, value));
+    Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
     document.documentElement.style.setProperty('--app-font', selectedFont.family);
     document.documentElement.style.setProperty('color-scheme', selectedTheme.colorScheme);
   }, [font, theme]);
