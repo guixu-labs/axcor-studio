@@ -14,6 +14,7 @@ import { createWorkbenchServices, WorkbenchCommandService } from './workbench/se
 import { SettingsModal } from './components/SettingsModal';
 import type { FontId, ThemeId } from './components/SettingsModal';
 import { defaultFont, defaultTheme, fonts, themes } from './settings';
+import { messages, type LocaleId } from './i18n';
 
 const client = new MockOpsbotClient();
 
@@ -31,6 +32,8 @@ export default function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeId>(() => loadWorkbenchState('workbench.theme', defaultTheme.id));
   const [font, setFont] = useState<FontId>(() => loadWorkbenchState('workbench.font', defaultFont.id));
+  const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
+  const t = messages[locale];
   const services = useRef(createWorkbenchServices()).current;
   const commands = services.get(WorkbenchCommandService);
   const editorLayout = layout.editorLayout;
@@ -40,6 +43,7 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.activeFile', file), [file]);
   useEffect(() => saveWorkbenchState('workbench.theme', theme), [theme]);
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
+  useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
   useEffect(() => {
     const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
     const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
@@ -98,21 +102,21 @@ export default function App(): JSX.Element {
   const leftWorkbenchWidth = (activeNavigation === 'workbench' && layout.sidebarVisible ? 52 + explorerWidth + 4 : 52) + 6;
   return <main className="app-shell" style={{ gridTemplateColumns: leftWorkbenchWidth + 'px minmax(0, 1fr)' }}>
       <header className="topbar">
-      <div className="topbar-brand" aria-label="Agent Workbench"><span className="brand-mark">A</span><span className="brand-name">Agent Workbench</span></div>
+      <div className="topbar-brand" aria-label={t.brand}><span className="brand-mark">A</span><span className="brand-name">{t.brand}</span></div>
         <div className="topbar-navigation">
-          <button className="icon-button" type="button" aria-label="Back" title="Back">‹</button>
-          <button className="icon-button" type="button" aria-label="Forward" title="Forward">›</button>
-          <button className="quick-search" type="button">Search files and commands</button>
+          <button className="icon-button" type="button" aria-label={t.back} title={t.back}>‹</button>
+          <button className="icon-button" type="button" aria-label={t.forward} title={t.forward}>›</button>
+          <button className="quick-search" type="button">{t.search}</button>
         </div>
         <div className="topbar-actions">
-          <button className="icon-button" type="button" onClick={chooseWorkspace} aria-label="Open workspace" title="Open workspace">＋</button>
-          <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label="Toggle sidebar" title="Toggle sidebar">▥</button>
-          <span className="workspace-pill"><i aria-hidden="true" />{workspace ?? 'No workspace selected'}</span>
+          <button className="icon-button" type="button" onClick={chooseWorkspace} aria-label={t.openWorkspace} title={t.openWorkspace}>＋</button>
+          <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label={t.toggleSidebar} title={t.toggleSidebar}>▥</button>
+          <span className="workspace-pill"><i aria-hidden="true" />{workspace ?? t.noWorkspace}</span>
         </div>
       </header>
     <div className="left-workbench" style={{ gridTemplateColumns: activeNavigation === 'workbench' && layout.sidebarVisible ? '52px minmax(0, 1fr) 4px' : '52px' }}>
-      <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} />
-      {activeNavigation === 'workbench' && layout.sidebarVisible && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} />}
+      <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
+      {activeNavigation === 'workbench' && layout.sidebarVisible && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} messages={t} />}
       {activeNavigation === 'workbench' && layout.sidebarVisible && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content">
@@ -120,15 +124,15 @@ export default function App(): JSX.Element {
         <div className="workbench-main" style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
           {activeNavigation === 'workbench' && <section className="workspace-grid">
             <div className={'editor-groups split-' + splitDirection}>
-              <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} />
-              {splitDirection !== 'none' && <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} />}
+              <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} messages={t} />
+              {splitDirection !== 'none' && <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} messages={t} />}
             </div>
           </section>}
-          {activeNavigation === 'runs' && <section className="single-panel"><RunPanel run={run} events={events} onRun={startRun} onCancel={cancelRun} /></section>}
+          {activeNavigation === 'runs' && <section className="single-panel"><RunPanel run={run} events={events} onRun={startRun} onCancel={cancelRun} messages={t} /></section>}
         </div>
       </div>
     </div>
-    <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? 'Workspace ready' : 'No workspace'}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>Markdown</span></footer>
-    {settingsOpen && <SettingsModal theme={theme} font={font} onThemeChange={setTheme} onFontChange={setFont} onClose={() => setSettingsOpen(false)} />}
+    <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></footer>
+    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
   </main>;
 }

@@ -1,17 +1,14 @@
 interface NavigationRailProps {
   active: string;
   onSelect: (item: string) => void;
+  messages: { workbench: string; runs: string; settings: string };
 }
 
-const items = [
-  { id: 'workbench', label: 'Workbench', icon: '⌘' },
-  { id: 'runs', label: 'Runs', icon: '▶' },
-];
-
-export function NavigationRail({ active, onSelect }: NavigationRailProps): JSX.Element {
-  return <nav className="navigation-rail" aria-label="Primary navigation">
+export function NavigationRail({ active, onSelect, messages }: NavigationRailProps): JSX.Element {
+  const localizedItems = [{ id: 'workbench', label: messages.workbench, icon: '⌘' }, { id: 'runs', label: messages.runs, icon: '▶' }];
+  return <nav className="navigation-rail" aria-label={messages.workbench}>
     <div className="rail-items">
-      {items.map(item => <button
+      {localizedItems.map(item => <button
         className={'rail-item' + (active === item.id ? ' active' : '')}
         key={item.id}
         type="button"
@@ -26,7 +23,7 @@ export function NavigationRail({ active, onSelect }: NavigationRailProps): JSX.E
     <button
       className={'rail-item rail-settings' + (active === 'settings' ? ' active' : '')}
       type="button"
-      aria-label="Settings"
+      aria-label={messages.settings}
       aria-current={active === 'settings' ? 'page' : undefined}
       onClick={() => onSelect('settings')}
     >
