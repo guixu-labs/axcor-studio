@@ -19,7 +19,7 @@ export function MarkdownEditor({ files, activeFile, content, onChange, onSelectF
         <button className="tab-close" type="button" aria-label={'Close ' + file} onClick={() => onCloseFile(file)}>×</button>
       </div>)}
     </div>
-    <div className="editor-toolbar"><h2>{activeFile}</h2><span>{messages.markdown}</span>{showSplitActions && <div className="editor-actions"><button className="icon-button" type="button" title={messages.splitVertical} aria-label={messages.splitVertical} onClick={() => onSplit(splitDirection === 'vertical' ? 'none' : 'vertical')}>◫</button><button className="icon-button" type="button" title={messages.splitHorizontal} aria-label={messages.splitHorizontal} onClick={() => onSplit(splitDirection === 'horizontal' ? 'none' : 'horizontal')}>▤</button></div>}</div>
+    <div className="editor-toolbar"><h2>{activeFile}</h2><span>{messages.markdown}</span>{showSplitActions && <div className="editor-actions"><button className="icon-button" type="button" title={messages.splitVertical} aria-label={messages.splitVertical} onClick={() => onSplit(splitDirection === 'vertical' ? 'none' : 'vertical')}><span className="split-vertical-icon" aria-hidden="true" /></button><button className="icon-button" type="button" title={messages.splitHorizontal} aria-label={messages.splitHorizontal} onClick={() => onSplit(splitDirection === 'horizontal' ? 'none' : 'horizontal')}><span className="split-horizontal-icon" aria-hidden="true" /></button></div>}</div>
     <textarea value={content} onChange={event => onChange(event.target.value)} spellCheck={false} />
   </section>;
 }

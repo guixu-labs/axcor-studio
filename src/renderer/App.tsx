@@ -130,7 +130,7 @@ export default function App(): JSX.Element {
         </div>
         <div className="topbar-actions">
           <button className="icon-button" type="button" onClick={chooseWorkspace} aria-label={t.openWorkspace} title={t.openWorkspace}>＋</button>
-          <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label={t.toggleSidebar} title={t.toggleSidebar}>▥</button>
+          <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label={t.toggleSidebar} title={t.toggleSidebar}><span className="sidebar-toggle-icon" aria-hidden="true" /></button>
           <span className="workspace-pill"><i aria-hidden="true" />{workspace ?? t.noWorkspace}</span>
         </div>
       </header>
