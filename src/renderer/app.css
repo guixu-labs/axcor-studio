@@ -74,10 +74,11 @@ footer { margin: 0 6px 6px; }
 .sidebar-toggle-icon::after, .split-vertical-icon::after { position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: currentColor; content: ''; }
 .split-horizontal-icon::after { position: absolute; top: 6px; right: 0; left: 0; height: 1px; background: currentColor; content: ''; }
 .file-entry-dir { font-weight: 500; }
-.tree-arrow { flex: none; width: 14px; color: var(--muted); font-size: 9px; line-height: 1; transition: transform .12s; }
-.file-entry-dir.expanded .tree-arrow { transform: rotate(90deg); }
-.tree-folder { position: relative; display: inline-block; flex: none; width: 14px; height: 10px; margin-top: 2px; border: 1px solid currentColor; border-radius: 2px; color: color-mix(in srgb, var(--accent) 55%, var(--muted)); }
+.file-entry-dir .tree-folder, .file-entry-dir .tree-folder-open { margin-right: 4px; margin-left: 4px; }
+.tree-folder, .tree-folder-open { position: relative; display: inline-block; flex: none; width: 14px; height: 10px; margin-top: 2px; border: 1px solid currentColor; border-radius: 2px; color: color-mix(in srgb, var(--accent) 55%, var(--muted)); }
 .tree-folder::before { position: absolute; top: -3px; left: 1px; width: 5px; height: 3px; border: 1px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; content: ''; }
+.tree-folder-open { background: color-mix(in srgb, currentColor 22%, transparent); }
+.tree-folder-open::before { position: absolute; top: -4px; left: 1px; width: 7px; height: 4px; border: 1px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; transform: rotate(-12deg); transform-origin: 100% 100%; content: ''; }
 .tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-badge { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 14px; border-radius: 3px; font-size: 8px; font-weight: 700; letter-spacing: .02em; }
 .badge-md { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }

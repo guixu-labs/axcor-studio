@@ -79,7 +79,7 @@ export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, onRun, m
       const isExpanded = expanded.has(node.path);
       return <Fragment key={node.path}>
         <button className={'file-entry file-entry-dir' + (isExpanded ? ' expanded' : '')} style={style} type="button" onClick={() => toggle(node.path)} aria-expanded={isExpanded}>
-          <span className="tree-arrow" aria-hidden="true">▸</span><span className="tree-folder" aria-hidden="true" /><span className="tree-name">{node.name}</span>
+          <span className={isExpanded ? 'tree-folder-open' : 'tree-folder'} aria-hidden="true" /><span className="tree-name">{node.name}</span>
         </button>
         {isExpanded && node.children.map(child => renderNode(child, depth + 1))}
       </Fragment>;
