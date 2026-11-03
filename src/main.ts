@@ -14,6 +14,7 @@ import {
   getInsightStatus,
   getOpsbotBaseUrl,
   importOpsbotSessionToInsight,
+  injectOpsbotSessionPrompt,
   listOpsbotRuns,
   setOpsbotBaseUrl,
   startOpsbotRun,
@@ -84,6 +85,7 @@ app.whenReady().then(() => {
   ipcMain.handle('opsbot:set-base-url', (_event, url: string) => { setOpsbotBaseUrl(url); });
   ipcMain.handle('opsbot:get-base-url', () => getOpsbotBaseUrl());
   ipcMain.handle('opsbot:get-run-sessions', (_event, runId: string) => getOpsbotRunSessions(runId));
+  ipcMain.handle('opsbot:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectOpsbotSessionPrompt(runId, sessionId, prompt));
   ipcMain.handle('opsbot:import-to-insight', (_event, sessionId: string) => importOpsbotSessionToInsight(sessionId));
   ipcMain.handle('opsbot:insight-status', () => getInsightStatus());
   ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => { showInsight(path, bounds, isDark); });

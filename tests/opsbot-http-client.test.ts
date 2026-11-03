@@ -7,6 +7,7 @@ import {
   getOpsbotRun,
   getOpsbotRunSessions,
   importOpsbotSessionToInsight,
+  injectOpsbotSessionPrompt,
   listOpsbotRuns,
   setOpsbotBaseUrl,
   startOpsbotRun,
@@ -57,6 +58,10 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
       }
       if (req.method === 'GET' && req.url === '/api/v1/insight/status') {
         res.end(JSON.stringify({ running: true, port: 21025 }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
+        res.end(JSON.stringify({ run_id: 'run-1', session_id: 'sess-1', accepted: true }));
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/stop') {
@@ -152,6 +157,13 @@ test('opsbot http client', async t => {
     const result = await importOpsbotSessionToInsight('sess-missing');
     assert.equal(result.ok, false);
     assert.match(result.error ?? '', /Cannot connect/);
+  });
+
+  await t.test('injectOpsbotSessionPrompt posts the prompt to the session', async () => {
+    await injectOpsbotSessionPrompt('run-1', 'sess-1', '先把测试跑通');
+    const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject').at(-1);
+    assert.ok(post);
+    assert.deepEqual(post.body, { prompt: '先把测试跑通' });
   });
 
   await t.test('getInsightStatus reports the insight port', async () => {

@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('opsbot', {
   getRun: (runId: string): Promise<Run> => ipcRenderer.invoke('opsbot:get-run', runId),
   cancelRun: (runId: string): Promise<void> => ipcRenderer.invoke('opsbot:cancel-run', runId),
   getRunSessions: (runId: string): Promise<OpsbotSession[]> => ipcRenderer.invoke('opsbot:get-run-sessions', runId),
+  injectPrompt: (runId: string, sessionId: string, prompt: string): Promise<void> => ipcRenderer.invoke('opsbot:inject-prompt', runId, sessionId, prompt),
   importToInsight: (sessionId: string): Promise<InsightImportResult> => ipcRenderer.invoke('opsbot:import-to-insight', sessionId),
   insightStatus: (): Promise<InsightStatusResult> => ipcRenderer.invoke('opsbot:insight-status'),
   subscribeRunEvents: (runId: string, listener: (event: RunEvent) => void): (() => void) => {

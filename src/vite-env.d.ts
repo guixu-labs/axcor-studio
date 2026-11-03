@@ -19,6 +19,7 @@ interface Window {
     getRun(runId: string): Promise<import('./shared/protocol').Run>;
     cancelRun(runId: string): Promise<void>;
     getRunSessions(runId: string): Promise<import('./shared/opsbotApi').OpsbotSession[]>;
+    injectPrompt(runId: string, sessionId: string, prompt: string): Promise<void>;
     importToInsight(sessionId: string): Promise<import('./shared/opsbotApi').InsightImportResult>;
     insightStatus(): Promise<import('./shared/opsbotApi').InsightStatusResult>;
     subscribeRunEvents(runId: string, listener: (event: import('./shared/protocol').RunEvent) => void): () => void;

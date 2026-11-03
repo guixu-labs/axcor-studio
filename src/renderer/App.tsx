@@ -49,6 +49,7 @@ export default function App(): JSX.Element {
   const [runLabel, setRunLabel] = useState('');
   const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
   const [maxParallel, setMaxParallel] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [insightPath, setInsightPath] = useState('/insight/');
   const [insightFailed, setInsightFailed] = useState(false);
   const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
@@ -198,6 +199,25 @@ export default function App(): JSX.Element {
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
+    const trimmedPrompt = prompt.trim();
+    if (trimmedPrompt) {
+      let injected = false;
+      for (let attempt = 0; attempt < 6 && !injected; attempt += 1) {
+        try {
+          const sessions = await window.opsbot.getRunSessions(created.id);
+          const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
+          if (target) {
+            await window.opsbot.injectPrompt(created.id, target.session_id, trimmedPrompt);
+            injected = true;
+          }
+        } catch {
+          // The executor session may not exist yet right after the run
+          // starts; retry for a few seconds before giving up softly.
+        }
+        if (!injected) await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      if (!injected) setOpsbotError('提示词注入失败：执行会话尚未就绪，run 已照常启动');
+    }
   };
   const closeFile = (closedFile: string): void => {
     if (openFiles.length === 1) return;
@@ -251,7 +271,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} prompt={prompt} onPromptChange={setPrompt} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>

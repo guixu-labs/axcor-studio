@@ -8,7 +8,7 @@ export interface RunsPanelMessages {
   selectRun: string; selectRunHint: string; openInInsight: string;
   runConfig: string; runtime: string; runLabel: string; runLabelPlaceholder: string;
   runParams: string; addParam: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
-  maxParallel: string; removeParam: string;
+  maxParallel: string; removeParam: string; prompt: string; promptPlaceholder: string;
 }
 
 export interface RunParamsRow { key: string; value: string; }
@@ -27,10 +27,12 @@ interface RunsListProps {
   onRunParamsChange: (rows: RunParamsRow[]) => void;
   maxParallel: string;
   onMaxParallelChange: (value: string) => void;
+  prompt: string;
+  onPromptChange: (value: string) => void;
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, prompt, onPromptChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><div><span className="eyebrow">{messages.runs}</span><h2>{messages.executionCenter}</h2></div></div>
@@ -76,6 +78,10 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
         <label className="run-config-field">
           <span className="run-config-title">{messages.maxParallel}</span>
           <input className="run-config-input" type="number" min={1} value={maxParallel} aria-label={messages.maxParallel} onChange={event => onMaxParallelChange(event.target.value)} />
+        </label>
+        <label className="run-config-field">
+          <span className="run-config-title">{messages.prompt}</span>
+          <textarea className="run-config-input run-config-prompt" value={prompt} placeholder={messages.promptPlaceholder} aria-label={messages.prompt} onChange={event => onPromptChange(event.target.value)} />
         </label>
       </>}
     </div>

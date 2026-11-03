@@ -87,6 +87,14 @@ export async function getOpsbotRunSessions(runId: string): Promise<OpsbotSession
   return response.sessions;
 }
 
+export async function injectOpsbotSessionPrompt(runId: string, sessionId: string, prompt: string): Promise<void> {
+  await opsbotRequest<{ run_id: string; session_id: string; accepted: boolean }>(
+    'POST',
+    `/api/v1/runs/${encodeURIComponent(runId)}/sessions/${encodeURIComponent(sessionId)}/inject`,
+    { prompt },
+  );
+}
+
 export async function importOpsbotSessionToInsight(sessionId: string): Promise<InsightImportResult> {
   const result = await opsbotRequest<InsightImportResult>('POST', `/api/v1/insight/import?session_id=${encodeURIComponent(sessionId)}`);
   return result.ok ? result : { ...result, ok: false };

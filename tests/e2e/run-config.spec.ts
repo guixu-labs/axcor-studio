@@ -14,6 +14,7 @@ test.describe('run configuration', () => {
   let opsbotServer: http.Server;
   let capturedBodies: Record<string, unknown>[] = [];
   let postedLabel = 'workflow.md';
+  let injectedPrompts: string[] = [];
 
   test.beforeAll(async () => {
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-run-params-'));
@@ -36,12 +37,17 @@ test.describe('run configuration', () => {
           res.end(JSON.stringify({ runs: [] }));
           return;
         }
+        if (req.method === 'POST' && req.url === '/api/v1/runs/run-params-1/sessions/sess-1/inject') {
+          if (typeof body['prompt'] === 'string') injectedPrompts.push(body['prompt']);
+          res.end(JSON.stringify({ run_id: 'run-params-1', session_id: 'sess-1', accepted: true }));
+          return;
+        }
         if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-params-1')) {
-          const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.md', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 };
+          const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.md', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1 };
           if (req.url.includes('/events')) {
             res.end(JSON.stringify({ events: [], next_cursor: 'c', limit: 200 }));
           } else {
-            res.end(JSON.stringify({ run: record, sessions: [] }));
+            res.end(JSON.stringify({ run: record, sessions: [{ session_id: 'sess-1', role: 'executor', context: null, state: 'running', stop_reason: null, in_flight: false }] }));
           }
           return;
         }
@@ -60,6 +66,7 @@ test.describe('run configuration', () => {
 
   test.beforeEach(async () => {
     capturedBodies = [];
+    injectedPrompts = [];
     app = await electron.launch({
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
       env: { ...process.env, WORKBENCH_WORKSPACE: workspaceDir, OPSBOT_BASE_URL: opsbotUrl },
@@ -77,7 +84,7 @@ test.describe('run configuration', () => {
     if (app) await app.close();
   });
 
-  test('starts a run with the configured runtime, label, params and max parallel', async () => {
+  test('starts a run with the configured runtime, label, params, prompt and max parallel', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     await window.locator('.rail-item', { hasText: '运行' }).click();
@@ -88,6 +95,7 @@ test.describe('run configuration', () => {
     await rows.first().getByPlaceholder('键').fill('dataset');
     await rows.first().getByPlaceholder('值').fill('core');
     await window.getByLabel('最大并行数').fill('4');
+    await window.getByLabel('提示词').fill('先跑通核心测试，再补充文档');
     await window.getByRole('button', { name: '运行工作流' }).click();
     await expect(window.getByRole('option', { name: /release-check/ })).toBeVisible();
     await expect.poll(() => capturedBodies.length).toBe(1);
@@ -95,5 +103,7 @@ test.describe('run configuration', () => {
     expect(capturedBodies[0]['label']).toBe('release-check');
     expect(capturedBodies[0]['params']).toEqual({ dataset: 'core' });
     expect(capturedBodies[0]['max_parallel']).toBe(4);
+    await expect.poll(() => injectedPrompts.length).toBe(1);
+    expect(injectedPrompts[0]).toBe('先跑通核心测试，再补充文档');
   });
 });
