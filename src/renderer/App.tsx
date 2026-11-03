@@ -17,6 +17,7 @@ import { SettingsModal } from './components/SettingsModal';
 import type { FontId, ThemeId } from './components/SettingsModal';
 import { defaultFont, defaultTheme, fonts, migrateLegacyThemeId, themes } from './settings';
 import { messages, type LocaleId } from './i18n';
+import { workflowProgramIssues } from './workflowProgram';
 
 const client = new WorkbenchOpsbotClient();
 const DEFAULT_OPSBOT_URL = 'http://127.0.0.1:18600';
@@ -163,6 +164,11 @@ export default function App(): JSX.Element {
   const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
   const startRun = async (): Promise<void> => {
     setOpsbotError(undefined);
+    if (!workspace) { setOpsbotError('运行工作流需要先选择工作区'); return; }
+    if (!file) { setOpsbotError('没有打开的工作流文件'); return; }
+    const issues = workflowProgramIssues(content);
+    if (issues.error) { setOpsbotError(issues.error); return; }
+    await save();
     let created: Run;
     try {
       created = await client.createRun({ workflowId: file, workspacePath: workspace, content });

@@ -53,4 +53,14 @@ test.describe('workspace tree', () => {
     await window.locator('.file-entry', { hasText: 'workflow.md' }).click();
     await expect(window.locator('.frontmatter-warn')).toBeVisible();
   });
+
+  test('rejects running a file that is not a workflow program before calling opsbot', async () => {
+    await window.locator('.rail-item', { hasText: '工作台' }).click();
+    await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
+    // workflow.md has no front matter declaration, so starting a run must
+    // fail locally with the front matter message (opsbot is not even running).
+    await window.locator('.rail-item', { hasText: '运行' }).click();
+    await window.getByRole('button', { name: '运行工作流' }).click();
+    await expect(window.locator('.run-list-error')).toContainText('front matter');
+  });
 });

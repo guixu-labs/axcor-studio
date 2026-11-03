@@ -93,6 +93,9 @@ test.describe('opsbot runs', () => {
   test('reconnects when the opsbot URL is changed in settings', async () => {
     const defaultApp = await electron.launch({
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
+      // Point the app at an unreachable port so the boot-time list fails
+      // deterministically, independent of any opsbot running on the host.
+      env: { ...process.env, OPSBOT_BASE_URL: 'http://127.0.0.1:1' },
     });
     const defaultWindow = await defaultApp.firstWindow();
     await defaultWindow.waitForLoadState('domcontentloaded');
