@@ -30,6 +30,17 @@ interface MonacoEditorProps {
   messages: MonacoEditorMessages;
 }
 
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+  md: 'markdown', ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+  json: 'json', py: 'python', css: 'css', html: 'html', yml: 'yaml', yaml: 'yaml',
+  sh: 'shell', toml: 'ini', xml: 'xml',
+};
+
+function languageForFile(name: string): string {
+  const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
+  return LANGUAGE_BY_EXTENSION[extension] ?? 'plaintext';
+}
+
 function defineWorkbenchTheme(tokens: Record<string, string>, colorScheme: 'light' | 'dark'): void {
   monaco.editor.defineTheme('workbench', {
     base: colorScheme === 'dark' ? 'vs-dark' : 'vs',
@@ -67,7 +78,7 @@ export function MonacoEditor({ files, activeFile, content, onChange, onSelectFil
     if (!host.current) return;
     editor.current = monaco.editor.create(host.current, {
       value: content,
-      language: 'markdown',
+      language: languageForFile(activeFile),
       automaticLayout: true,
       fontFamily,
       fontSize: 13,
@@ -89,6 +100,12 @@ export function MonacoEditor({ files, activeFile, content, onChange, onSelectFil
   }, [content]);
 
   useEffect(() => {
+    const model = editor.current?.getModel();
+    if (!model) return;
+    monaco.editor.setModelLanguage(model, languageForFile(activeFile));
+  }, [activeFile]);
+
+  useEffect(() => {
     if (!editor.current) return;
     defineWorkbenchTheme(tokens, colorScheme);
   }, [colorScheme, tokens]);
@@ -97,7 +114,7 @@ export function MonacoEditor({ files, activeFile, content, onChange, onSelectFil
     editor.current?.updateOptions({ fontFamily });
   }, [fontFamily]);
 
-  const issues = workflowProgramIssues(content);
+  const issues = activeFile.endsWith('.md') ? workflowProgramIssues(content) : { error: undefined };
 
   return <section className="editor-pane">
     <div className="editor-tabs" role="tablist" aria-label="Open files">

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import started from 'electron-squirrel-startup';
 import {
   stopAllOpsbotPolls,
@@ -19,11 +20,12 @@ import {
   stopOpsbotRun,
 } from './opsbotHttp';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
+import { walkWorkspace } from './workspaceFiles';
 import type { CreateRunInput } from './shared/protocol';
 
 if (started) app.quit();
 
-let selectedWorkspace: string | undefined;
+let selectedWorkspace: string | undefined = process.env.WORKBENCH_WORKSPACE && existsSync(process.env.WORKBENCH_WORKSPACE) ? path.resolve(process.env.WORKBENCH_WORKSPACE) : undefined;
 
 const workspacePath = (filePath: string): string => {
   if (!selectedWorkspace) throw new Error('No workspace selected');
@@ -68,10 +70,10 @@ app.whenReady().then(() => {
     selectedWorkspace = result.canceled ? undefined : result.filePaths[0];
     return selectedWorkspace;
   });
-  ipcMain.handle('workspace:list-markdown', async () => {
+  ipcMain.handle('workspace:get', () => selectedWorkspace);
+  ipcMain.handle('workspace:list-tree', async () => {
     if (!selectedWorkspace) throw new Error('No workspace selected');
-    const entries = await fs.readdir(selectedWorkspace, { withFileTypes: true });
-    return entries.filter(entry => entry.isFile() && entry.name.endsWith('.md')).map(entry => entry.name);
+    return walkWorkspace(selectedWorkspace);
   });
   ipcMain.handle('workspace:read-file', (_event, fileName: string) => fs.readFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), 'utf8'));
   ipcMain.handle('workspace:write-file', (_event, fileName: string, content: string) => fs.writeFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), content, 'utf8'));

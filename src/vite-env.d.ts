@@ -6,9 +6,10 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 interface Window {
   workbench: {
     chooseWorkspace(): Promise<string | undefined>;
-    listMarkdownFiles(): Promise<string[]>;
-    readFile(fileName: string): Promise<string>;
-    writeFile(fileName: string, content: string): Promise<void>;
+    getWorkspace(): Promise<string | undefined>;
+    listTree(): Promise<import('./workspaceFiles').WorkspaceNode[]>;
+    readFile(filePath: string): Promise<string>;
+    writeFile(filePath: string, content: string): Promise<void>;
   };
   opsbot: {
     setBaseUrl(url: string): Promise<void>;

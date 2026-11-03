@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { WorkbenchOpsbotClient } from './services/opsbotClient';
 import type { Run, RunEvent } from '../shared/protocol';
 import { isTerminalRun } from '../shared/run';
+import type { WorkspaceNode } from '../workspaceFiles';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
 import { MonacoEditor } from './components/MonacoEditor';
@@ -22,7 +23,7 @@ const DEFAULT_OPSBOT_URL = 'http://127.0.0.1:18600';
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
-  const [files, setFiles] = useState(['workflow.md']);
+  const [tree, setTree] = useState<WorkspaceNode[]>([]);
   const [openFiles, setOpenFiles] = useState(() => loadWorkbenchState('workbench.openFiles', ['workflow.md']));
   const [file, setFile] = useState(() => loadWorkbenchState('workbench.activeFile', 'workflow.md'));
   const [contents, setContents] = useState<Record<string, string>>({ 'workflow.md': '# New workflow\n\nDescribe the workflow steps here.' });
@@ -61,7 +62,12 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
   useEffect(() => {
-    if (opsbotUrl) void window.opsbot.setBaseUrl(opsbotUrl);
+    void window.opsbot.setBaseUrl(opsbotUrl ?? '');
+    void window.workbench.getWorkspace().then(current => {
+      if (!current) return;
+      setWorkspace(current);
+      return loadWorkspaceTree();
+    }).catch(() => {});
     void client.listRuns()
       .then(setRuns)
       .catch((error: Error) => setOpsbotError(error.message));
@@ -128,19 +134,23 @@ export default function App(): JSX.Element {
   };
 
   const content = contents[file] ?? '';
-  const chooseWorkspace = async (): Promise<void> => {
-    const selected = await window.workbench.chooseWorkspace();
-    if (!selected) return;
-    const workspaceFiles = await window.workbench.listMarkdownFiles();
-    const initialFile = workspaceFiles[0] ?? 'workflow.md';
-    setWorkspace(selected);
-    setFiles(workspaceFiles.length ? workspaceFiles : ['workflow.md']);
-    setOpenFiles([initialFile]);
+  const loadWorkspaceTree = async (): Promise<void> => {
+    const workspaceTree = await window.workbench.listTree();
+    setTree(workspaceTree);
+    const firstMarkdown = workspaceTree.find(node => node.type === 'file' && node.name.endsWith('.md'));
+    const initialFile = firstMarkdown?.path ?? workspaceTree.find(node => node.type === 'file')?.path ?? '';
+    setOpenFiles(initialFile ? [initialFile] : []);
     setFile(initialFile);
-    if (workspaceFiles[0]) {
+    if (initialFile) {
       const initialContent = await window.workbench.readFile(initialFile);
       setContents(previous => ({ ...previous, [initialFile]: initialContent }));
     }
+  };
+  const chooseWorkspace = async (): Promise<void> => {
+    const selected = await window.workbench.chooseWorkspace();
+    if (!selected) return;
+    setWorkspace(selected);
+    await loadWorkspaceTree();
   };
   const selectFile = async (nextFile: string): Promise<void> => {
     setFile(nextFile);
@@ -217,7 +227,7 @@ export default function App(): JSX.Element {
       </header>
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
-      {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} messages={t} />}
+      {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} messages={t} />}
       {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>

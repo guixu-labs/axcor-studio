@@ -1,12 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CreateRunInput, Run, RunEvent } from './shared/protocol';
 import type { InsightImportResult, InsightStatusResult, OpsbotSession } from './shared/opsbotApi';
+import type { WorkspaceNode } from './workspaceFiles';
 
 contextBridge.exposeInMainWorld('workbench', {
   chooseWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke('workspace:choose'),
-  listMarkdownFiles: (): Promise<string[]> => ipcRenderer.invoke('workspace:list-markdown'),
-  readFile: (fileName: string): Promise<string> => ipcRenderer.invoke('workspace:read-file', fileName),
-  writeFile: (fileName: string, content: string): Promise<void> => ipcRenderer.invoke('workspace:write-file', fileName, content),
+  getWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke('workspace:get'),
+  listTree: (): Promise<WorkspaceNode[]> => ipcRenderer.invoke('workspace:list-tree'),
+  readFile: (filePath: string): Promise<string> => ipcRenderer.invoke('workspace:read-file', filePath),
+  writeFile: (filePath: string, content: string): Promise<void> => ipcRenderer.invoke('workspace:write-file', filePath, content),
 });
 
 contextBridge.exposeInMainWorld('opsbot', {

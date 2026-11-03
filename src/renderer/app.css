@@ -73,3 +73,7 @@ footer { margin: 0 6px 6px; }
 .sidebar-toggle-icon, .split-vertical-icon, .split-horizontal-icon { position: relative; display: block; width: 14px; height: 14px; border: 1.5px solid currentColor; border-radius: 2px; opacity: .9; }
 .sidebar-toggle-icon::after, .split-vertical-icon::after { position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: currentColor; content: ''; }
 .split-horizontal-icon::after { position: absolute; top: 6px; right: 0; left: 0; height: 1px; background: currentColor; content: ''; }
+.file-entry-dir { font-weight: 550; }
+.tree-arrow { display: inline-block; width: 14px; color: var(--muted); font-size: 10px; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-entry .tab-file-icon { display: inline-block; width: 18px; text-align: center; }
