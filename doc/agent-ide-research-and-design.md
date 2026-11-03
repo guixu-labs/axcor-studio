@@ -189,7 +189,7 @@ gates: [tests-pass, sift-compliance, human-approval]
 
 ### P0：一个可靠的本地闭环（第 1–4 周）
 
-- VS Code extension 或 Code-OSS shell；打开 workspace 后发现工作流包。
+- Electron 桌面壳（编辑器能力用 Monaco 组件组装）；打开 workspace 后发现工作流包。
 - Markdown workflow parser + front matter 校验。
 - Opsbot 作为执行后端，支持 Claude Code/OpenCode/Codex CLI 三种 adapter。
 - Run Plan、阶段时间线、暂停/继续/人工修改、diff 和测试结果。
@@ -260,7 +260,7 @@ gates: [tests-pass, sift-compliance, human-approval]
 2. 在 Insight 中增加 workflow、step、artifact、gate、policy 字段和统一事件导入。
 3. 在 Sift 中增加 workflow 级 gate schema，支持工作流声明与实际执行的逐条对账。
 4. 选一个真实任务族（例如算子生成或发布准备）做 20–30 个 baseline/shadow/control 样本。
-5. 做一个 VS Code extension vertical slice：发现 Markdown → 生成计划 → 运行 → 暂停/继续 → 查看证据 → Sift gate。
+5. 做一个桌面 App vertical slice：发现 Markdown → 生成计划 → 运行 → 暂停/继续 → 查看证据 → Sift gate。
 6. 用三类竞品做可用性对照：VS Code custom agent、Cursor Cloud Agent、Kiro Spec；比较“从意图到可审查交付”的步骤数、等待时间和证据完整度。
 
 ## 参考资料（官方文档）
@@ -276,18 +276,20 @@ gates: [tests-pass, sift-compliance, human-approval]
 - OpenAI Skills: https://developers.openai.com/plugins/concepts/skills
 - OpenAI Agents API: https://developers.openai.com/api/docs/guides/agents-api/overview
 
-## 13. 技术形态建议：Extension-first，Local service，Web control plane
+## 13. 技术形态决策：独立 IDE + 本地服务 + Web 控制面（2026-11-03 修订）
 
-推荐采用三层形态，而不是在 App、Web、VS Code 插件中三选一：
+> **决策记录（2026-11-03）**：本工具定位为**独立 IDE**——用户在做工作流时全程留在本工具内（写 workflow → 运行 → 审证据 → 改代码），不跳回 VS Code。编辑器能力路线选定 **B：自研壳 + 组件组装**（Electron + Monaco / xterm.js / LSP），**不 fork VS Code**（fork 的转向判据见文末）。本节其余内容为修订后的形态描述。
 
-1. **主工作台：VS Code Extension**
-   - 直接复用编辑器、文件树、Git、终端、Remote SSH、Dev Container 和 Worktree。
-   - Workflow Explorer、Markdown 编辑器、Run Control、Evidence Drawer 通过原生 View/Panel + Webview 实现。
-   - 先做 VS Code Extension，最快验证“工作流优先”的交互是否成立。
+采用三层形态：
+
+1. **主工作台：独立 Desktop App（当前路线）**
+   - 自研壳复用 VS Code 工作台边界（NavigationRail / Explorer / Editor Part / Panel，见 doc/vscode-workbench-adaptation.md）；编辑器能力用同源组件组装：**Monaco**（编辑、语法高亮、diff）、**xterm.js**（终端）、**monaco-languageclient**（LSP）。
+   - 不重造编辑器长尾：SCM 用 git CLI 封装、搜索用 ripgrep、调试器与扩展市场不在 MVP 范围，按需演进。
+   - 用户不跳回 VS Code；如需在外部编辑器打开文件，由本工具发深链，反向不成立。
 
 2. **执行后端：本地 companion service**
    - Opsbot、runtime adapters、Insight collector、Sift runner 运行在本地进程或 workspace-sidecar 中。
-   - Extension 只负责 UI 和命令编排，不把长任务状态放在 Extension Host 内。
+   - 桌面壳只负责 UI 和命令编排，不把长任务状态放在渲染层内。
    - 通过 localhost HTTP/SSE 或 WebSocket 通信，未来可把同一协议切到远程 worker。
 
 3. **远程控制面：Web**
@@ -298,31 +300,28 @@ gates: [tests-pass, sift-compliance, human-approval]
 
 | 形态 | 适合 | 优点 | 主要问题 | 建议 |
 |---|---|---|---|---|
-| VS Code Extension | 本地工作流编写和运行 | 文件、Git、终端、Remote、Worktree 都在同一上下文；用户迁移成本低 | 受 Extension API、发布和宿主生命周期约束 | **第一阶段首选** |
-| 独立 Desktop App | 多项目 Agent 控制中心、长期运行、强隔离 | 可控制 Electron/Code-OSS、后台进程和升级；可以做独立产品体验 | 需要重做编辑器、信任、Git、终端、远程开发等大量能力 | 第二阶段再考虑 |
+| VS Code Extension | 本地工作流编写和运行 | 文件、Git、终端、Remote、Worktree 都在同一上下文；用户迁移成本低 | 受 Extension API、发布和宿主生命周期约束；用户在 VS Code 内而非本工具内 | 暂不采用（产品定位要求全程留在本工具） |
+| 独立 Desktop App | IDE 定位的工作流控制台、长期运行、强隔离 | 可控制 Electron、后台进程和升级；产品体验自由；无上游同步负担 | 编辑器能力需组件组装（Monaco/xterm.js/LSP） | **当前路线（2026-11-03 定）** |
 | Web App | 云端运行、团队协作、手机审批、运行报表 | 部署和协作方便；天然适合远程 Worker | 本地文件、终端、凭据、Worktree 和网络权限受限 | 作为远程控制面 |
-
-VS Code 当前已经把 Agents window、远程工作区、Worktree 隔离和多会话管理做成平台能力，因此第一阶段直接利用其宿主能力比重新造一个 Desktop App 更划算。[Agents window](https://code.visualstudio.com/docs/agents/run/agents-window)、[Remote Development](https://code.visualstudio.com/docs/remote/remote-overview)
-
-VS Code Extension 的 Webview 足以承载定制的 Run Control 和 Evidence UI，Extension Host 可以访问工作区和远程环境；但长任务不应依赖 Extension Host 自身的生命周期，应由独立的本地服务保存状态和恢复运行。[Webviews](https://code.visualstudio.com/api/ux-guidelines/webviews)、[Extension Host](https://code.visualstudio.com/api/advanced-topics/extension-host)
 
 ### 推荐的技术栈
 
-- **Extension：** TypeScript + VS Code Extension API；React/Svelte 仅用于复杂 Webview，避免整个产品变成一个脱离 VS Code 的网页。
+- **Desktop shell：** Electron + React；编辑器能力组装 Monaco（编辑/语法高亮/diff）、xterm.js（终端）、monaco-languageclient（LSP），不 fork VS Code。
 - **Local service：** 复用 Opsbot 的 Python 核心；提供 Run API、事件流、状态恢复、权限和 artifact 引用。
 - **Event transport：** MVP 使用 HTTP + SSE；需要双向控制时增加 WebSocket。事件持久化由服务端负责，UI 断线后通过 `run_id` 重放。
 - **契约：** OpenAPI/JSON Schema 固化 Run、Step、Approval、Artifact、Event、Gate；不要让 UI 直接读取各 runtime 的私有日志。
 - **Persistence：** 本地 SQLite 保存运行元数据和事件索引，文件/日志/截图存 artifact directory；未来可替换为 Postgres + object storage。
-- **Remote：** 保持同一 Run API，把 local service 替换为 remote worker gateway；Web 和 Extension 都是客户端。
-- **Packaging：** `opsbot` 作为 CLI/服务包，Extension 作为独立 VSIX；两者通过版本化协议兼容，不把 Python runtime 打进前端 bundle。
+- **Remote：** 保持同一 Run API，把 local service 替换为 remote worker gateway；Web 和 Desktop App 都是客户端。
+- **Packaging：** `opsbot` 作为 CLI/服务包，Desktop App 作为独立 Electron 发行（自有更新渠道）；两者通过版本化协议兼容，不把 Python runtime 打进前端 bundle。
 
-### 什么时候值得做独立 App
+### 独立 App 的边界原则与 fork 转向判据（2026-11-03）
 
-只有在以下条件同时成立时再启动 Code-OSS/Electron 方案：
+独立 App 已定为当前路线，但边界是“Agent Control Center”型，不复制完整 VS Code：保留 Markdown/Workflow 编辑、Run Control、Evidence、Git 交付；编辑器能力以 Monaco 提供扎实的代码阅读 / diff 审查 / 就地修改，编辑器长尾功能（调试器、扩展市场）不在 MVP 范围。
 
-- 真实用户需要跨多个仓库同时管理十个以上长期 Run；
-- VS Code Agents window 的 session、权限或布局限制已经成为可量化瓶颈；
-- 本地服务和 Run API 已经稳定，能作为 App 的后端；
-- 需要自有更新渠道、企业策略、后台常驻和更强的隔离控制。
+**不 fork VS Code**（Cursor 路线被评估后否决）：本产品的差异化是工作流编排与证据链，不是 AI 原生编辑，fork 的最大收益（深入 text model / diff 引擎）用不上，而其上游同步成本（VS Code 每月发版，需专职 merge 团队）、扩展市场替换（Open VSX）、遥测/品牌/更新通道剥离均是负资产。以下条件**同时成立**时才重新评估 fork：
 
-届时建议做“Agent Control Center”型 App，而不是复制完整 VS Code：保留 Markdown/Workflow 编辑、Run Control、Evidence 和 Git 交付，把代码编辑继续交给 VS Code 或通过深链接回到 VS Code。
+- 产品验证后发现核心场景变成“AI 原生改代码”（补全、inline diff、多文件编辑成为主交互）；
+- 需要官方扩展市场或 VS Code 级调试/Remote 能力，且 Monaco 组装路径已被证明覆盖不了；
+- 团队规模足以承担上游同步。
+
+架构纪律保证该决策无沉没成本：**服务层与 UI 经协议解耦**（`shared/protocol.ts`、OpsbotClient、insight 服务调用均壳无关）。若未来转向 fork，运行控制面可整体迁入 VS Code 的 webview/panel，损失仅限于 React UI 层。
