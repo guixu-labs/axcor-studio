@@ -12,6 +12,8 @@ interface SettingsModalProps {
   onFontChange: (font: FontId) => void;
   locale: LocaleId;
   onLocaleChange: (locale: LocaleId) => void;
+  opsbotUrl: string;
+  onOpsbotUrlChange: (url: string) => void;
   messages: Messages;
   onClose: () => void;
 }
@@ -72,9 +74,31 @@ function SelectField({ title, description, icon, items, groupLabels, selected, d
   </div>;
 }
 
+interface InputFieldProps {
+  title: string;
+  description: string;
+  icon: string;
+  value: string;
+  ariaLabel: string;
+  onChange: (value: string) => void;
+}
+
+function InputField({ title, description, icon, value, ariaLabel, onChange }: InputFieldProps): JSX.Element {
+  return <div className="settings-field">
+    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
+    <div className="settings-field-main">
+      <div className="settings-field-title">{title}</div>
+      <p className="settings-field-description">{description}</p>
+      <div className="settings-field-control">
+        <input className="settings-input" type="text" value={value} aria-label={ariaLabel} spellCheck={false} onChange={event => onChange(event.target.value)} />
+      </div>
+    </div>
+  </div>;
+}
+
 const categories = ['appearance', 'general'] as const;
 
-export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, onClose, messages }: SettingsModalProps): JSX.Element {
+export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
   const categoryLabel = activeCategory === 'appearance' ? messages.appearance : messages.general;
   return <div className="settings-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -134,6 +158,14 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                 defaultId="zh-CN"
                 defaultBadge={messages.defaultBadge}
                 onSelect={value => onLocaleChange(value as LocaleId)}
+              />
+              <InputField
+                title={messages.opsbotUrl}
+                description={messages.opsbotUrlDescription}
+                icon="⇄"
+                value={opsbotUrl}
+                ariaLabel={messages.opsbotUrl}
+                onChange={onOpsbotUrlChange}
               />
             </div>}
         </div>

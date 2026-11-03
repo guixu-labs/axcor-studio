@@ -8,4 +8,12 @@ interface Window {
     readFile(fileName: string): Promise<string>;
     writeFile(fileName: string, content: string): Promise<void>;
   };
+  opsbot: {
+    setBaseUrl(url: string): Promise<void>;
+    startRun(input: import('./shared/protocol').CreateRunInput): Promise<import('./shared/protocol').Run>;
+    listRuns(): Promise<import('./shared/protocol').Run[]>;
+    getRun(runId: string): Promise<import('./shared/protocol').Run>;
+    cancelRun(runId: string): Promise<void>;
+    subscribeRunEvents(runId: string, listener: (event: import('./shared/protocol').RunEvent) => void): () => void;
+  };
 }

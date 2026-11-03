@@ -9,12 +9,13 @@ export interface RunsPanelMessages {
 interface RunsListProps {
   runs: Run[];
   selectedRunId?: string;
+  error?: string;
   onSelectRun: (runId: string) => void;
   onRun: () => void;
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, onSelectRun, onRun, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, messages }: RunsListProps): JSX.Element {
   return <aside className="runs-panel">
     <div className="explorer-heading"><div><span className="eyebrow">{messages.runs}</span><h2>{messages.executionCenter}</h2></div></div>
     <div className="run-list" role="listbox" aria-label={messages.executionCenter}>
@@ -30,6 +31,7 @@ export function RunsList({ runs, selectedRunId, onSelectRun, onRun, messages }: 
         <span className="run-entry-title">{run.workflowId}</span>
         <small>{new Date(run.createdAt).toLocaleTimeString()}</small>
       </button>) : <div className="run-list-empty"><strong>{messages.noRuns}</strong><p>{messages.runToSeeEvents}</p></div>}
+      {error && <p className="run-list-error" role="alert">{error}</p>}
     </div>
     <button className="run-action" type="button" onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
   </aside>;

@@ -2,6 +2,19 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import started from 'electron-squirrel-startup';
+import {
+  stopAllOpsbotPolls,
+  subscribeOpsbotEvents,
+  unsubscribeOpsbotEvents,
+} from './opsbotClient';
+import {
+  getOpsbotRun,
+  listOpsbotRuns,
+  setOpsbotBaseUrl,
+  startOpsbotRun,
+  stopOpsbotRun,
+} from './opsbotHttp';
+import type { CreateRunInput } from './shared/protocol';
 
 if (started) app.quit();
 
@@ -56,8 +69,18 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('workspace:read-file', (_event, fileName: string) => fs.readFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), 'utf8'));
   ipcMain.handle('workspace:write-file', (_event, fileName: string, content: string) => fs.writeFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), content, 'utf8'));
+  ipcMain.handle('opsbot:start-run', (_event, input: CreateRunInput) => startOpsbotRun(input));
+  ipcMain.handle('opsbot:list-runs', () => listOpsbotRuns());
+  ipcMain.handle('opsbot:get-run', (_event, runId: string) => getOpsbotRun(runId));
+  ipcMain.handle('opsbot:cancel-run', (_event, runId: string) => stopOpsbotRun(runId));
+  ipcMain.handle('opsbot:set-base-url', (_event, url: string) => { setOpsbotBaseUrl(url); });
+  ipcMain.on('opsbot:subscribe-events', (_event, runId: string) => subscribeOpsbotEvents(runId));
+  ipcMain.on('opsbot:unsubscribe-events', (_event, runId: string) => unsubscribeOpsbotEvents(runId));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => {
+  stopAllOpsbotPolls();
+  if (process.platform !== 'darwin') app.quit();
+});

@@ -1,5 +1,14 @@
 import type { Artifact, CreateRunInput, OpsbotClient, Run, RunEvent } from '../../shared/protocol';
 
+export class WorkbenchOpsbotClient implements OpsbotClient {
+  createRun(input: CreateRunInput): Promise<Run> { return window.opsbot.startRun(input); }
+  getRun(runId: string): Promise<Run> { return window.opsbot.getRun(runId); }
+  cancelRun(runId: string): Promise<void> { return window.opsbot.cancelRun(runId); }
+  subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void { return window.opsbot.subscribeRunEvents(runId, listener); }
+  async listRuns(): Promise<Run[]> { return window.opsbot.listRuns(); }
+  async listArtifacts(): Promise<Artifact[]> { return []; }
+}
+
 export class MockOpsbotClient implements OpsbotClient {
   private readonly runs = new Map<string, Run>();
   private readonly listeners = new Map<string, Set<(event: RunEvent) => void>>();
@@ -15,6 +24,7 @@ export class MockOpsbotClient implements OpsbotClient {
   }
 
   async getRun(runId: string): Promise<Run> { const run = this.runs.get(runId); if (!run) throw new Error(`Unknown run: ${runId}`); return run; }
+  async listRuns(): Promise<Run[]> { return [...this.runs.values()]; }
   async cancelRun(runId: string): Promise<void> { this.advance(runId, 'cancelled', 'run.cancelled'); }
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void { const listeners = this.listeners.get(runId) ?? new Set(); listeners.add(listener); this.listeners.set(runId, listeners); return () => listeners.delete(listener); }
   async listArtifacts(runId: string): Promise<Artifact[]> { return [{ id: `artifact_${runId}`, runId, type: 'log', name: 'mock-run.log' }]; }

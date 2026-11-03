@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MockOpsbotClient } from './services/opsbotClient';
+import { WorkbenchOpsbotClient } from './services/opsbotClient';
 import type { Run, RunEvent } from '../shared/protocol';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
@@ -16,7 +16,8 @@ import type { FontId, ThemeId } from './components/SettingsModal';
 import { defaultFont, defaultTheme, fonts, themes } from './settings';
 import { messages, type LocaleId } from './i18n';
 
-const client = new MockOpsbotClient();
+const client = new WorkbenchOpsbotClient();
+const DEFAULT_OPSBOT_URL = 'http://127.0.0.1:18600';
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
@@ -36,6 +37,9 @@ export default function App(): JSX.Element {
   const [theme, setTheme] = useState<ThemeId>(() => loadWorkbenchState('workbench.theme', defaultTheme.id));
   const [font, setFont] = useState<FontId>(() => loadWorkbenchState('workbench.font', defaultFont.id));
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
+  const [opsbotUrl, setOpsbotUrl] = useState<string | undefined>(() => loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
+  const [opsbotError, setOpsbotError] = useState<string>();
+  const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
   const t = messages[locale];
   const services = useRef(createWorkbenchServices()).current;
   const commands = services.get(WorkbenchCommandService);
@@ -47,6 +51,19 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.theme', theme), [theme]);
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
+  useEffect(() => {
+    if (opsbotUrl) void window.opsbot.setBaseUrl(opsbotUrl);
+    void client.listRuns()
+      .then(setRuns)
+      .catch((error: Error) => setOpsbotError(error.message));
+  }, []);
+  useEffect(() => {
+    if (!selectedRunId) return;
+    return client.subscribeRunEvents(selectedRunId, event => {
+      setEventsByRun(previous => ({ ...previous, [selectedRunId]: [...(previous[selectedRunId] ?? []), event] }));
+      void client.getRun(selectedRunId).then(latest => setRuns(previous => previous.map(item => item.id === latest.id ? latest : item)));
+    });
+  }, [selectedRunId]);
   useEffect(() => {
     const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
     const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
@@ -94,16 +111,19 @@ export default function App(): JSX.Element {
   };
   const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
   const startRun = async (): Promise<void> => {
-    const created = await client.createRun({ workflowId: file, workspacePath: workspace, content });
+    setOpsbotError(undefined);
+    let created: Run;
+    try {
+      created = await client.createRun({ workflowId: file, workspacePath: workspace, content });
+    } catch (error) {
+      setOpsbotError(error instanceof Error ? error.message : String(error));
+      return;
+    }
     setRuns(previous => [created, ...previous]);
     setSelectedRunId(created.id);
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
-    client.subscribeRunEvents(created.id, event => {
-      setEventsByRun(previous => ({ ...previous, [created.id]: [...(previous[created.id] ?? []), event] }));
-      void client.getRun(created.id).then(latest => setRuns(previous => previous.map(item => item.id === latest.id ? latest : item)));
-    });
   };
   const closeFile = (closedFile: string): void => {
     if (openFiles.length === 1) return;
@@ -113,7 +133,12 @@ export default function App(): JSX.Element {
   };
   const cancelRun = async (): Promise<void> => {
     if (!selectedRun) return;
-    await client.cancelRun(selectedRun.id);
+    try {
+      await client.cancelRun(selectedRun.id);
+    } catch (error) {
+      setOpsbotError(error instanceof Error ? error.message : String(error));
+      return;
+    }
     const latest = await client.getRun(selectedRun.id);
     setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
   };
@@ -137,7 +162,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer files={files} activeFile={file} onSelect={selectFile} onSave={save} onRun={startRun} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} onRun={startRun} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content">
@@ -156,6 +181,6 @@ export default function App(): JSX.Element {
       </div>
     </div>
     <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></footer>
-    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
+    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} opsbotUrl={effectiveOpsbotUrl} onOpsbotUrlChange={url => { setOpsbotUrl(url); saveWorkbenchState('workbench.opsbotUrl', url); void window.opsbot.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setOpsbotError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
   </main>;
 }

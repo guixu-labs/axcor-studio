@@ -26,7 +26,7 @@ export interface CreateRunInput {
 export interface RunEvent {
   id: string;
   runId: string;
-  type: RunEventType;
+  type: string;
   timestamp: string;
   stepId?: string;
   payload: unknown;
@@ -42,6 +42,7 @@ export interface Artifact {
 
 export interface OpsbotClient {
   createRun(input: CreateRunInput): Promise<Run>;
+  listRuns(): Promise<Run[]>;
   getRun(runId: string): Promise<Run>;
   cancelRun(runId: string): Promise<void>;
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void;
