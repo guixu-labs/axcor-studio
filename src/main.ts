@@ -9,11 +9,16 @@ import {
 } from './opsbotClient';
 import {
   getOpsbotRun,
+  getOpsbotRunSessions,
+  getInsightStatus,
+  getOpsbotBaseUrl,
+  importOpsbotSessionToInsight,
   listOpsbotRuns,
   setOpsbotBaseUrl,
   startOpsbotRun,
   stopOpsbotRun,
 } from './opsbotHttp';
+import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
 import type { CreateRunInput } from './shared/protocol';
 
 if (started) app.quit();
@@ -48,6 +53,7 @@ const createWindow = (): void => {
   } else {
     void window.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
+  attachInsightViewTo(window);
   window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     console.error(`[renderer] failed to load ${validatedURL}: ${errorCode} ${errorDescription}`);
   });
@@ -74,6 +80,13 @@ app.whenReady().then(() => {
   ipcMain.handle('opsbot:get-run', (_event, runId: string) => getOpsbotRun(runId));
   ipcMain.handle('opsbot:cancel-run', (_event, runId: string) => stopOpsbotRun(runId));
   ipcMain.handle('opsbot:set-base-url', (_event, url: string) => { setOpsbotBaseUrl(url); });
+  ipcMain.handle('opsbot:get-base-url', () => getOpsbotBaseUrl());
+  ipcMain.handle('opsbot:get-run-sessions', (_event, runId: string) => getOpsbotRunSessions(runId));
+  ipcMain.handle('opsbot:import-to-insight', (_event, sessionId: string) => importOpsbotSessionToInsight(sessionId));
+  ipcMain.handle('opsbot:insight-status', () => getInsightStatus());
+  ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => { showInsight(path, bounds, isDark); });
+  ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => { updateInsightBounds(bounds); });
+  ipcMain.handle('insight:hide', () => { hideInsight(); });
   ipcMain.on('opsbot:subscribe-events', (_event, runId: string) => subscribeOpsbotEvents(runId));
   ipcMain.on('opsbot:unsubscribe-events', (_event, runId: string) => unsubscribeOpsbotEvents(runId));
   createWindow();

@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
+  getInsightStatus,
   getOpsbotRun,
+  getOpsbotRunSessions,
+  importOpsbotSessionToInsight,
   listOpsbotRuns,
   setOpsbotBaseUrl,
   startOpsbotRun,
@@ -40,7 +43,20 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/runs/run-1') {
-        res.end(JSON.stringify({ run: { run_id: 'run-1', kind: 'workflow', format: 'markdown', status: 'running', program_ref: 'workflow.md', params: {}, label: 'workflow.md', work_dir: '/tmp/ws', max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1 }, sessions: [] }));
+        res.end(JSON.stringify({ run: { run_id: 'run-1', kind: 'workflow', format: 'markdown', status: 'running', program_ref: 'workflow.md', params: {}, label: 'workflow.md', work_dir: '/tmp/ws', max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1 }, sessions: [{ session_id: 'sess-1', role: 'executor', context: null, state: 'running', stop_reason: null, in_flight: true }] }));
+        return;
+      }
+      if (req.method === 'POST' && req.url?.startsWith('/api/v1/insight/import')) {
+        const sessionId = new URL(req.url, 'http://x').searchParams.get('session_id');
+        if (sessionId === 'sess-missing') {
+          res.end(JSON.stringify({ ok: false, error: 'Cannot connect to cannbot-insight at localhost:21025' }));
+          return;
+        }
+        res.end(JSON.stringify({ ok: true, sessionId, insightUrl: `/insight/session/${sessionId}`, imported: true }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/insight/status') {
+        res.end(JSON.stringify({ running: true, port: 21025 }));
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/stop') {
@@ -106,6 +122,32 @@ test('opsbot http client', async t => {
   await t.test('stopOpsbotRun posts stop and refreshes', async () => {
     await stopOpsbotRun('run-1');
     assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/stop'));
+  });
+
+  await t.test('getOpsbotRunSessions returns the run members', async () => {
+    const sessions = await getOpsbotRunSessions('run-1');
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0].session_id, 'sess-1');
+    assert.equal(sessions[0].role, 'executor');
+  });
+
+  await t.test('importOpsbotSessionToInsight posts the import and maps the result', async () => {
+    const result = await importOpsbotSessionToInsight('sess-1');
+    assert.equal(result.ok, true);
+    assert.equal(result.insightUrl, '/insight/session/sess-1');
+    assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url?.startsWith('/api/v1/insight/import?session_id=sess-1')));
+  });
+
+  await t.test('importOpsbotSessionToInsight surfaces service-level errors', async () => {
+    const result = await importOpsbotSessionToInsight('sess-missing');
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? '', /Cannot connect/);
+  });
+
+  await t.test('getInsightStatus reports the insight port', async () => {
+    const status = await getInsightStatus();
+    assert.equal(status.running, true);
+    assert.equal(status.port, 21025);
   });
 
   await t.test('404 surfaces the opsbot detail message', async () => {

@@ -1,11 +1,11 @@
 interface NavigationRailProps {
   active: string;
   onSelect: (item: string) => void;
-  messages: { workbench: string; runs: string; settings: string };
+  messages: { workbench: string; runs: string; settings: string; insight: string };
 }
 
 export function NavigationRail({ active, onSelect, messages }: NavigationRailProps): JSX.Element {
-  const localizedItems = [{ id: 'workbench', label: messages.workbench, icon: '⌘' }, { id: 'runs', label: messages.runs, icon: '▶' }];
+  const localizedItems = [{ id: 'workbench', label: messages.workbench, icon: '⌘' }, { id: 'runs', label: messages.runs, icon: '▶' }, { id: 'insight', label: messages.insight, icon: '◉' }];
   return <nav className="navigation-rail" aria-label={messages.workbench}>
     <div className="rail-items">
       {localizedItems.map(item => <button

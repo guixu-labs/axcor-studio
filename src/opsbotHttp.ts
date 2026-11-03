@@ -3,8 +3,11 @@ import type { CreateRunInput, Run } from './shared/protocol';
 import {
   mapRun,
   OpsbotApiError,
+  type InsightImportResult,
+  type InsightStatusResult,
   type OpsbotRunDetailResponse,
   type OpsbotRunListResponse,
+  type OpsbotSession,
   type OpsbotStartRunResponse,
 } from './shared/opsbotApi';
 
@@ -74,4 +77,18 @@ export async function getOpsbotRun(runId: string): Promise<Run> {
 export async function stopOpsbotRun(runId: string): Promise<Run> {
   await opsbotRequest<{ run_id: string; status: string; accepted: boolean }>('POST', `/api/v1/runs/${encodeURIComponent(runId)}/stop`);
   return getOpsbotRun(runId);
+}
+
+export async function getOpsbotRunSessions(runId: string): Promise<OpsbotSession[]> {
+  const response = await opsbotRequest<OpsbotRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
+  return response.sessions;
+}
+
+export async function importOpsbotSessionToInsight(sessionId: string): Promise<InsightImportResult> {
+  const result = await opsbotRequest<InsightImportResult>('POST', `/api/v1/insight/import?session_id=${encodeURIComponent(sessionId)}`);
+  return result.ok ? result : { ...result, ok: false };
+}
+
+export async function getInsightStatus(): Promise<InsightStatusResult> {
+  return opsbotRequest<InsightStatusResult>('GET', '/api/v1/insight/status');
 }

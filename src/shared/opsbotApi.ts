@@ -32,7 +32,29 @@ export interface OpsbotRunListResponse {
 
 export interface OpsbotRunDetailResponse {
   run: OpsbotRun;
-  sessions: unknown[];
+  sessions: OpsbotSession[];
+}
+
+export interface OpsbotSession {
+  session_id: string;
+  role: string;
+  context: string | null;
+  state: string;
+  stop_reason: string | null;
+  in_flight: boolean;
+}
+
+export interface InsightImportResult {
+  ok: boolean;
+  sessionId?: string;
+  insightUrl?: string;
+  imported?: boolean;
+  error?: string;
+}
+
+export interface InsightStatusResult {
+  running: boolean;
+  port: number;
 }
 
 export interface OpsbotStartRunResponse {

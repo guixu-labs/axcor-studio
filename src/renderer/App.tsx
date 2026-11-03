@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchOpsbotClient } from './services/opsbotClient';
 import type { Run, RunEvent } from '../shared/protocol';
+import { isTerminalRun } from '../shared/run';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
 import { MonacoEditor } from './components/MonacoEditor';
@@ -39,7 +40,11 @@ export default function App(): JSX.Element {
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
   const [opsbotUrl, setOpsbotUrl] = useState<string | undefined>(() => loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
   const [opsbotError, setOpsbotError] = useState<string>();
+  const [insightPath, setInsightPath] = useState('/insight/');
+  const [insightFailed, setInsightFailed] = useState(false);
   const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
+  const appContent = useRef<HTMLDivElement>(null);
+  const importedToInsight = useRef(new Set<string>());
   const t = messages[locale];
   const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
   const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
@@ -63,9 +68,35 @@ export default function App(): JSX.Element {
     if (!selectedRunId) return;
     return client.subscribeRunEvents(selectedRunId, event => {
       setEventsByRun(previous => ({ ...previous, [selectedRunId]: [...(previous[selectedRunId] ?? []), event] }));
-      void client.getRun(selectedRunId).then(latest => setRuns(previous => previous.map(item => item.id === latest.id ? latest : item)));
+      void client.getRun(selectedRunId).then(async latest => {
+        setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
+        if (isTerminalRun(latest) && !importedToInsight.current.has(latest.id)) {
+          importedToInsight.current.add(latest.id);
+          try {
+            const sessions = await window.opsbot.getRunSessions(latest.id);
+            for (const session of sessions) await window.opsbot.importToInsight(session.session_id);
+          } catch {
+            // Observability import is best-effort; the run view stays usable.
+          }
+        }
+      });
     });
   }, [selectedRunId]);
+  useEffect(() => {
+    if (activeNavigation !== 'insight') { void window.insight.hide(); return; }
+    setInsightFailed(false);
+    const node = appContent.current;
+    if (!node) return;
+    const push = (): void => {
+      const rect = node.getBoundingClientRect();
+      void window.insight.show(insightPath, { x: rect.left, y: rect.top, width: rect.width, height: rect.height }, selectedTheme.colorScheme === 'dark');
+    };
+    push();
+    const observer = new ResizeObserver(push);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [activeNavigation, insightPath, selectedTheme.colorScheme]);
+  useEffect(() => window.insight.onLoadFailed(() => setInsightFailed(true)), []);
   useEffect(() => {
     Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
     document.documentElement.style.setProperty('--app-font', selectedFont.family);
@@ -82,7 +113,11 @@ export default function App(): JSX.Element {
     commands.execute('workbench.splitEditor');
   };
   const navigate = (item: string): void => {
-    commands.register('workbench.navigate', () => { if (item === 'settings') { setSettingsOpen(true); return; } setActiveNavigation(item); });
+    commands.register('workbench.navigate', () => {
+      if (item === 'settings') { setSettingsOpen(true); return; }
+      if (item === 'insight') { setInsightPath('/insight/'); setInsightFailed(false); }
+      setActiveNavigation(item);
+    });
     commands.execute('workbench.navigate');
   };
 
@@ -142,6 +177,21 @@ export default function App(): JSX.Element {
     const latest = await client.getRun(selectedRun.id);
     setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
   };
+  const openInsightForRun = async (): Promise<void> => {
+    if (!selectedRun) return;
+    setOpsbotError(undefined);
+    try {
+      const sessions = await window.opsbot.getRunSessions(selectedRun.id);
+      const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
+      if (!target) { setOpsbotError(t.noObservableSessions); return; }
+      const result = await window.opsbot.importToInsight(target.session_id);
+      if (!result.ok) { setOpsbotError(result.error ?? t.insightLoadFailed); return; }
+      setInsightPath('/insight/session/' + encodeURIComponent(target.session_id));
+      setActiveNavigation('insight');
+    } catch (error) {
+      setOpsbotError(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   const showSidebar = layout.sidebarVisible && (activeNavigation === 'workbench' || activeNavigation === 'runs');
   const leftWorkbenchWidth = (showSidebar ? 52 + explorerWidth + 4 : 52) + 6;
@@ -165,7 +215,7 @@ export default function App(): JSX.Element {
       {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
-    <div className="app-content">
+    <div className="app-content" ref={appContent}>
       <div className="workbench-body">
         <div className="workbench-main" style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
           {activeNavigation === 'workbench' && <section className="workspace-grid">
@@ -175,8 +225,9 @@ export default function App(): JSX.Element {
             </div>
           </section>}
           {activeNavigation === 'runs' && (selectedRun
-            ? <section className="single-panel"><RunDetail run={selectedRun} events={selectedEvents} onCancel={cancelRun} messages={t} /></section>
+            ? <section className="single-panel"><RunDetail run={selectedRun} events={selectedEvents} onCancel={cancelRun} onOpenInsight={openInsightForRun} messages={t} /></section>
             : <section className="single-panel"><section className="run-detail"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></section></section>)}
+          {activeNavigation === 'insight' && <section className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
         </div>
       </div>
     </div>
