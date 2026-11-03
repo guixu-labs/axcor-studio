@@ -14,7 +14,7 @@ import { loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
 import { createWorkbenchServices, WorkbenchCommandService } from './workbench/services';
 import { SettingsModal } from './components/SettingsModal';
 import type { FontId, ThemeId } from './components/SettingsModal';
-import { defaultFont, defaultTheme, fonts, themes } from './settings';
+import { defaultFont, defaultTheme, fonts, migrateLegacyThemeId, themes } from './settings';
 import { messages, type LocaleId } from './i18n';
 
 const client = new WorkbenchOpsbotClient();
@@ -35,9 +35,11 @@ export default function App(): JSX.Element {
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [theme, setTheme] = useState<ThemeId>(() => loadWorkbenchState('workbench.theme', defaultTheme.id));
+  const [theme, setTheme] = useState<ThemeId>(() => migrateLegacyThemeId(loadWorkbenchState('workbench.theme', defaultTheme.id)));
   const [font, setFont] = useState<FontId>(() => loadWorkbenchState('workbench.font', defaultFont.id));
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
+  const [backgroundImage, setBackgroundImage] = useState(() => loadWorkbenchState('workbench.backgroundImage', ''));
+  const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
   const [opsbotUrl, setOpsbotUrl] = useState<string | undefined>(() => loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
   const [opsbotError, setOpsbotError] = useState<string>();
   const [insightPath, setInsightPath] = useState('/insight/');
@@ -101,7 +103,11 @@ export default function App(): JSX.Element {
     Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
     document.documentElement.style.setProperty('--app-font', selectedFont.family);
     document.documentElement.style.setProperty('color-scheme', selectedTheme.colorScheme);
-  }, [selectedFont, selectedTheme]);
+    document.documentElement.style.setProperty('--empty-background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');
+    document.documentElement.style.setProperty('--empty-background-size', backgroundFit);
+  }, [backgroundFit, backgroundImage, selectedFont, selectedTheme]);
+  useEffect(() => saveWorkbenchState('workbench.backgroundImage', backgroundImage), [backgroundImage]);
+  useEffect(() => saveWorkbenchState('workbench.backgroundFit', backgroundFit), [backgroundFit]);
   const splitEditor = (direction: 'none' | 'horizontal' | 'vertical'): void => {
     commands.register('workbench.splitEditor', () => {
       if (direction === 'none') {
@@ -226,12 +232,12 @@ export default function App(): JSX.Element {
           </section>}
           {activeNavigation === 'runs' && (selectedRun
             ? <section className="single-panel"><RunDetail run={selectedRun} events={selectedEvents} onCancel={cancelRun} onOpenInsight={openInsightForRun} messages={t} /></section>
-            : <section className="single-panel"><section className="run-detail"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></section></section>)}
+            : <section className="single-panel"><section className="run-detail run-empty-bg"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></section></section>)}
           {activeNavigation === 'insight' && <section className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
         </div>
       </div>
     </div>
     <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></footer>
-    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} opsbotUrl={effectiveOpsbotUrl} onOpsbotUrlChange={url => { setOpsbotUrl(url); saveWorkbenchState('workbench.opsbotUrl', url); void window.opsbot.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setOpsbotError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
+    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} opsbotUrl={effectiveOpsbotUrl} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onOpsbotUrlChange={url => { setOpsbotUrl(url); saveWorkbenchState('workbench.opsbotUrl', url); void window.opsbot.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setOpsbotError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
   </main>;
 }

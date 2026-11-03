@@ -14,8 +14,54 @@ interface SettingsModalProps {
   onLocaleChange: (locale: LocaleId) => void;
   opsbotUrl: string;
   onOpsbotUrlChange: (url: string) => void;
+  backgroundImage: string;
+  backgroundFit: 'cover' | 'contain';
+  onBackgroundImageChange: (dataUrl: string) => void;
+  onBackgroundFitChange: (fit: 'cover' | 'contain') => void;
   messages: Messages;
   onClose: () => void;
+}
+
+const MAX_BACKGROUND_IMAGE_BYTES = 3 * 1024 * 1024;
+
+interface BackgroundImageFieldProps {
+  title: string;
+  description: string;
+  icon: string;
+  hasImage: boolean;
+  chooseLabel: string;
+  removeLabel: string;
+  onChange: (dataUrl: string) => void;
+}
+
+function BackgroundImageField({ title, description, icon, hasImage, chooseLabel, removeLabel, onChange }: BackgroundImageFieldProps): JSX.Element {
+  const input = useRef<HTMLInputElement>(null);
+  return <div className="settings-field">
+    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
+    <div className="settings-field-main">
+      <div className="settings-field-title">{title}</div>
+      <p className="settings-field-description">{description}</p>
+      <div className="settings-field-control">
+        <input
+          ref={input}
+          className="settings-file-input"
+          type="file"
+          accept="image/*"
+          aria-label={title}
+          onChange={event => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file || file.size > MAX_BACKGROUND_IMAGE_BYTES) return;
+            const reader = new FileReader();
+            reader.onload = () => { if (typeof reader.result === 'string') onChange(reader.result); };
+            reader.readAsDataURL(file);
+          }}
+        />
+        <button className="settings-image-button" type="button" onClick={() => input.current?.click()}>{chooseLabel}</button>
+        {hasImage && <button className="settings-image-button" type="button" onClick={() => onChange('')}>{removeLabel}</button>}
+      </div>
+    </div>
+  </div>;
 }
 
 interface SelectFieldProps {
@@ -98,7 +144,7 @@ function InputField({ title, description, icon, value, ariaLabel, onChange }: In
 
 const categories = ['appearance', 'general'] as const;
 
-export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, onClose, messages }: SettingsModalProps): JSX.Element {
+export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
   const categoryLabel = activeCategory === 'appearance' ? messages.appearance : messages.general;
   return <div className="settings-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -146,6 +192,25 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                 defaultId={defaultFont.id}
                 defaultBadge={messages.defaultBadge}
                 onSelect={onFontChange}
+              />
+              <BackgroundImageField
+                title={messages.backgroundImage}
+                description={messages.backgroundImageDescription}
+                icon="▧"
+                hasImage={backgroundImage !== ''}
+                chooseLabel={messages.chooseImage}
+                removeLabel={messages.removeImage}
+                onChange={onBackgroundImageChange}
+              />
+              <SelectField
+                title={messages.backgroundFit}
+                description={messages.backgroundFitDescription}
+                icon="⇱"
+                items={[{ id: 'cover', label: messages.fitCover }, { id: 'contain', label: messages.fitContain }]}
+                selected={backgroundFit}
+                defaultId="cover"
+                defaultBadge={messages.defaultBadge}
+                onSelect={value => onBackgroundFitChange(value as 'cover' | 'contain')}
               />
             </div>
             : <div className="settings-fields">

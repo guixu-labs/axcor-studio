@@ -66,3 +66,7 @@ footer { margin: 0 6px 6px; }
 .insight-pane { display: grid; place-items: center; align-content: center; gap: 8px; width: 100%; height: 100%; padding: 24px; background: var(--surface-0); color: var(--muted); }
 .insight-pane strong { color: var(--text); font-size: 13px; }
 .insight-pane p { margin: 0; max-width: 420px; font-size: 12px; text-align: center; }
+.run-empty-bg { background-image: var(--empty-background-image); background-size: var(--empty-background-size); background-position: center; background-repeat: no-repeat; }
+.settings-file-input { display: none; }
+.settings-image-button { min-height: 32px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-3); color: var(--text); font-size: 11px; }
+.settings-image-button:hover { border-color: var(--accent); }
