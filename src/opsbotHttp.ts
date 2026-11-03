@@ -56,11 +56,14 @@ export async function startOpsbotRun(input: CreateRunInput): Promise<Run> {
     throw new OpsbotApiError(422, '运行工作流需要先选择工作区');
   }
   const programPath = path.join(input.workspacePath, input.workflowId);
-  const started = await opsbotRequest<OpsbotStartRunResponse>('POST', '/api/v1/runs', {
+  const body: Record<string, unknown> = {
     program_path: programPath,
     work_dir: input.workspacePath,
-    ...(input.workflowId ? { label: input.workflowId } : {}),
-  });
+  };
+  if (input.label) body.label = input.label;
+  if (input.params && Object.keys(input.params).length > 0) body.params = input.params;
+  if (input.maxParallel !== undefined) body.max_parallel = input.maxParallel;
+  const started = await opsbotRequest<OpsbotStartRunResponse>('POST', '/api/v1/runs', body);
   return getOpsbotRun(started.run_id);
 }
 

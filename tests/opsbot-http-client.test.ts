@@ -87,20 +87,30 @@ test('opsbot http client', async t => {
   t.after(() => fixture.server.close());
 
   await t.test('startOpsbotRun posts the workflow payload and maps the run', async () => {
-    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf' });
+    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot' });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs');
     assert.ok(post);
     assert.equal(post.body.program_path, '/tmp/ws/workflow.md');
     assert.equal(post.body.work_dir, '/tmp/ws');
-    assert.equal(post.body.label, 'workflow.md');
+    assert.equal(post.body.label, undefined);
     assert.equal(run.id, 'run-1');
     assert.equal(run.status, 'running');
     assert.equal(run.workflowId, 'workflow.md');
   });
 
+  await t.test('startOpsbotRun passes label, params and max_parallel when provided', async () => {
+    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot', label: 'release-check', params: { dataset: 'core', mode: 'fast' }, maxParallel: 4 });
+    const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
+    assert.ok(post);
+    assert.equal(post.body.label, 'release-check');
+    assert.deepEqual(post.body.params, { dataset: 'core', mode: 'fast' });
+    assert.equal(post.body.max_parallel, 4);
+    assert.equal(run.id, 'run-1');
+  });
+
   await t.test('startOpsbotRun refuses without a workspace', async () => {
     await assert.rejects(
-      () => startOpsbotRun({ workflowId: 'workflow.md' }),
+      () => startOpsbotRun({ workflowId: 'workflow.md', runtime: 'opsbot' }),
       (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 422,
     );
   });

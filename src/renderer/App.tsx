@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchOpsbotClient } from './services/opsbotClient';
-import type { Run, RunEvent } from '../shared/protocol';
+import type { Run, RunEvent, RuntimeId } from '../shared/protocol';
 import { isTerminalRun } from '../shared/run';
+import type { RunParamsRow } from './components/RunsPanel';
 import type { WorkspaceNode } from '../workspaceFiles';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
@@ -44,6 +45,10 @@ export default function App(): JSX.Element {
   const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
   const [opsbotUrl, setOpsbotUrl] = useState<string | undefined>(() => loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
   const [opsbotError, setOpsbotError] = useState<string>();
+  const [runtime, setRuntime] = useState<RuntimeId>(() => loadWorkbenchState<RuntimeId>('workbench.runtime', 'opsbot'));
+  const [runLabel, setRunLabel] = useState('');
+  const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
+  const [maxParallel, setMaxParallel] = useState('');
   const [insightPath, setInsightPath] = useState('/insight/');
   const [insightFailed, setInsightFailed] = useState(false);
   const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
@@ -115,6 +120,7 @@ export default function App(): JSX.Element {
   }, [backgroundFit, backgroundImage, selectedFont, selectedTheme]);
   useEffect(() => saveWorkbenchState('workbench.backgroundImage', backgroundImage), [backgroundImage]);
   useEffect(() => saveWorkbenchState('workbench.backgroundFit', backgroundFit), [backgroundFit]);
+  useEffect(() => saveWorkbenchState('workbench.runtime', runtime), [runtime]);
   const splitEditor = (direction: 'none' | 'horizontal' | 'vertical'): void => {
     commands.register('workbench.splitEditor', () => {
       if (direction === 'none') {
@@ -169,9 +175,20 @@ export default function App(): JSX.Element {
     const issues = workflowProgramIssues(content);
     if (issues.error) { setOpsbotError(issues.error); return; }
     await save();
+    const params: Record<string, string> = {};
+    for (const row of runParams) if (row.key.trim()) params[row.key.trim()] = row.value;
+    const parsedMaxParallel = Number.parseInt(maxParallel, 10);
     let created: Run;
     try {
-      created = await client.createRun({ workflowId: file, workspacePath: workspace, content });
+      created = await client.createRun({
+        workflowId: file,
+        workspacePath: workspace,
+        content,
+        runtime,
+        label: runLabel.trim() || file,
+        ...(Object.keys(params).length > 0 ? { params } : {}),
+        ...(Number.isInteger(parsedMaxParallel) && parsedMaxParallel >= 1 ? { maxParallel: parsedMaxParallel } : {}),
+      });
     } catch (error) {
       setOpsbotError(error instanceof Error ? error.message : String(error));
       return;
@@ -234,7 +251,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>

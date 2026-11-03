@@ -91,3 +91,15 @@ footer { margin: 0 6px 6px; }
 .badge-yml { color: #8b9dc3; background: color-mix(in srgb, #8b9dc3 18%, transparent); }
 .badge-sh { color: #4e9a51; background: color-mix(in srgb, #4e9a51 18%, transparent); }
 .badge-plain { color: var(--muted); background: color-mix(in srgb, var(--muted) 15%, transparent); }
+.run-config { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.run-config-toggle { display: flex; align-items: center; gap: 5px; width: 100%; border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.run-config-arrow { font-size: 9px; }
+.run-config-field { display: grid; gap: 4px; }
+.run-config-title { color: var(--muted); font-size: 11px; }
+.run-config-input, .run-config-select { min-height: 28px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-3); color: var(--text); font: inherit; font-size: 12px; }
+.run-config-input:focus-visible, .run-config-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.run-param-row { display: flex; gap: 4px; }
+.run-param-row .run-config-input { flex: 1; min-width: 0; }
+.run-param-remove { width: 26px; border: 0; background: transparent; color: var(--muted); font-size: 14px; }
+.run-param-remove:hover { color: var(--text); }
+.run-param-add { justify-self: start; }

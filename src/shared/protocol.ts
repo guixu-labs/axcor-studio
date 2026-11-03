@@ -17,10 +17,23 @@ export interface Run {
   updatedAt: string;
 }
 
+export type RuntimeId = 'opsbot';
+
+export interface RuntimeDescriptor {
+  id: RuntimeId;
+  label: string;
+}
+
+export const RUNTIMES: RuntimeDescriptor[] = [{ id: 'opsbot', label: 'Opsbot' }];
+
 export interface CreateRunInput {
   workflowId: string;
   workspacePath?: string;
   content?: string;
+  runtime: RuntimeId;
+  label?: string;
+  params?: Record<string, string>;
+  maxParallel?: number;
 }
 
 export interface RunEvent {
