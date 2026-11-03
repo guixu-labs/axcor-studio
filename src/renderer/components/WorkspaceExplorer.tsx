@@ -35,17 +35,27 @@ function buildTree(nodes: WorkspaceNode[]): TreeNode[] {
   return roots;
 }
 
-function fileBadge(name: string): string {
+const EXTENSION_BADGES: Record<string, { label: string; className: string }> = {
+  md: { label: 'MD', className: 'badge-md' },
+  ts: { label: 'TS', className: 'badge-ts' },
+  tsx: { label: 'TS', className: 'badge-ts' },
+  js: { label: 'JS', className: 'badge-js' },
+  jsx: { label: 'JS', className: 'badge-js' },
+  json: { label: '{}', className: 'badge-json' },
+  py: { label: 'PY', className: 'badge-py' },
+  css: { label: '#', className: 'badge-css' },
+  html: { label: '<>', className: 'badge-html' },
+  yml: { label: 'Y', className: 'badge-yml' },
+  yaml: { label: 'Y', className: 'badge-yml' },
+  sh: { label: '$', className: 'badge-sh' },
+};
+
+function extensionBadge(name: string): { label: string; className: string } {
   const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
-  if (extension === 'md') return '≡';
-  if (extension === 'ts' || extension === 'tsx') return 'TS';
-  if (extension === 'js' || extension === 'jsx') return 'JS';
-  if (extension === 'json') return '{}';
-  if (extension === 'py') return 'Py';
-  if (extension === 'css') return '#';
-  if (extension === 'yml' || extension === 'yaml') return 'Y';
-  return '·';
+  return EXTENSION_BADGES[extension] ?? { label: '·', className: 'badge-plain' };
 }
+
+const INDENT_GUIDE = 'linear-gradient(to right, transparent 7px, var(--border) 7px, var(--border) 8px, transparent 8px)';
 
 export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, onRun, messages }: WorkspaceExplorerProps): JSX.Element {
   const roots = buildTree(tree);
@@ -61,18 +71,22 @@ export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, onRun, m
   };
 
   const renderNode = (node: TreeNode, depth: number): JSX.Element => {
-    const indent = { paddingLeft: 10 + depth * 14 + 'px' };
+    const style: React.CSSProperties = {
+      paddingLeft: 10 + depth * 14,
+      ...(depth > 0 ? { backgroundImage: INDENT_GUIDE, backgroundPosition: `${depth * 14 - 7}px 0`, backgroundRepeat: 'no-repeat' } : {}),
+    };
     if (node.type === 'dir') {
       const isExpanded = expanded.has(node.path);
       return <Fragment key={node.path}>
-        <button className={'file-entry file-entry-dir' + (isExpanded ? ' expanded' : '')} style={indent} type="button" onClick={() => toggle(node.path)} aria-expanded={isExpanded}>
-          <span className="tree-arrow" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span><span className="tree-name">{node.name}</span>
+        <button className={'file-entry file-entry-dir' + (isExpanded ? ' expanded' : '')} style={style} type="button" onClick={() => toggle(node.path)} aria-expanded={isExpanded}>
+          <span className="tree-arrow" aria-hidden="true">▸</span><span className="tree-folder" aria-hidden="true" /><span className="tree-name">{node.name}</span>
         </button>
         {isExpanded && node.children.map(child => renderNode(child, depth + 1))}
       </Fragment>;
     }
-    return <button className={'file-entry' + (node.path === activeFile ? ' active' : '')} style={indent} key={node.path} type="button" onClick={() => onSelect(node.path)}>
-      <span className="tab-file-icon" aria-hidden="true">{fileBadge(node.name)}</span><span className="tree-name">{node.name}</span>
+    const badge = extensionBadge(node.name);
+    return <button className={'file-entry' + (node.path === activeFile ? ' active' : '')} style={style} key={node.path} type="button" onClick={() => onSelect(node.path)}>
+      <span className={'file-badge ' + badge.className} aria-hidden="true">{badge.label}</span><span className="tree-name">{node.name}</span>
     </button>;
   };
 
