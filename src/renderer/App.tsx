@@ -3,7 +3,7 @@ import { WorkbenchOpsbotClient } from './services/opsbotClient';
 import type { Run, RunEvent } from '../shared/protocol';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
-import { MarkdownEditor } from './components/MarkdownEditor';
+import { MonacoEditor } from './components/MonacoEditor';
 import { RunDetail, RunsList } from './components/RunsPanel';
 import { ResizeHandle } from './components/ResizeHandle';
 import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
@@ -41,6 +41,8 @@ export default function App(): JSX.Element {
   const [opsbotError, setOpsbotError] = useState<string>();
   const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
   const t = messages[locale];
+  const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
+  const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
   const services = useRef(createWorkbenchServices()).current;
   const commands = services.get(WorkbenchCommandService);
   const editorLayout = layout.editorLayout;
@@ -65,12 +67,10 @@ export default function App(): JSX.Element {
     });
   }, [selectedRunId]);
   useEffect(() => {
-    const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
-    const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
     Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
     document.documentElement.style.setProperty('--app-font', selectedFont.family);
     document.documentElement.style.setProperty('color-scheme', selectedTheme.colorScheme);
-  }, [font, theme]);
+  }, [selectedFont, selectedTheme]);
   const splitEditor = (direction: 'none' | 'horizontal' | 'vertical'): void => {
     commands.register('workbench.splitEditor', () => {
       if (direction === 'none') {
@@ -170,8 +170,8 @@ export default function App(): JSX.Element {
         <div className="workbench-main" style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
           {activeNavigation === 'workbench' && <section className="workspace-grid">
             <div className={'editor-groups split-' + splitDirection}>
-              <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} messages={t} />
-              {splitDirection !== 'none' && <MarkdownEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} messages={t} />}
+              <MonacoEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />
+              {splitDirection !== 'none' && <MonacoEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />}
             </div>
           </section>}
           {activeNavigation === 'runs' && (selectedRun
