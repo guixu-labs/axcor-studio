@@ -6,8 +6,7 @@ interface WorkspaceExplorerProps {
   activeFile: string;
   onSelect: (filePath: string) => void;
   onSave: () => void;
-  onRun: () => void;
-  messages: { files: string; save: string; runWorkflow: string; emptyWorkspace: string };
+  messages: { files: string; save: string; emptyWorkspace: string };
 }
 
 interface TreeNode {
@@ -57,7 +56,7 @@ function extensionBadge(name: string): { label: string; className: string } {
 
 const INDENT_GUIDE = 'linear-gradient(to right, transparent 7px, var(--border) 7px, var(--border) 8px, transparent 8px)';
 
-export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, onRun, messages }: WorkspaceExplorerProps): JSX.Element {
+export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, messages }: WorkspaceExplorerProps): JSX.Element {
   const roots = buildTree(tree);
   const topLevelDirs = new Set(roots.filter(node => node.type === 'dir').map(node => node.path));
   const [expanded, setExpanded] = useState<Set<string>>(topLevelDirs);
@@ -95,6 +94,5 @@ export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, onRun, m
     <div className="file-list">
       {roots.length ? roots.map(node => renderNode(node, 0)) : <div className="run-list-empty"><strong>{messages.emptyWorkspace}</strong></div>}
     </div>
-    <button className="run-action" type="button" onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
   </aside>;
 }
