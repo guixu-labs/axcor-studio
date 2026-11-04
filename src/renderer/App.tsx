@@ -53,6 +53,7 @@ export default function App(): JSX.Element {
   const [runLabel, setRunLabel] = useState('');
   const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
   const [maxParallel, setMaxParallel] = useState('');
+  const [runPrompt, setRunPrompt] = useState('');
   const [sessionPrompt, setSessionPrompt] = useState('');
   const [sessionRuntime, setSessionRuntime] = useState('claude_sdk');
   const [sessionModel, setSessionModel] = useState('');
@@ -228,6 +229,27 @@ export default function App(): JSX.Element {
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
+    if (runtime === 'opsbot-run') {
+      const trimmedPrompt = runPrompt.trim();
+      if (trimmedPrompt) {
+        let injected = false;
+        for (let attempt = 0; attempt < 6 && !injected; attempt += 1) {
+          try {
+            const sessions = await window.opsbot.getRunSessions(created.id);
+            const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
+            if (target) {
+              await window.opsbot.injectPrompt(created.id, target.session_id, trimmedPrompt);
+              injected = true;
+            }
+          } catch {
+            // The executor session may not exist yet right after the run
+            // starts; retry for a few seconds before giving up softly.
+          }
+          if (!injected) await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        if (!injected) setOpsbotError('提示词注入失败：执行会话尚未就绪，run 已照常启动');
+      }
+    }
   };
   const closeFile = (closedFile: string): void => {
     if (openFiles.length === 1) return;
@@ -288,7 +310,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={setSessionRuntime} sessionModel={sessionModel} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={setSessionRuntime} sessionModel={sessionModel} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>

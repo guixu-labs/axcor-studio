@@ -7,6 +7,7 @@ import {
   getOpsbotRun,
   getOpsbotRunSessions,
   importOpsbotSessionToInsight,
+  injectOpsbotSessionPrompt,
   listOpsbotRuns,
   setOpsbotBaseUrl,
   startOpsbotRun,
@@ -58,6 +59,10 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
       }
       if (req.method === 'GET' && req.url === '/api/v1/insight/status') {
         res.end(JSON.stringify({ running: true, port: 21025 }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
+        res.end(JSON.stringify({ run_id: 'run-1', session_id: 'sess-1', accepted: true }));
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/stop') {
@@ -216,6 +221,13 @@ test('opsbot http client', async t => {
     const status = await getInsightStatus();
     assert.equal(status.running, true);
     assert.equal(status.port, 21025);
+  });
+
+  await t.test('injectOpsbotSessionPrompt posts to the inject endpoint', async () => {
+    await injectOpsbotSessionPrompt('run-1', 'sess-1', '请继续推进');
+    const inject = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject');
+    assert.ok(inject);
+    assert.equal(inject.body.prompt, '请继续推进');
   });
 
   await t.test('404 surfaces the opsbot detail message', async () => {

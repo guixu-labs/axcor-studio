@@ -52,12 +52,17 @@ test.describe('run configuration', () => {
           res.end(JSON.stringify({ id: 'sess-new', name: postedSessionPrompt.slice(0, 20), role: 'worker', state: 'running', created_at: '2026-11-03T12:10:00+00:00', stop_reason: null, loop_status: 'yes' }));
           return;
         }
+        if (req.method === 'POST' && req.url === '/api/v1/runs/run-params-1/sessions/sess-exec/inject') {
+          capturedBodies.push(body);
+          res.end(JSON.stringify({ run_id: 'run-params-1', session_id: 'sess-exec', accepted: true }));
+          return;
+        }
         if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-params-1')) {
           const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.md', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 };
           if (req.url.includes('/events')) {
             res.end(JSON.stringify({ events: [], next_cursor: 'c', limit: 200 }));
           } else {
-            res.end(JSON.stringify({ run: record, sessions: [] }));
+            res.end(JSON.stringify({ run: record, sessions: [{ session_id: 'sess-exec', role: 'executor', context: null, state: 'running', stop_reason: null, in_flight: true }] }));
           }
           return;
         }
@@ -104,9 +109,12 @@ test.describe('run configuration', () => {
     await rows.first().getByPlaceholder('键').fill('dataset');
     await rows.first().getByPlaceholder('值').fill('core');
     await window.getByLabel('最大并行数').fill('4');
+    await window.getByLabel('提示词', { exact: true }).fill('按计划推进发布准备');
     await window.getByRole('button', { name: '运行工作流' }).click();
     await expect(window.getByRole('option', { name: /release-check/ })).toBeVisible();
-    await expect.poll(() => capturedBodies.length).toBe(1);
+    await expect.poll(() => capturedBodies.filter(body => body['prompt'] !== undefined).length).toBe(1);
+    const injectBody = capturedBodies.find(body => body['prompt'] !== undefined);
+    expect(injectBody?.['prompt']).toBe('按计划推进发布准备');
     expect(capturedBodies[0]['program_path']).toBe(path.join(workspaceDir, 'workflow.md'));
     expect(capturedBodies[0]['label']).toBe('release-check');
     expect(capturedBodies[0]['params']).toEqual({ dataset: 'core' });

@@ -11,6 +11,7 @@ export interface RunsPanelMessages {
   maxParallel: string; removeParam: string;
   agentRuntime: string; sessionPrompt: string; sessionModel: string; sessionSystemPrompt: string;
   sessionMaxIterations: string; sessionReviewerEnabled: string;
+  prompt: string; promptPlaceholder: string;
 }
 
 export interface RunParamsRow { key: string; value: string; }
@@ -36,6 +37,8 @@ interface RunsListProps {
   onRunParamsChange: (rows: RunParamsRow[]) => void;
   maxParallel: string;
   onMaxParallelChange: (value: string) => void;
+  runPrompt: string;
+  onRunPromptChange: (value: string) => void;
   sessionPrompt: string;
   onSessionPromptChange: (value: string) => void;
   sessionRuntime: string;
@@ -51,7 +54,7 @@ interface RunsListProps {
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><div><span className="eyebrow">{messages.runs}</span><h2>{messages.executionCenter}</h2></div></div>
@@ -98,6 +101,10 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
           <label className="run-config-field">
             <span className="run-config-title">{messages.maxParallel}</span>
             <input className="run-config-input" type="number" min={1} value={maxParallel} aria-label={messages.maxParallel} onChange={event => onMaxParallelChange(event.target.value)} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.prompt}</span>
+            <textarea className="run-config-input run-config-textarea" rows={3} value={runPrompt} placeholder={messages.promptPlaceholder} aria-label={messages.prompt} onChange={event => onRunPromptChange(event.target.value)} />
           </label>
         </>}
         {runtime === 'opsbot-session' && <>
