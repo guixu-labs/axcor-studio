@@ -181,6 +181,7 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const [baseUrl, setBaseUrl] = useState('');
   const [runtime, setRuntime] = useState('claude_sdk');
   const [busy, setBusy] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const refresh = async (): Promise<void> => {
     try {
@@ -236,63 +237,74 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   return <div className="providers-panel">
     {error && <p className="run-list-error" role="alert">{error}</p>}
     {notice && <p className="providers-notice" role="status">{notice}</p>}
-    <div className="provider-list">
-      {providers === null && !error && <p className="providers-loading">{messages.insightHint}</p>}
-      {providers?.length === 0 && !error && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
-      {providers?.map(provider => <div className={'provider-row' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={provider.provider_index}>
-        <div className="provider-main">
-          <div className="provider-head">
-            <span className="provider-key">{provider.masked}</span>
-            {provider.model && <span className="provider-model">{provider.model}</span>}
-            {validationChip(provider.worker_validation, messages)}
-            {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
-          </div>
-          <div className="provider-meta">
-            {provider.base_url && <span>{provider.base_url}</span>}
-            {provider.runtime && <span>{providerRuntimeLabel(provider.runtime)}</span>}
-          </div>
+    <section className="providers-section">
+      <h3 className="providers-heading">{messages.addProvider}</h3>
+      <div className="providers-form">
+        <div className="providers-form-grid">
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.providerRuntime}</span>
+            <select className="run-config-select" value={runtime} aria-label={messages.providerRuntime} onChange={event => setRuntime(event.target.value)}>
+              {PROVIDER_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.providerBaseUrl}</span>
+            <input className="run-config-input" type="text" value={baseUrl} aria-label={messages.providerBaseUrl} onChange={event => setBaseUrl(event.target.value)} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.providerModel}</span>
+            <input className="run-config-input" type="text" value={model} aria-label={messages.providerModel} onChange={event => setModel(event.target.value)} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.providerKey}</span>
+            <input className="run-config-input" type="password" value={key} aria-label={messages.providerKey} onChange={event => setKey(event.target.value)} />
+          </label>
         </div>
-        <div className="provider-actions">
-          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
-            const result = await window.opsbot.testProvider(provider.provider_index);
-            if (result.success === false || result.error) {
-              setError(`${messages.providerTestFailed}：${result.error ?? 'unknown'}`);
-            } else {
-              setNotice(messages.providerTestPassed);
-              await refresh();
-            }
-          })}>{messages.testKey}</button>
-          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { const result = await window.opsbot.activateProvider(provider.provider_index); if (!result.ok) { setError('激活失败'); return; } setActiveIndex(result.activeIndex); setNotice(messages.providerActivated); })}>{messages.providerActive}</button>
-          <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
+        <div className="providers-form-actions">
+          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void testCandidate()}>{messages.testKey}</button>
+          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void addProvider()}>{messages.add}</button>
         </div>
-      </div>)}
-    </div>
-    <div className="providers-form">
-      <div className="providers-form-grid">
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.providerKey}</span>
-          <input className="run-config-input" type="password" value={key} aria-label={messages.providerKey} onChange={event => setKey(event.target.value)} />
-        </label>
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.providerModel}</span>
-          <input className="run-config-input" type="text" value={model} aria-label={messages.providerModel} onChange={event => setModel(event.target.value)} />
-        </label>
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.providerBaseUrl}</span>
-          <input className="run-config-input" type="text" value={baseUrl} aria-label={messages.providerBaseUrl} onChange={event => setBaseUrl(event.target.value)} />
-        </label>
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.providerRuntime}</span>
-          <select className="run-config-select" value={runtime} aria-label={messages.providerRuntime} onChange={event => setRuntime(event.target.value)}>
-            {PROVIDER_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
-        </label>
       </div>
-      <div className="providers-form-actions">
-        <button className="settings-image-button" type="button" disabled={busy} onClick={() => void testCandidate()}>{messages.testKey}</button>
-        <button className="settings-image-button" type="button" disabled={busy} onClick={() => void addProvider()}>{messages.addProvider}</button>
+    </section>
+    <section className="providers-section">
+      <h3 className="providers-heading">{messages.providersExisting}</h3>
+      <div className="provider-list">
+        {providers === null && !error && <p className="providers-empty">{messages.providersDescription}</p>}
+        {providers?.length === 0 && !error && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
+        {providers?.map(provider => {
+          const isExpanded = provider.provider_index === expandedIndex;
+          return <div className={'provider-row provider-card' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={provider.provider_index}>
+            <button className="provider-card-head" type="button" aria-expanded={isExpanded} onClick={() => setExpandedIndex(isExpanded ? null : provider.provider_index)}>
+              <span className="provider-key">{provider.masked}</span>
+              {provider.model && <span className="provider-model">{provider.model}</span>}
+              {validationChip(provider.worker_validation, messages)}
+              {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
+              <span className="provider-chevron" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+            </button>
+            {isExpanded && <div className="provider-card-detail">
+              <div className="provider-meta">
+                {provider.base_url && <span>{messages.providerBaseUrl}：{provider.base_url}</span>}
+                {provider.runtime && <span>{messages.providerRuntime}：{providerRuntimeLabel(provider.runtime)}</span>}
+                {provider.worker_validation?.checked_at !== undefined && provider.worker_validation.checked_at !== null && <span>{messages.providerCheckedAt}：{String(provider.worker_validation.checked_at).slice(0, 19).replace('T', ' ')}</span>}
+              </div>
+              <div className="provider-actions">
+                <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
+                  const result = await window.opsbot.testProvider(provider.provider_index);
+                  if (result.success === false || result.error) {
+                    setError(`${messages.providerTestFailed}：${result.error ?? 'unknown'}`);
+                  } else {
+                    setNotice(messages.providerTestPassed);
+                    await refresh();
+                  }
+                })}>{messages.testKey}</button>
+                <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { const result = await window.opsbot.activateProvider(provider.provider_index); if (!result.ok) { setError('激活失败'); return; } setActiveIndex(result.activeIndex); setNotice(messages.providerActivated); })}>{messages.providerActive}</button>
+                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
+              </div>
+            </div>}
+          </div>;
+        })}
       </div>
-    </div>
+    </section>
   </div>;
 }
 
