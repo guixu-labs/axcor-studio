@@ -111,9 +111,10 @@ footer { margin: 0 6px 6px; }
 .provider-list { display: grid; gap: 8px; }
 .provider-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); }
 .provider-row-active { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
-.provider-main { display: grid; gap: 6px; min-width: 0; }
-.provider-key { color: var(--text); font-size: 12px; font-family: var(--app-font); }
-.provider-title { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.provider-main { display: grid; gap: 5px; min-width: 0; }
+.provider-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.provider-key { overflow: hidden; max-width: 320px; color: var(--text); font-family: var(--app-font); font-size: 12.5px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.provider-model { color: var(--text); font-size: 12px; }
 .provider-meta { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 11px; }
 .provider-actions { display: flex; gap: 6px; flex: none; }
 .provider-delete { color: var(--muted); }

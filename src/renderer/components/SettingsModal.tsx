@@ -157,6 +157,10 @@ function validationChip(validation: ProviderKey['worker_validation'], messages: 
   return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
 }
 
+function providerRuntimeLabel(runtime?: string): string {
+  return PROVIDER_RUNTIME_OPTIONS.find(item => item.id === runtime)?.label ?? runtime ?? '';
+}
+
 function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const [providers, setProviders] = useState<ProviderKey[] | null>(null);
   const [error, setError] = useState<string>();
@@ -227,14 +231,16 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
       {providers?.length === 0 && !error && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
       {providers?.map(provider => <div className={'provider-row' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={provider.provider_index}>
         <div className="provider-main">
-          <div className="provider-key"><span className="provider-title">{messages.providerKey}</span>{provider.masked}</div>
-          <div className="provider-meta">
-            {provider.model && <span><span className="provider-title">{messages.providerModel}</span>{provider.model}</span>}
-            {provider.base_url && <span><span className="provider-title">{messages.providerBaseUrl}</span>{provider.base_url}</span>}
-            {provider.runtime && <span><span className="provider-title">{messages.providerRuntime}</span>{provider.runtime}</span>}
+          <div className="provider-head">
+            <span className="provider-key">{provider.masked}</span>
+            {provider.model && <span className="provider-model">{provider.model}</span>}
+            {validationChip(provider.worker_validation, messages)}
+            {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
           </div>
-          {validationChip(provider.worker_validation, messages)}
-          {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
+          <div className="provider-meta">
+            {provider.base_url && <span>{provider.base_url}</span>}
+            {provider.runtime && <span>{providerRuntimeLabel(provider.runtime)}</span>}
+          </div>
         </div>
         <div className="provider-actions">
           <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.testProvider(provider.provider_index); setNotice(messages.providerTestPassed); })}>{messages.testKey}</button>

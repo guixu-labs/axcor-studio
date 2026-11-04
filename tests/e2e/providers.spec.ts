@@ -100,7 +100,7 @@ test.describe('provider settings', () => {
     await window.getByLabel('API 密钥').fill('sk-new-key');
     await window.getByLabel('模型').fill('claude-opus-4-6');
     await window.getByLabel('Base URL').fill('https://other.example.com');
-    await window.locator('.providers-form').getByRole('button', { name: '试测' }).click();
+    await window.locator('.providers-form').getByRole('button', { name: '测试' }).click();
     await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/test-key')).toBe(true);
     // Add and save the provider list.
     await window.getByRole('button', { name: '添加供应商' }).click();
@@ -109,7 +109,7 @@ test.describe('provider settings', () => {
     expect((save?.body.keys as Array<Record<string, unknown>>).length).toBe(2);
     expect((save?.body.keys as Array<Record<string, unknown>>)[1].key).toBe('sk-new-key');
     // Activate the first provider.
-    await window.locator('.provider-row').first().getByRole('button', { name: '使用中' }).click();
+    await window.locator('.provider-row').first().getByRole('button', { name: '使用' }).click();
     await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/activate')).toBe(true);
     expect(captured.find(request => request.url === '/api/v1/auth/activate')?.body.index).toBe(0);
     // Delete the first provider.
