@@ -152,8 +152,18 @@ const PROVIDER_RUNTIME_OPTIONS = [
 
 function validationChip(validation: ProviderKey['worker_validation'], messages: Messages): JSX.Element {
   if (!validation) return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
-  if (validation.success === true) return <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>;
-  if (validation.success === false) return <span className="provider-chip provider-chip-fail">{messages.providerFailed}</span>;
+  // Opsbot reports validation either as a success boolean (test responses)
+  // or as a status string (persisted provider state).
+  if (typeof validation.success === 'boolean') {
+    return validation.success
+      ? <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>
+      : <span className="provider-chip provider-chip-fail">{messages.providerFailed}</span>;
+  }
+  if (typeof validation.status === 'string' && validation.status !== '') {
+    return validation.status === 'valid'
+      ? <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>
+      : <span className="provider-chip provider-chip-fail" title={validation.error}>{messages.providerFailed}</span>;
+  }
   return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
 }
 
@@ -243,7 +253,15 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
           </div>
         </div>
         <div className="provider-actions">
-          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.testProvider(provider.provider_index); setNotice(messages.providerTestPassed); })}>{messages.testKey}</button>
+          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
+            const result = await window.opsbot.testProvider(provider.provider_index);
+            if (result.success === false || result.error) {
+              setError(`${messages.providerTestFailed}：${result.error ?? 'unknown'}`);
+            } else {
+              setNotice(messages.providerTestPassed);
+              await refresh();
+            }
+          })}>{messages.testKey}</button>
           <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { const result = await window.opsbot.activateProvider(provider.provider_index); if (!result.ok) { setError('激活失败'); return; } setActiveIndex(result.activeIndex); setNotice(messages.providerActivated); })}>{messages.providerActive}</button>
           <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
         </div>
