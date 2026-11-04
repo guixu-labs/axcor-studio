@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import type { RunEvent } from './shared/protocol';
 import { mapEvent, type OpsbotEventPage } from './shared/opsbotApi';
-import { opsbotRequest } from './opsbotHttp';
+import { getOpsbotRun, isSessionRun, opsbotRequest } from './opsbotHttp';
 
 export { getOpsbotBaseUrl, setOpsbotBaseUrl } from './opsbotHttp';
 
@@ -13,6 +13,7 @@ class EventPoller {
   private timer: NodeJS.Timeout | null = null;
   private cursor: string | undefined;
   private running = false;
+  private lastSessionStatus: string | undefined;
 
   constructor(runId: string) {
     this.runId = runId;
@@ -33,15 +34,8 @@ class EventPoller {
     if (this.running) return;
     this.running = true;
     try {
-      let hasMore = true;
-      while (hasMore) {
-        const params = new URLSearchParams({ limit: String(POLL_PAGE_SIZE) });
-        if (this.cursor) params.set('cursor', this.cursor);
-        const page = await opsbotRequest<OpsbotEventPage>('GET', `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`);
-        this.cursor = page.next_cursor;
-        hasMore = page.events.length >= page.limit;
-        for (const raw of page.events) emitOpsbotEvent(mapEvent(raw));
-      }
+      if (isSessionRun(this.runId)) await this.pollSession();
+      else await this.pollRunEvents();
     } catch (error) {
       // A down or mid-restart Opsbot is not fatal: keep the cursor and retry
       // on the next tick so a transient outage recovers without a resubscribe.
@@ -49,6 +43,32 @@ class EventPoller {
     } finally {
       this.running = false;
     }
+  }
+
+  private async pollRunEvents(): Promise<void> {
+    let hasMore = true;
+    while (hasMore) {
+      const params = new URLSearchParams({ limit: String(POLL_PAGE_SIZE) });
+      if (this.cursor) params.set('cursor', this.cursor);
+      const page = await opsbotRequest<OpsbotEventPage>('GET', `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`);
+      this.cursor = page.next_cursor;
+      hasMore = page.events.length >= page.limit;
+      for (const raw of page.events) emitOpsbotEvent(mapEvent(raw));
+    }
+  }
+
+  private async pollSession(): Promise<void> {
+    const run = await getOpsbotRun(this.runId);
+    if (run.status === this.lastSessionStatus) return;
+    this.lastSessionStatus = run.status;
+    const event: RunEvent = {
+      id: `session-${Date.now()}`,
+      runId: this.runId,
+      type: 'session_state_changed',
+      timestamp: new Date().toISOString(),
+      payload: { state: run.status },
+    };
+    emitOpsbotEvent(event);
   }
 }
 

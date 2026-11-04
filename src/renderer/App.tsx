@@ -45,11 +45,20 @@ export default function App(): JSX.Element {
   const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
   const [opsbotUrl, setOpsbotUrl] = useState<string | undefined>(() => loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
   const [opsbotError, setOpsbotError] = useState<string>();
-  const [runtime, setRuntime] = useState<RuntimeId>(() => loadWorkbenchState<RuntimeId>('workbench.runtime', 'opsbot'));
+  const [runtime, setRuntime] = useState<RuntimeId>(() => {
+    // Legacy stored value 'opsbot' maps to the run mode.
+    const stored = loadWorkbenchState<string>('workbench.runtime', 'opsbot-run');
+    return stored === 'opsbot-session' ? 'opsbot-session' : 'opsbot-run';
+  });
   const [runLabel, setRunLabel] = useState('');
   const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
   const [maxParallel, setMaxParallel] = useState('');
-  const [prompt, setPrompt] = useState('');
+  const [sessionPrompt, setSessionPrompt] = useState('');
+  const [sessionRuntime, setSessionRuntime] = useState('claude_sdk');
+  const [sessionModel, setSessionModel] = useState('');
+  const [sessionSystemPrompt, setSessionSystemPrompt] = useState('');
+  const [sessionMaxIterations, setSessionMaxIterations] = useState('');
+  const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
   const [insightPath, setInsightPath] = useState('/insight/');
   const [insightFailed, setInsightFailed] = useState(false);
   const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
@@ -88,8 +97,12 @@ export default function App(): JSX.Element {
         if (isTerminalRun(latest) && !importedToInsight.current.has(latest.id)) {
           importedToInsight.current.add(latest.id);
           try {
-            const sessions = await window.opsbot.getRunSessions(latest.id);
-            for (const session of sessions) await window.opsbot.importToInsight(session.session_id);
+            if (latest.runtimeId === 'opsbot-session') {
+              await window.opsbot.importToInsight(latest.id);
+            } else {
+              const sessions = await window.opsbot.getRunSessions(latest.id);
+              for (const session of sessions) await window.opsbot.importToInsight(session.session_id);
+            }
           } catch {
             // Observability import is best-effort; the run view stays usable.
           }
@@ -172,24 +185,40 @@ export default function App(): JSX.Element {
   const startRun = async (): Promise<void> => {
     setOpsbotError(undefined);
     if (!workspace) { setOpsbotError('运行工作流需要先选择工作区'); return; }
-    if (!file) { setOpsbotError('没有打开的工作流文件'); return; }
-    const issues = workflowProgramIssues(content);
-    if (issues.error) { setOpsbotError(issues.error); return; }
-    await save();
-    const params: Record<string, string> = {};
-    for (const row of runParams) if (row.key.trim()) params[row.key.trim()] = row.value;
-    const parsedMaxParallel = Number.parseInt(maxParallel, 10);
     let created: Run;
     try {
-      created = await client.createRun({
-        workflowId: file,
-        workspacePath: workspace,
-        content,
-        runtime,
-        label: runLabel.trim() || file,
-        ...(Object.keys(params).length > 0 ? { params } : {}),
-        ...(Number.isInteger(parsedMaxParallel) && parsedMaxParallel >= 1 ? { maxParallel: parsedMaxParallel } : {}),
-      });
+      if (runtime === 'opsbot-session') {
+        if (!sessionPrompt.trim()) { setOpsbotError('会话模式需要填写提示词'); return; }
+        const parsedMaxIterations = Number.parseInt(sessionMaxIterations, 10);
+        created = await client.createRun({
+          workflowId: '',
+          workspacePath: workspace,
+          runtime,
+          prompt: sessionPrompt,
+          sessionRuntime,
+          ...(sessionModel.trim() ? { model: sessionModel.trim() } : {}),
+          ...(sessionSystemPrompt.trim() ? { systemPrompt: sessionSystemPrompt.trim() } : {}),
+          ...(Number.isInteger(parsedMaxIterations) && parsedMaxIterations >= 1 ? { maxIterations: parsedMaxIterations } : {}),
+          reviewerEnabled: sessionReviewerEnabled,
+        });
+      } else {
+        if (!file) { setOpsbotError('没有打开的工作流文件'); return; }
+        const issues = workflowProgramIssues(content);
+        if (issues.error) { setOpsbotError(issues.error); return; }
+        await save();
+        const params: Record<string, string> = {};
+        for (const row of runParams) if (row.key.trim()) params[row.key.trim()] = row.value;
+        const parsedMaxParallel = Number.parseInt(maxParallel, 10);
+        created = await client.createRun({
+          workflowId: file,
+          workspacePath: workspace,
+          content,
+          runtime,
+          label: runLabel.trim() || file,
+          ...(Object.keys(params).length > 0 ? { params } : {}),
+          ...(Number.isInteger(parsedMaxParallel) && parsedMaxParallel >= 1 ? { maxParallel: parsedMaxParallel } : {}),
+        });
+      }
     } catch (error) {
       setOpsbotError(error instanceof Error ? error.message : String(error));
       return;
@@ -199,25 +228,6 @@ export default function App(): JSX.Element {
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
-    const trimmedPrompt = prompt.trim();
-    if (trimmedPrompt) {
-      let injected = false;
-      for (let attempt = 0; attempt < 6 && !injected; attempt += 1) {
-        try {
-          const sessions = await window.opsbot.getRunSessions(created.id);
-          const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
-          if (target) {
-            await window.opsbot.injectPrompt(created.id, target.session_id, trimmedPrompt);
-            injected = true;
-          }
-        } catch {
-          // The executor session may not exist yet right after the run
-          // starts; retry for a few seconds before giving up softly.
-        }
-        if (!injected) await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      if (!injected) setOpsbotError('提示词注入失败：执行会话尚未就绪，run 已照常启动');
-    }
   };
   const closeFile = (closedFile: string): void => {
     if (openFiles.length === 1) return;
@@ -240,6 +250,13 @@ export default function App(): JSX.Element {
     if (!selectedRun) return;
     setOpsbotError(undefined);
     try {
+      if (selectedRun.runtimeId === 'opsbot-session') {
+        const result = await window.opsbot.importToInsight(selectedRun.id);
+        if (!result.ok) { setOpsbotError(result.error ?? t.insightLoadFailed); return; }
+        setInsightPath('/insight/session/' + encodeURIComponent(selectedRun.id));
+        setActiveNavigation('insight');
+        return;
+      }
       const sessions = await window.opsbot.getRunSessions(selectedRun.id);
       const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
       if (!target) { setOpsbotError(t.noObservableSessions); return; }
@@ -271,7 +288,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} prompt={prompt} onPromptChange={setPrompt} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={setSessionRuntime} sessionModel={sessionModel} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>

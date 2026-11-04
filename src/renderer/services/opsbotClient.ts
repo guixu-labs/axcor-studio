@@ -15,7 +15,7 @@ export class MockOpsbotClient implements OpsbotClient {
 
   async createRun(input: CreateRunInput): Promise<Run> {
     const now = new Date().toISOString();
-    const run: Run = { id: `run_${crypto.randomUUID()}`, workflowId: input.workflowId, status: 'queued', createdAt: now, updatedAt: now };
+    const run: Run = { id: `run_${crypto.randomUUID()}`, workflowId: input.workflowId || 'session', status: 'queued', createdAt: now, updatedAt: now, runtimeId: input.runtime };
     this.runs.set(run.id, run);
     this.emit(run, 'run.created', { workflowId: input.workflowId });
     setTimeout(() => this.advance(run.id, 'running', 'run.started'), 250);

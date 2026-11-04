@@ -15,16 +15,20 @@ export interface Run {
   status: RunStatus;
   createdAt: string;
   updatedAt: string;
+  runtimeId: RuntimeId;
 }
 
-export type RuntimeId = 'opsbot';
+export type RuntimeId = 'opsbot-run' | 'opsbot-session';
 
 export interface RuntimeDescriptor {
   id: RuntimeId;
   label: string;
 }
 
-export const RUNTIMES: RuntimeDescriptor[] = [{ id: 'opsbot', label: 'Opsbot' }];
+export const RUNTIMES: RuntimeDescriptor[] = [
+  { id: 'opsbot-run', label: 'Opsbot Run' },
+  { id: 'opsbot-session', label: 'Opsbot Session' },
+];
 
 export interface CreateRunInput {
   workflowId: string;
@@ -34,6 +38,12 @@ export interface CreateRunInput {
   label?: string;
   params?: Record<string, string>;
   maxParallel?: number;
+  prompt?: string;
+  sessionRuntime?: string;
+  model?: string;
+  systemPrompt?: string;
+  maxIterations?: number;
+  reviewerEnabled?: boolean;
 }
 
 export interface RunEvent {

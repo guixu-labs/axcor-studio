@@ -14,6 +14,11 @@ const sessionRecord = { session_id: 'sess-1', role: 'executor', context: null, s
 
 function startFixtureOpsbot(): Promise<{ url: string; close: () => void }> {
   const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/api/v1/sessions') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify([]));
+      return;
+    }
     if (req.method === 'GET' && req.url === '/api/v1/runs') {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ runs: [runRecord] }));

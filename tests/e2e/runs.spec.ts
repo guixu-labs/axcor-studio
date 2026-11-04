@@ -15,6 +15,10 @@ function startFixtureOpsbot(): Promise<{ url: string; close: () => void }> {
   let eventCursorSeen = false;
   const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'GET' && req.url === '/api/v1/sessions') {
+      res.end(JSON.stringify([]));
+      return;
+    }
     if (req.method === 'GET' && req.url === '/api/v1/runs') {
       res.end(JSON.stringify({ runs: [runRecord] }));
       return;

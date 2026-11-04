@@ -8,10 +8,19 @@ export interface RunsPanelMessages {
   selectRun: string; selectRunHint: string; openInInsight: string;
   runConfig: string; runtime: string; runLabel: string; runLabelPlaceholder: string;
   runParams: string; addParam: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
-  maxParallel: string; removeParam: string; prompt: string; promptPlaceholder: string;
+  maxParallel: string; removeParam: string;
+  agentRuntime: string; sessionPrompt: string; sessionModel: string; sessionSystemPrompt: string;
+  sessionMaxIterations: string; sessionReviewerEnabled: string;
 }
 
 export interface RunParamsRow { key: string; value: string; }
+
+const SESSION_RUNTIME_OPTIONS = [
+  { id: 'claude_sdk', label: 'Claude SDK' },
+  { id: 'claude_cli', label: 'Claude CLI' },
+  { id: 'opencode', label: 'OpenCode' },
+  { id: 'codex_cli', label: 'Codex CLI' },
+];
 
 interface RunsListProps {
   runs: Run[];
@@ -27,12 +36,22 @@ interface RunsListProps {
   onRunParamsChange: (rows: RunParamsRow[]) => void;
   maxParallel: string;
   onMaxParallelChange: (value: string) => void;
-  prompt: string;
-  onPromptChange: (value: string) => void;
+  sessionPrompt: string;
+  onSessionPromptChange: (value: string) => void;
+  sessionRuntime: string;
+  onSessionRuntimeChange: (value: string) => void;
+  sessionModel: string;
+  onSessionModelChange: (value: string) => void;
+  sessionSystemPrompt: string;
+  onSessionSystemPromptChange: (value: string) => void;
+  sessionMaxIterations: string;
+  onSessionMaxIterationsChange: (value: string) => void;
+  sessionReviewerEnabled: boolean;
+  onSessionReviewerEnabledChange: (value: boolean) => void;
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, prompt, onPromptChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><div><span className="eyebrow">{messages.runs}</span><h2>{messages.executionCenter}</h2></div></div>
@@ -62,27 +81,53 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
             {RUNTIMES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.runLabel}</span>
-          <input className="run-config-input" type="text" value={runLabel} placeholder={messages.runLabelPlaceholder} aria-label={messages.runLabel} onChange={event => onRunLabelChange(event.target.value)} />
-        </label>
-        <div className="run-config-field">
-          <span className="run-config-title">{messages.runParams}</span>
-          {runParams.map((row, index) => <div className="run-param-row" key={index}>
-            <input className="run-config-input" type="text" value={row.key} placeholder={messages.paramKeyPlaceholder} aria-label={messages.paramKeyPlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} />
-            <input className="run-config-input" type="text" value={row.value} placeholder={messages.paramValuePlaceholder} aria-label={messages.paramValuePlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} />
-            <button className="run-param-remove" type="button" aria-label={messages.removeParam} onClick={() => onRunParamsChange(runParams.filter((_item, itemIndex) => itemIndex !== index))}>×</button>
-          </div>)}
-          <button className="text-button run-param-add" type="button" onClick={() => onRunParamsChange([...runParams, { key: '', value: '' }])}>{messages.addParam}</button>
-        </div>
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.maxParallel}</span>
-          <input className="run-config-input" type="number" min={1} value={maxParallel} aria-label={messages.maxParallel} onChange={event => onMaxParallelChange(event.target.value)} />
-        </label>
-        <label className="run-config-field">
-          <span className="run-config-title">{messages.prompt}</span>
-          <textarea className="run-config-input run-config-prompt" value={prompt} placeholder={messages.promptPlaceholder} aria-label={messages.prompt} onChange={event => onPromptChange(event.target.value)} />
-        </label>
+        {runtime === 'opsbot-run' && <>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.runLabel}</span>
+            <input className="run-config-input" type="text" value={runLabel} placeholder={messages.runLabelPlaceholder} aria-label={messages.runLabel} onChange={event => onRunLabelChange(event.target.value)} />
+          </label>
+          <div className="run-config-field">
+            <span className="run-config-title">{messages.runParams}</span>
+            {runParams.map((row, index) => <div className="run-param-row" key={index}>
+              <input className="run-config-input" type="text" value={row.key} placeholder={messages.paramKeyPlaceholder} aria-label={messages.paramKeyPlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} />
+              <input className="run-config-input" type="text" value={row.value} placeholder={messages.paramValuePlaceholder} aria-label={messages.paramValuePlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} />
+              <button className="run-param-remove" type="button" aria-label={messages.removeParam} onClick={() => onRunParamsChange(runParams.filter((_item, itemIndex) => itemIndex !== index))}>×</button>
+            </div>)}
+            <button className="text-button run-param-add" type="button" onClick={() => onRunParamsChange([...runParams, { key: '', value: '' }])}>{messages.addParam}</button>
+          </div>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.maxParallel}</span>
+            <input className="run-config-input" type="number" min={1} value={maxParallel} aria-label={messages.maxParallel} onChange={event => onMaxParallelChange(event.target.value)} />
+          </label>
+        </>}
+        {runtime === 'opsbot-session' && <>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionPrompt}</span>
+            <textarea className="run-config-input run-config-textarea" rows={4} value={sessionPrompt} aria-label={messages.sessionPrompt} onChange={event => onSessionPromptChange(event.target.value)} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.agentRuntime}</span>
+            <select className="run-config-select" value={sessionRuntime} aria-label={messages.agentRuntime} onChange={event => onSessionRuntimeChange(event.target.value)}>
+              {SESSION_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionModel}</span>
+            <input className="run-config-input" type="text" value={sessionModel} aria-label={messages.sessionModel} onChange={event => onSessionModelChange(event.target.value)} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionSystemPrompt}</span>
+            <textarea className="run-config-input run-config-textarea" rows={3} value={sessionSystemPrompt} aria-label={messages.sessionSystemPrompt} onChange={event => onSessionSystemPromptChange(event.target.value)} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionMaxIterations}</span>
+            <input className="run-config-input" type="number" min={1} value={sessionMaxIterations} aria-label={messages.sessionMaxIterations} onChange={event => onSessionMaxIterationsChange(event.target.value)} />
+          </label>
+          <label className="run-config-field run-config-check">
+            <input type="checkbox" checked={sessionReviewerEnabled} aria-label={messages.sessionReviewerEnabled} onChange={event => onSessionReviewerEnabledChange(event.target.checked)} />
+            <span className="run-config-title">{messages.sessionReviewerEnabled}</span>
+          </label>
+        </>}
       </>}
     </div>
     <button className="run-action" type="button" onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>

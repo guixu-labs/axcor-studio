@@ -4,7 +4,7 @@ import { MockOpsbotClient } from '../src/renderer/services/opsbotClient';
 
 test('mock client emits a completed run', async () => {
   const client = new MockOpsbotClient();
-  const run = await client.createRun({ workflowId: 'workflow.md', runtime: 'opsbot' });
+  const run = await client.createRun({ workflowId: 'workflow.md', runtime: 'opsbot-run' });
   const events: string[] = [];
   client.subscribeRunEvents(run.id, event => events.push(event.type));
   await new Promise(resolve => setTimeout(resolve, 1400));

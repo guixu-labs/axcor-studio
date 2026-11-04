@@ -2,12 +2,14 @@ import path from 'node:path';
 import type { CreateRunInput, Run } from './shared/protocol';
 import {
   mapRun,
+  mapSession,
   OpsbotApiError,
   type InsightImportResult,
   type InsightStatusResult,
   type OpsbotRunDetailResponse,
   type OpsbotRunListResponse,
   type OpsbotSession,
+  type OpsbotSessionRecord,
   type OpsbotStartRunResponse,
 } from './shared/opsbotApi';
 
@@ -51,6 +53,14 @@ export async function opsbotRequest<T>(method: 'GET' | 'POST', apiPath: string, 
   return JSON.parse(text) as T;
 }
 
+// Tracks which run ids were created as sessions so list/get/stop/events
+// dispatch to the session API instead of the run API.
+const sessionRunIds = new Set<string>();
+
+export function isSessionRun(runId: string): boolean {
+  return sessionRunIds.has(runId);
+}
+
 export async function startOpsbotRun(input: CreateRunInput): Promise<Run> {
   if (!input.workspacePath) {
     throw new OpsbotApiError(422, '运行工作流需要先选择工作区');
@@ -67,17 +77,60 @@ export async function startOpsbotRun(input: CreateRunInput): Promise<Run> {
   return getOpsbotRun(started.run_id);
 }
 
+export async function startOpsbotSession(input: CreateRunInput): Promise<Run> {
+  if (!input.workspacePath) {
+    throw new OpsbotApiError(422, '启动会话需要先选择工作区');
+  }
+  const prompt = input.prompt?.trim();
+  if (!prompt) {
+    throw new OpsbotApiError(422, '会话模式需要填写提示词');
+  }
+  const body: Record<string, unknown> = {
+    project_dir: input.workspacePath,
+    prompt,
+  };
+  if (input.sessionRuntime) body.runtime = input.sessionRuntime;
+  if (input.model?.trim()) body.model = input.model.trim();
+  if (input.systemPrompt?.trim()) body.system_prompt = input.systemPrompt.trim();
+  if (input.maxIterations !== undefined) body.max_iterations = input.maxIterations;
+  if (input.reviewerEnabled !== undefined) body.reviewer_enabled = input.reviewerEnabled;
+  const started = await opsbotRequest<{ session_id: string }>('POST', '/api/v1/sessions/start', body);
+  sessionRunIds.add(started.session_id);
+  return getOpsbotRun(started.session_id);
+}
+
 export async function listOpsbotRuns(): Promise<Run[]> {
-  const response = await opsbotRequest<OpsbotRunListResponse>('GET', '/api/v1/runs');
-  return response.runs.map(mapRun);
+  const [runsResponse, sessions] = await Promise.all([
+    opsbotRequest<OpsbotRunListResponse>('GET', '/api/v1/runs'),
+    opsbotRequest<OpsbotSessionRecord[]>('GET', '/api/v1/sessions'),
+  ]);
+  for (const session of sessions) sessionRunIds.add(session.id);
+  return [...runsResponse.runs.map(mapRun), ...sessions.map(mapSession)];
 }
 
 export async function getOpsbotRun(runId: string): Promise<Run> {
-  const response = await opsbotRequest<OpsbotRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
-  return mapRun(response.run);
+  if (sessionRunIds.has(runId)) {
+    const session = await opsbotRequest<OpsbotSessionRecord>('GET', `/api/v1/sessions/${encodeURIComponent(runId)}`);
+    return mapSession(session);
+  }
+  try {
+    const response = await opsbotRequest<OpsbotRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
+    return mapRun(response.run);
+  } catch (error) {
+    if (error instanceof OpsbotApiError && error.status === 404) {
+      const session = await opsbotRequest<OpsbotSessionRecord>('GET', `/api/v1/sessions/${encodeURIComponent(runId)}`);
+      sessionRunIds.add(runId);
+      return mapSession(session);
+    }
+    throw error;
+  }
 }
 
 export async function stopOpsbotRun(runId: string): Promise<Run> {
+  if (sessionRunIds.has(runId)) {
+    await opsbotRequest<Record<string, unknown>>('POST', `/api/v1/sessions/${encodeURIComponent(runId)}/stop`);
+    return getOpsbotRun(runId);
+  }
   await opsbotRequest<{ run_id: string; status: string; accepted: boolean }>('POST', `/api/v1/runs/${encodeURIComponent(runId)}/stop`);
   return getOpsbotRun(runId);
 }
@@ -85,14 +138,6 @@ export async function stopOpsbotRun(runId: string): Promise<Run> {
 export async function getOpsbotRunSessions(runId: string): Promise<OpsbotSession[]> {
   const response = await opsbotRequest<OpsbotRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
   return response.sessions;
-}
-
-export async function injectOpsbotSessionPrompt(runId: string, sessionId: string, prompt: string): Promise<void> {
-  await opsbotRequest<{ run_id: string; session_id: string; accepted: boolean }>(
-    'POST',
-    `/api/v1/runs/${encodeURIComponent(runId)}/sessions/${encodeURIComponent(sessionId)}/inject`,
-    { prompt },
-  );
 }
 
 export async function importOpsbotSessionToInsight(sessionId: string): Promise<InsightImportResult> {

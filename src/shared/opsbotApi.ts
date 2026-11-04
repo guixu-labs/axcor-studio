@@ -101,6 +101,40 @@ export function mapRun(record: OpsbotRun): Run {
     status: mapRunStatus(record.status),
     createdAt: record.created_at,
     updatedAt: record.finished_at ?? record.reopened_at ?? record.created_at,
+    runtimeId: 'opsbot-run',
+  };
+}
+
+export interface OpsbotSessionRecord {
+  id: string;
+  name?: string | null;
+  role?: string | null;
+  state?: string;
+  created_at?: string | null;
+  stop_reason?: string | null;
+  loop_status?: string | null;
+}
+
+const SESSION_STATUS_MAP: Record<string, RunStatus> = {
+  creating: 'queued',
+  idle: 'queued',
+  waiting_retry: 'queued',
+  running: 'running',
+  paused: 'paused',
+  completed: 'completed',
+  failed: 'failed',
+  stopped: 'cancelled',
+};
+
+export function mapSession(session: OpsbotSessionRecord): Run {
+  const createdAt = session.created_at ?? '';
+  return {
+    id: session.id,
+    workflowId: session.name || session.id,
+    status: SESSION_STATUS_MAP[session.state ?? ''] ?? 'queued',
+    createdAt,
+    updatedAt: createdAt,
+    runtimeId: 'opsbot-session',
   };
 }
 

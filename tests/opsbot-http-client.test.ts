@@ -7,10 +7,10 @@ import {
   getOpsbotRun,
   getOpsbotRunSessions,
   importOpsbotSessionToInsight,
-  injectOpsbotSessionPrompt,
   listOpsbotRuns,
   setOpsbotBaseUrl,
   startOpsbotRun,
+  startOpsbotSession,
   stopOpsbotRun,
 } from '../src/opsbotHttp';
 import { OpsbotApiError } from '../src/shared/opsbotApi';
@@ -60,12 +60,34 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         res.end(JSON.stringify({ running: true, port: 21025 }));
         return;
       }
-      if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
-        res.end(JSON.stringify({ run_id: 'run-1', session_id: 'sess-1', accepted: true }));
-        return;
-      }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/stop') {
         res.end(JSON.stringify({ run_id: 'run-1', status: 'stopped', accepted: true }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/sessions') {
+        res.end(JSON.stringify([{ id: 'sess-9', name: 'ad-hoc-session', role: 'worker', state: 'running', created_at: '2026-11-03T09:00:00+00:00', stop_reason: null, loop_status: 'yes' }]));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-9') {
+        res.end(JSON.stringify({ id: 'sess-9', name: 'ad-hoc-session', role: 'worker', state: 'running', created_at: '2026-11-03T09:00:00+00:00', stop_reason: null, loop_status: 'yes' }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/sessions/start') {
+        res.statusCode = 201;
+        res.end(JSON.stringify({ session_id: 'sess-new' }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-new') {
+        res.end(JSON.stringify({ id: 'sess-new', name: 'my prompt', role: 'worker', state: 'running', created_at: '2026-11-03T09:30:00+00:00', stop_reason: null, loop_status: 'yes' }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/sessions/sess-new/stop') {
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/sessions/missing') {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ detail: 'session 不在账面：missing' }));
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/runs/missing') {
@@ -92,7 +114,7 @@ test('opsbot http client', async t => {
   t.after(() => fixture.server.close());
 
   await t.test('startOpsbotRun posts the workflow payload and maps the run', async () => {
-    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot' });
+    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot-run' });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs');
     assert.ok(post);
     assert.equal(post.body.program_path, '/tmp/ws/workflow.md');
@@ -104,7 +126,7 @@ test('opsbot http client', async t => {
   });
 
   await t.test('startOpsbotRun passes label, params and max_parallel when provided', async () => {
-    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot', label: 'release-check', params: { dataset: 'core', mode: 'fast' }, maxParallel: 4 });
+    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot-run', label: 'release-check', params: { dataset: 'core', mode: 'fast' }, maxParallel: 4 });
     const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
     assert.ok(post);
     assert.equal(post.body.label, 'release-check');
@@ -115,18 +137,49 @@ test('opsbot http client', async t => {
 
   await t.test('startOpsbotRun refuses without a workspace', async () => {
     await assert.rejects(
-      () => startOpsbotRun({ workflowId: 'workflow.md', runtime: 'opsbot' }),
+      () => startOpsbotRun({ workflowId: 'workflow.md', runtime: 'opsbot-run' }),
       (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 422,
     );
   });
 
-  await t.test('listOpsbotRuns maps statuses and workflow names', async () => {
+  await t.test('listOpsbotRuns merges runs and sessions with runtime ids', async () => {
     const runs = await listOpsbotRuns();
-    assert.equal(runs.length, 2);
+    assert.equal(runs.length, 3);
     assert.equal(runs[0].status, 'running');
+    assert.equal(runs[0].runtimeId, 'opsbot-run');
     assert.equal(runs[1].status, 'cancelled');
     assert.equal(runs[1].workflowId, 'run-2');
     assert.equal(runs[1].updatedAt, '2026-11-03T09:30:00+00:00');
+    assert.equal(runs[2].id, 'sess-9');
+    assert.equal(runs[2].runtimeId, 'opsbot-session');
+    assert.equal(runs[2].workflowId, 'ad-hoc-session');
+  });
+
+  await t.test('startOpsbotSession posts the session payload and maps the run', async () => {
+    const run = await startOpsbotSession({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'opsbot-session', prompt: 'my prompt', sessionRuntime: 'claude_sdk', model: 'claude-sonnet', systemPrompt: 'be brief', maxIterations: 12, reviewerEnabled: true });
+    const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/sessions/start');
+    assert.ok(post);
+    assert.equal(post.body.project_dir, '/tmp/ws');
+    assert.equal(post.body.prompt, 'my prompt');
+    assert.equal(post.body.runtime, 'claude_sdk');
+    assert.equal(post.body.model, 'claude-sonnet');
+    assert.equal(post.body.system_prompt, 'be brief');
+    assert.equal(post.body.max_iterations, 12);
+    assert.equal(post.body.reviewer_enabled, true);
+    assert.equal(run.id, 'sess-new');
+    assert.equal(run.runtimeId, 'opsbot-session');
+  });
+
+  await t.test('startOpsbotSession requires a prompt', async () => {
+    await assert.rejects(
+      () => startOpsbotSession({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'opsbot-session' }),
+      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 422 && error.message.includes('提示词'),
+    );
+  });
+
+  await t.test('stopOpsbotRun dispatches to the session stop endpoint for sessions', async () => {
+    await stopOpsbotRun('sess-new');
+    assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url === '/api/v1/sessions/sess-new/stop'));
   });
 
   await t.test('getOpsbotRun fetches the run detail', async () => {
@@ -159,13 +212,6 @@ test('opsbot http client', async t => {
     assert.match(result.error ?? '', /Cannot connect/);
   });
 
-  await t.test('injectOpsbotSessionPrompt posts the prompt to the session', async () => {
-    await injectOpsbotSessionPrompt('run-1', 'sess-1', '先把测试跑通');
-    const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject').at(-1);
-    assert.ok(post);
-    assert.deepEqual(post.body, { prompt: '先把测试跑通' });
-  });
-
   await t.test('getInsightStatus reports the insight port', async () => {
     const status = await getInsightStatus();
     assert.equal(status.running, true);
@@ -175,7 +221,7 @@ test('opsbot http client', async t => {
   await t.test('404 surfaces the opsbot detail message', async () => {
     await assert.rejects(
       () => getOpsbotRun('missing'),
-      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 404 && error.message.includes('run 不在账面：missing'),
+      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 404 && error.message.includes('session 不在账面：missing'),
     );
   });
 

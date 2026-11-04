@@ -103,4 +103,6 @@ footer { margin: 0 6px 6px; }
 .run-param-remove { width: 26px; border: 0; background: transparent; color: var(--muted); font-size: 14px; }
 .run-param-remove:hover { color: var(--text); }
 .run-param-add { justify-self: start; }
-.run-config-prompt { min-height: 64px; resize: vertical; }
+.run-config-textarea { resize: vertical; min-height: 64px; }
+.run-config-check { display: flex; align-items: center; gap: 8px; }
+.run-config-check input { accent-color: var(--accent); }
