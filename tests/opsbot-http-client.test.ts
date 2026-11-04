@@ -3,16 +3,22 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
+  activateProvider,
+  deleteProvider,
   getInsightStatus,
   getOpsbotRun,
   getOpsbotRunSessions,
   importOpsbotSessionToInsight,
   injectOpsbotSessionPrompt,
   listOpsbotRuns,
+  listProviders,
+  saveProviders,
   setOpsbotBaseUrl,
   startOpsbotRun,
   startOpsbotSession,
   stopOpsbotRun,
+  testProvider,
+  testProviderKey,
 } from '../src/opsbotHttp';
 import { OpsbotApiError } from '../src/shared/opsbotApi';
 
@@ -67,6 +73,30 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/stop') {
         res.end(JSON.stringify({ run_id: 'run-1', status: 'stopped', accepted: true }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/auth/keys') {
+        res.end(JSON.stringify({ keys: [{ key: 'sk-abc123', masked: 'sk-a*****3', provider_index: 0, model: 'claude-sonnet-4-6', base_url: 'https://api.example.com', runtime: 'claude_sdk', worker_validation: { success: true } }] }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/auth/keys') {
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      if (req.method === 'DELETE' && req.url === '/api/v1/auth/keys/0') {
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/auth/activate') {
+        res.end(JSON.stringify({ ok: true, active_index: 0 }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/auth/keys/0/test') {
+        res.end(JSON.stringify({ success: true }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/v1/auth/test-key') {
+        res.end(JSON.stringify({ success: true }));
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/sessions') {
@@ -228,6 +258,50 @@ test('opsbot http client', async t => {
     const inject = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject');
     assert.ok(inject);
     assert.equal(inject.body.prompt, '请继续推进');
+  });
+
+  await t.test('listProviders maps the provider rows', async () => {
+    const providers = await listProviders();
+    assert.equal(providers.length, 1);
+    assert.equal(providers[0].masked, 'sk-a*****3');
+    assert.equal(providers[0].model, 'claude-sonnet-4-6');
+    assert.equal(providers[0].worker_validation?.success, true);
+  });
+
+  await t.test('saveProviders posts the full key list', async () => {
+    const result = await saveProviders([{ key: 'sk-new', model: 'claude-opus', base_url: 'https://x', runtime: 'opencode' }]);
+    assert.equal(result.ok, true);
+    const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/auth/keys');
+    assert.ok(post);
+    const postedKeys = post.body.keys as Array<Record<string, unknown>>;
+    assert.equal(postedKeys[0].key, 'sk-new');
+    assert.equal(postedKeys[0].runtime, 'opencode');
+  });
+
+  await t.test('deleteProvider calls the delete endpoint', async () => {
+    await deleteProvider(0);
+    assert.ok(fixture.requests.some(r => r.method === 'DELETE' && r.url === '/api/v1/auth/keys/0'));
+  });
+
+  await t.test('activateProvider posts the index and maps the active index', async () => {
+    const result = await activateProvider(0);
+    assert.equal(result.ok, true);
+    assert.equal(result.activeIndex, 0);
+    const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/auth/activate');
+    assert.equal(post?.body.index, 0);
+  });
+
+  await t.test('testProvider retests one provider row', async () => {
+    const result = await testProvider(0);
+    assert.equal(result.success, true);
+  });
+
+  await t.test('testProviderKey validates a candidate without saving', async () => {
+    const result = await testProviderKey('sk-candidate', 'claude-opus', 'https://api.example.com', 'claude_sdk');
+    assert.equal(result.success, true);
+    const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/auth/test-key');
+    assert.equal(post?.body.key, 'sk-candidate');
+    assert.equal(post?.body.base_url, 'https://api.example.com');
   });
 
   await t.test('404 surfaces the opsbot detail message', async () => {

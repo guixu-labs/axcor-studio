@@ -20,10 +20,17 @@ import {
   startOpsbotRun,
   startOpsbotSession,
   stopOpsbotRun,
+  listProviders,
+  saveProviders,
+  deleteProvider,
+  activateProvider,
+  testProvider,
+  testProviderKey,
 } from './opsbotHttp';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
 import { walkWorkspace } from './workspaceFiles';
 import type { CreateRunInput } from './shared/protocol';
+import type { ProviderKeyInput } from './shared/opsbotApi';
 
 if (started) app.quit();
 
@@ -89,6 +96,12 @@ app.whenReady().then(() => {
   ipcMain.handle('opsbot:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectOpsbotSessionPrompt(runId, sessionId, prompt));
   ipcMain.handle('opsbot:import-to-insight', (_event, sessionId: string) => importOpsbotSessionToInsight(sessionId));
   ipcMain.handle('opsbot:insight-status', () => getInsightStatus());
+  ipcMain.handle('opsbot:list-providers', () => listProviders());
+  ipcMain.handle('opsbot:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));
+  ipcMain.handle('opsbot:delete-provider', (_event, providerIndex: number) => deleteProvider(providerIndex));
+  ipcMain.handle('opsbot:activate-provider', (_event, providerIndex: number) => activateProvider(providerIndex));
+  ipcMain.handle('opsbot:test-provider', (_event, providerIndex: number) => testProvider(providerIndex));
+  ipcMain.handle('opsbot:test-provider-key', (_event, key: string, model: string, baseUrl: string, runtime: string | undefined) => testProviderKey(key, model, baseUrl, runtime));
   ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => { showInsight(path, bounds, isDark); });
   ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => { updateInsightBounds(bounds); });
   ipcMain.handle('insight:hide', () => { hideInsight(); });

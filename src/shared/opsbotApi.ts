@@ -57,6 +57,37 @@ export interface InsightStatusResult {
   port: number;
 }
 
+export interface ProviderValidation {
+  success?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface ProviderKey {
+  key: string;
+  masked: string;
+  provider_index: number;
+  model?: string;
+  base_url?: string;
+  runtime?: string;
+  provider_kind?: string;
+  worker_validation?: ProviderValidation;
+  reviewer_validation?: ProviderValidation;
+}
+
+export interface ProviderKeyInput {
+  key: string;
+  model?: string;
+  base_url?: string;
+  runtime?: string;
+}
+
+export interface ProviderTestResult {
+  success?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
 export interface OpsbotStartRunResponse {
   run_id: string;
   status: OpsbotRunStatus;

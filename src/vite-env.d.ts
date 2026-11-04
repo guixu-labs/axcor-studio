@@ -22,6 +22,12 @@ interface Window {
     injectPrompt(runId: string, sessionId: string, prompt: string): Promise<void>;
     importToInsight(sessionId: string): Promise<import('./shared/opsbotApi').InsightImportResult>;
     insightStatus(): Promise<import('./shared/opsbotApi').InsightStatusResult>;
+    listProviders(): Promise<import('./shared/opsbotApi').ProviderKey[]>;
+    saveProviders(keys: import('./shared/opsbotApi').ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }>;
+    deleteProvider(providerIndex: number): Promise<void>;
+    activateProvider(providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }>;
+    testProvider(providerIndex: number): Promise<import('./shared/opsbotApi').ProviderTestResult>;
+    testProviderKey(key: string, model: string, baseUrl: string, runtime?: string): Promise<import('./shared/opsbotApi').ProviderTestResult>;
     subscribeRunEvents(runId: string, listener: (event: import('./shared/protocol').RunEvent) => void): () => void;
   };
   insight: {

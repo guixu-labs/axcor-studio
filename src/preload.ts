@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CreateRunInput, Run, RunEvent } from './shared/protocol';
-import type { InsightImportResult, InsightStatusResult, OpsbotSession } from './shared/opsbotApi';
+import type { InsightImportResult, InsightStatusResult, OpsbotSession, ProviderKey, ProviderKeyInput, ProviderTestResult } from './shared/opsbotApi';
 import type { WorkspaceNode } from './workspaceFiles';
 
 contextBridge.exposeInMainWorld('workbench', {
@@ -22,6 +22,12 @@ contextBridge.exposeInMainWorld('opsbot', {
   injectPrompt: (runId: string, sessionId: string, prompt: string): Promise<void> => ipcRenderer.invoke('opsbot:inject-prompt', runId, sessionId, prompt),
   importToInsight: (sessionId: string): Promise<InsightImportResult> => ipcRenderer.invoke('opsbot:import-to-insight', sessionId),
   insightStatus: (): Promise<InsightStatusResult> => ipcRenderer.invoke('opsbot:insight-status'),
+  listProviders: (): Promise<ProviderKey[]> => ipcRenderer.invoke('opsbot:list-providers'),
+  saveProviders: (keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('opsbot:save-providers', keys),
+  deleteProvider: (providerIndex: number): Promise<void> => ipcRenderer.invoke('opsbot:delete-provider', providerIndex),
+  activateProvider: (providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> => ipcRenderer.invoke('opsbot:activate-provider', providerIndex),
+  testProvider: (providerIndex: number): Promise<ProviderTestResult> => ipcRenderer.invoke('opsbot:test-provider', providerIndex),
+  testProviderKey: (key: string, model: string, baseUrl: string, runtime?: string): Promise<ProviderTestResult> => ipcRenderer.invoke('opsbot:test-provider-key', key, model, baseUrl, runtime),
   subscribeRunEvents: (runId: string, listener: (event: RunEvent) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, runEvent: RunEvent): void => {
       if (runEvent.runId === runId) listener(runEvent);

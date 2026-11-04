@@ -106,3 +106,22 @@ footer { margin: 0 6px 6px; }
 .run-config-textarea { resize: vertical; min-height: 64px; }
 .run-config-check { display: flex; align-items: center; gap: 8px; }
 .run-config-check input { accent-color: var(--accent); }
+.providers-panel { display: grid; gap: 14px; max-width: 780px; }
+.providers-notice { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #77d6a1 45%, var(--border)); border-radius: 7px; background: color-mix(in srgb, #77d6a1 12%, transparent); color: var(--text); font-size: 11px; }
+.provider-list { display: grid; gap: 8px; }
+.provider-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); }
+.provider-row-active { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.provider-main { display: grid; gap: 6px; min-width: 0; }
+.provider-key { color: var(--text); font-size: 12px; font-family: var(--app-font); }
+.provider-title { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.provider-meta { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 11px; }
+.provider-actions { display: flex; gap: 6px; flex: none; }
+.provider-delete { color: var(--muted); }
+.provider-chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; }
+.provider-chip-ok { color: #77d6a1; background: color-mix(in srgb, #77d6a1 15%, transparent); }
+.provider-chip-fail { color: #ef8c9d; background: color-mix(in srgb, #ef8c9d 15%, transparent); }
+.provider-chip-untested { color: var(--muted); background: color-mix(in srgb, var(--muted) 15%, transparent); }
+.provider-chip-active { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.providers-form { display: grid; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
+.providers-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.providers-form-actions { display: flex; gap: 8px; justify-content: flex-end; }

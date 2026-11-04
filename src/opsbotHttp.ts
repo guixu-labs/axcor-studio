@@ -11,6 +11,9 @@ import {
   type OpsbotSession,
   type OpsbotSessionRecord,
   type OpsbotStartRunResponse,
+  type ProviderKey,
+  type ProviderKeyInput,
+  type ProviderTestResult,
 } from './shared/opsbotApi';
 
 const DEFAULT_BASE_URL = process.env.OPSBOT_BASE_URL ?? 'http://127.0.0.1:18600';
@@ -27,7 +30,7 @@ export function getOpsbotBaseUrl(): string {
   return baseUrl;
 }
 
-export async function opsbotRequest<T>(method: 'GET' | 'POST', apiPath: string, body?: Record<string, unknown>): Promise<T> {
+export async function opsbotRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPath: string, body?: Record<string, unknown>): Promise<T> {
   let response: Response;
   try {
     response = await fetch(baseUrl + apiPath, {
@@ -155,4 +158,31 @@ export async function importOpsbotSessionToInsight(sessionId: string): Promise<I
 
 export async function getInsightStatus(): Promise<InsightStatusResult> {
   return opsbotRequest<InsightStatusResult>('GET', '/api/v1/insight/status');
+}
+
+export async function listProviders(): Promise<ProviderKey[]> {
+  const result = await opsbotRequest<{ keys?: ProviderKey[] }>('GET', '/api/v1/auth/keys');
+  return result.keys ?? [];
+}
+
+export async function saveProviders(keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> {
+  const result = await opsbotRequest<{ ok?: boolean; error?: string }>('POST', '/api/v1/auth/keys', { keys });
+  return { ok: result.ok === true, error: result.error };
+}
+
+export async function deleteProvider(providerIndex: number): Promise<void> {
+  await opsbotRequest<{ ok: boolean }>('DELETE', `/api/v1/auth/keys/${providerIndex}`);
+}
+
+export async function activateProvider(providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> {
+  const result = await opsbotRequest<{ ok?: boolean; active_index?: number }>('POST', '/api/v1/auth/activate', { index: providerIndex });
+  return { ok: result.ok === true, activeIndex: result.active_index };
+}
+
+export async function testProvider(providerIndex: number): Promise<ProviderTestResult> {
+  return opsbotRequest<ProviderTestResult>('POST', `/api/v1/auth/keys/${providerIndex}/test`);
+}
+
+export async function testProviderKey(key: string, model: string, baseUrl: string, runtime?: string): Promise<ProviderTestResult> {
+  return opsbotRequest<ProviderTestResult>('POST', '/api/v1/auth/test-key', { key, model, base_url: baseUrl, ...(runtime ? { runtime } : {}) });
 }

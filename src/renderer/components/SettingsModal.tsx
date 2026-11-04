@@ -1,6 +1,7 @@
 import { defaultFont, defaultTheme, fonts, themes } from '../settings';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { localeOptions, type LocaleId, type Messages } from '../i18n';
+import type { ProviderKey } from '../../shared/opsbotApi';
 
 export type ThemeId = string;
 export type FontId = string;
@@ -142,11 +143,141 @@ function InputField({ title, description, icon, value, ariaLabel, onChange }: In
   </div>;
 }
 
-const categories = ['appearance', 'general'] as const;
+const PROVIDER_RUNTIME_OPTIONS = [
+  { id: 'claude_sdk', label: 'Claude SDK' },
+  { id: 'claude_cli', label: 'Claude CLI' },
+  { id: 'opencode', label: 'OpenCode' },
+  { id: 'codex_cli', label: 'Codex CLI' },
+];
+
+function validationChip(validation: ProviderKey['worker_validation'], messages: Messages): JSX.Element {
+  if (!validation) return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
+  if (validation.success === true) return <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>;
+  if (validation.success === false) return <span className="provider-chip provider-chip-fail">{messages.providerFailed}</span>;
+  return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
+}
+
+function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
+  const [providers, setProviders] = useState<ProviderKey[] | null>(null);
+  const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
+  const [activeIndex, setActiveIndex] = useState<number>();
+  const [key, setKey] = useState('');
+  const [model, setModel] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [runtime, setRuntime] = useState('claude_sdk');
+  const [busy, setBusy] = useState(false);
+
+  const refresh = async (): Promise<void> => {
+    try {
+      setProviders(await window.opsbot.listProviders());
+      setError(undefined);
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
+    }
+  };
+  useEffect(() => { void refresh(); }, []);
+
+  const run = async (action: () => Promise<void>): Promise<void> => {
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      await action();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : String(actionError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const testCandidate = async (): Promise<void> => {
+    setNotice(undefined);
+    setError(undefined);
+    try {
+      const result = await window.opsbot.testProviderKey(key.trim(), model.trim(), baseUrl.trim(), runtime);
+      setNotice(result.success === false || result.error ? `${messages.providerTestFailed}：${result.error ?? 'unknown'}` : messages.providerTestPassed);
+    } catch (testError) {
+      setError(testError instanceof Error ? testError.message : String(testError));
+    }
+  };
+
+  const addProvider = async (): Promise<void> => {
+    if (!key.trim()) { setError(messages.providerKey + ' 不能为空'); return; }
+    await run(async () => {
+      const rows = (providers ?? []).map(provider => ({
+        key: provider.key,
+        ...(provider.model ? { model: provider.model } : {}),
+        ...(provider.base_url ? { base_url: provider.base_url } : {}),
+        ...(provider.runtime ? { runtime: provider.runtime } : {}),
+      }));
+      rows.push({ key: key.trim(), ...(model.trim() ? { model: model.trim() } : {}), ...(baseUrl.trim() ? { base_url: baseUrl.trim() } : {}), runtime });
+      const saved = await window.opsbot.saveProviders(rows);
+      if (!saved.ok) { setError(saved.error ?? '保存失败'); return; }
+      setKey(''); setModel(''); setBaseUrl('');
+      setNotice(messages.providerSaved);
+      await refresh();
+    });
+  };
+
+  return <div className="providers-panel">
+    {error && <p className="run-list-error" role="alert">{error}</p>}
+    {notice && <p className="providers-notice" role="status">{notice}</p>}
+    <div className="provider-list">
+      {providers === null && !error && <p className="providers-loading">{messages.insightHint}</p>}
+      {providers?.length === 0 && !error && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
+      {providers?.map(provider => <div className={'provider-row' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={provider.provider_index}>
+        <div className="provider-main">
+          <div className="provider-key"><span className="provider-title">{messages.providerKey}</span>{provider.masked}</div>
+          <div className="provider-meta">
+            {provider.model && <span><span className="provider-title">{messages.providerModel}</span>{provider.model}</span>}
+            {provider.base_url && <span><span className="provider-title">{messages.providerBaseUrl}</span>{provider.base_url}</span>}
+            {provider.runtime && <span><span className="provider-title">{messages.providerRuntime}</span>{provider.runtime}</span>}
+          </div>
+          {validationChip(provider.worker_validation, messages)}
+          {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
+        </div>
+        <div className="provider-actions">
+          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.testProvider(provider.provider_index); setNotice(messages.providerTestPassed); })}>{messages.testKey}</button>
+          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { const result = await window.opsbot.activateProvider(provider.provider_index); if (!result.ok) { setError('激活失败'); return; } setActiveIndex(result.activeIndex); setNotice(messages.providerActivated); })}>{messages.providerActive}</button>
+          <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
+        </div>
+      </div>)}
+    </div>
+    <div className="providers-form">
+      <div className="providers-form-grid">
+        <label className="run-config-field">
+          <span className="run-config-title">{messages.providerKey}</span>
+          <input className="run-config-input" type="password" value={key} aria-label={messages.providerKey} onChange={event => setKey(event.target.value)} />
+        </label>
+        <label className="run-config-field">
+          <span className="run-config-title">{messages.providerModel}</span>
+          <input className="run-config-input" type="text" value={model} aria-label={messages.providerModel} onChange={event => setModel(event.target.value)} />
+        </label>
+        <label className="run-config-field">
+          <span className="run-config-title">{messages.providerBaseUrl}</span>
+          <input className="run-config-input" type="text" value={baseUrl} aria-label={messages.providerBaseUrl} onChange={event => setBaseUrl(event.target.value)} />
+        </label>
+        <label className="run-config-field">
+          <span className="run-config-title">{messages.providerRuntime}</span>
+          <select className="run-config-select" value={runtime} aria-label={messages.providerRuntime} onChange={event => setRuntime(event.target.value)}>
+            {PROVIDER_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="providers-form-actions">
+        <button className="settings-image-button" type="button" disabled={busy} onClick={() => void testCandidate()}>{messages.testKey}</button>
+        <button className="settings-image-button" type="button" disabled={busy} onClick={() => void addProvider()}>{messages.addProvider}</button>
+      </div>
+    </div>
+  </div>;
+}
+
+const categories = ['appearance', 'general', 'providers'] as const;
 
 export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
-  const categoryLabel = activeCategory === 'appearance' ? messages.appearance : messages.general;
+  const categoryLabels: Record<typeof categories[number], string> = { appearance: messages.appearance, general: messages.general, providers: messages.providers };
+  const categoryLabel = categoryLabels[activeCategory];
   return <div className="settings-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <header className="settings-header">
@@ -165,7 +296,7 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
             aria-current={activeCategory === category ? 'page' : undefined}
             onClick={() => setActiveCategory(category)}
           >
-            {category === 'appearance' ? messages.appearance : messages.general}
+            {categoryLabels[category]}
           </button>)}
         </nav>
         <div className="settings-content">
@@ -213,26 +344,28 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                 onSelect={value => onBackgroundFitChange(value as 'cover' | 'contain')}
               />
             </div>
-            : <div className="settings-fields">
-              <SelectField
-                title={messages.language}
-                description={messages.languageDescription}
-                icon="文"
-                items={localeOptions}
-                selected={locale}
-                defaultId="zh-CN"
-                defaultBadge={messages.defaultBadge}
-                onSelect={value => onLocaleChange(value as LocaleId)}
-              />
-              <InputField
-                title={messages.opsbotUrl}
-                description={messages.opsbotUrlDescription}
-                icon="⇄"
-                value={opsbotUrl}
-                ariaLabel={messages.opsbotUrl}
-                onChange={onOpsbotUrlChange}
-              />
-            </div>}
+            : activeCategory === 'general'
+              ? <div className="settings-fields">
+                <SelectField
+                  title={messages.language}
+                  description={messages.languageDescription}
+                  icon="文"
+                  items={localeOptions}
+                  selected={locale}
+                  defaultId="zh-CN"
+                  defaultBadge={messages.defaultBadge}
+                  onSelect={value => onLocaleChange(value as LocaleId)}
+                />
+                <InputField
+                  title={messages.opsbotUrl}
+                  description={messages.opsbotUrlDescription}
+                  icon="⇄"
+                  value={opsbotUrl}
+                  ariaLabel={messages.opsbotUrl}
+                  onChange={onOpsbotUrlChange}
+                />
+              </div>
+              : <ProvidersPanel messages={messages} />}
         </div>
       </div>
     </section>
