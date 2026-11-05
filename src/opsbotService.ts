@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import { getOpsbotBaseUrl } from './opsbotHttp';
 
@@ -7,6 +7,20 @@ const STARTUP_WAIT_MS = 20_000;
 const POLL_INTERVAL_MS = 500;
 
 let starting = false;
+let spawnedChild: ChildProcess | undefined;
+
+/**
+ * Stop the Opsbot instance this workbench started, if any. Instances
+ * that were already running (reused) are never touched.
+ */
+export function stopOpsbotIfStarted(): void {
+  const child = spawnedChild;
+  spawnedChild = undefined;
+  if (child && !child.killed) {
+    console.log(`[opsbot] stopping instance started by the workbench (pid ${child.pid})`);
+    child.kill();
+  }
+}
 
 export async function isOpsbotReachable(baseUrl: string = getOpsbotBaseUrl()): Promise<boolean> {
   try {
@@ -37,7 +51,7 @@ async function spawnOpsbot(port: string): Promise<boolean> {
     const child = spawn(command, args, { env, cwd: os.homedir(), detached: true, stdio: 'ignore' });
     let settled = false;
     child.on('error', (error: NodeJS.ErrnoException) => { if (!settled) { settled = true; console.error(`[opsbot] spawn ${command} failed: ${error.message}`); resolve(false); } });
-    child.on('spawn', () => { if (!settled) { settled = true; console.log(`[opsbot] spawned ${command} (pid ${child.pid})`); child.unref(); resolve(true); } });
+    child.on('spawn', () => { if (!settled) { settled = true; spawnedChild = child; console.log(`[opsbot] spawned ${command} (pid ${child.pid})`); child.unref(); resolve(true); } });
   });
   if (await trySpawn('opsbot', ['web', '--port', port])) return true;
   return trySpawn('npx', ['opsbot', 'web', '--port', port]);

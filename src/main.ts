@@ -29,7 +29,7 @@ import {
 } from './opsbotHttp';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
 import { walkWorkspace } from './workspaceFiles';
-import { ensureOpsbotRunning } from './opsbotService';
+import { ensureOpsbotRunning, stopOpsbotIfStarted } from './opsbotService';
 import type { CreateRunInput } from './shared/protocol';
 import type { ProviderKeyInput } from './shared/opsbotApi';
 
@@ -111,6 +111,11 @@ app.whenReady().then(() => {
   ipcMain.on('opsbot:unsubscribe-events', (_event, runId: string) => unsubscribeOpsbotEvents(runId));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+
+app.on('before-quit', () => {
+  stopAllOpsbotPolls();
+  stopOpsbotIfStarted();
 });
 
 app.on('window-all-closed', () => {

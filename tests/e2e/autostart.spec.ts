@@ -68,5 +68,15 @@ test.describe('opsbot auto-start', () => {
     // the renderer retries until the run list arrives.
     await expect(window.getByRole('option', { name: /auto-started/ })).toBeVisible({ timeout: 20_000 });
     await expect(window.locator('.run-list-error')).toHaveCount(0);
+    // Quitting the workbench must stop the instance it started.
+    await app.close();
+    app = undefined as unknown as ElectronApplication;
+    const url = `http://127.0.0.1:${opsbotPort}/api/v1/runs`;
+    let stopped = false;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try { await fetch(url, { signal: AbortSignal.timeout(500) }); } catch { stopped = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    expect(stopped).toBe(true);
   });
 });
