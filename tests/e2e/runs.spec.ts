@@ -64,7 +64,7 @@ test.describe('opsbot runs', () => {
   test.beforeEach(async () => {
     app = await electron.launch({
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_BASE_URL: fixture.url },
+      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: fixture.url },
     });
     window = await app.firstWindow();
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
@@ -99,12 +99,12 @@ test.describe('opsbot runs', () => {
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
       // Point the app at an unreachable port so the boot-time list fails
       // deterministically, independent of any opsbot running on the host.
-      env: { ...process.env, OPSBOT_BASE_URL: 'http://127.0.0.1:1' },
+      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: 'http://127.0.0.1:1' },
     });
     const defaultWindow = await defaultApp.firstWindow();
     await defaultWindow.waitForLoadState('domcontentloaded');
     await expect(defaultWindow.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
-    await expect(defaultWindow.locator('.run-list-error')).toContainText('无法连接 Opsbot');
+    await expect(defaultWindow.locator('.run-list-error')).toContainText('无法连接 Opsbot', { timeout: 20_000 });
     await defaultWindow.locator('.rail-settings').click();
     await defaultWindow.getByRole('button', { name: '常规' }).click();
     await defaultWindow.getByLabel('Opsbot 地址').fill(fixture.url);

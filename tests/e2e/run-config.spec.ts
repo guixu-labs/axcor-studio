@@ -83,7 +83,7 @@ test.describe('run configuration', () => {
     capturedBodies = [];
     app = await electron.launch({
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, WORKBENCH_WORKSPACE: workspaceDir, OPSBOT_BASE_URL: opsbotUrl },
+      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir, OPSBOT_BASE_URL: opsbotUrl },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

@@ -84,7 +84,7 @@ test.describe('insight observability view', () => {
   test.beforeEach(async () => {
     app = await electron.launch({
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_BASE_URL: fixture.url },
+      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: fixture.url },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

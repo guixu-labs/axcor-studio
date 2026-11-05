@@ -78,6 +78,20 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.theme', theme), [theme]);
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
+  const bootListRuns = async (): Promise<void> => {
+    // Opsbot may be starting up under us; retry for a while before
+    // surfacing a connection error.
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        setRuns(await client.listRuns());
+        setOpsbotError(undefined);
+        return;
+      } catch (error) {
+        if (attempt === 5) setOpsbotError(error instanceof Error ? error.message : String(error));
+        else await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  };
   useEffect(() => {
     void window.opsbot.setBaseUrl(opsbotUrl ?? '');
     void window.workbench.getWorkspace().then(current => {
@@ -85,9 +99,7 @@ export default function App(): JSX.Element {
       setWorkspace(current);
       return loadWorkspaceTree();
     }).catch(() => {});
-    void client.listRuns()
-      .then(setRuns)
-      .catch((error: Error) => setOpsbotError(error.message));
+    void bootListRuns();
   }, []);
   useEffect(() => {
     if (!selectedRunId) return;

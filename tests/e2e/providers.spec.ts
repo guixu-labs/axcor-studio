@@ -73,7 +73,7 @@ test.describe('provider settings', () => {
     captured = [];
     app = await electron.launch({
       args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_BASE_URL: opsbotUrl },
+      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: opsbotUrl },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

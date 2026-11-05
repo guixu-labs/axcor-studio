@@ -29,6 +29,7 @@ import {
 } from './opsbotHttp';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
 import { walkWorkspace } from './workspaceFiles';
+import { ensureOpsbotRunning } from './opsbotService';
 import type { CreateRunInput } from './shared/protocol';
 import type { ProviderKeyInput } from './shared/opsbotApi';
 
@@ -74,6 +75,7 @@ const createWindow = (): void => {
 }
 
 app.whenReady().then(() => {
+  void ensureOpsbotRunning();
   ipcMain.handle('workspace:choose', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
     selectedWorkspace = result.canceled ? undefined : result.filePaths[0];

@@ -7,7 +7,7 @@ test.describe('settings', () => {
   let window: Page;
 
   test.beforeEach(async () => {
-    app = await electron.launch({ args: ['--no-sandbox', path.resolve('.vite/build/main.js')] });
+    app = await electron.launch({ args: ['--no-sandbox', path.resolve('.vite/build/main.js')], env: { ...process.env, OPSBOT_NO_AUTOSTART: '1' } });
     app.process().stderr?.on('data', chunk => console.error(`[electron] ${chunk.toString().trim()}`));
     window = await app.firstWindow();
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
