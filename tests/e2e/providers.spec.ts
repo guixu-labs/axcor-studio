@@ -99,7 +99,7 @@ test.describe('provider settings', () => {
     // Test the candidate form.
     await window.getByLabel('API 密钥').fill('sk-new-key');
     await window.getByLabel('模型').fill('claude-opus-4-6');
-    await window.getByLabel('基础地址').fill('https://other.example.com');
+    await window.getByLabel('地址').fill('https://other.example.com');
     await window.locator('.providers-form').getByRole('button', { name: '测试' }).click();
     await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/test-key')).toBe(true);
     // Add and save the provider list.
