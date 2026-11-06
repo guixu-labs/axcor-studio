@@ -74,7 +74,7 @@ GitHub Agentic Workflows 将文件分成两部分：YAML frontmatter 配置触�
 
 ### 5.1 保持易读的源文件，明确结构化边界
 
-现有[竞品调研与方案设计](agent-ide-research-and-design.md)提出以 Markdown 工作流及轻量 frontmatter 组织工作流资产。本次调研可作为该方向的补充依据。
+现有[方案设计](agent-ide-design.md)提出以 Markdown 工作流及轻量 frontmatter 组织工作流资产。本次调研可作为该方向的补充依据。
 
 建议保留 Markdown 对目标、上下文和验收的表达能力，逐步明确需要机器校验的内容：
 
