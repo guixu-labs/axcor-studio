@@ -1,6 +1,6 @@
 # axcor-studio
 
-![axcor-studio：工作流一站式解决平台，贯通编写、执行、观测与评测，通过（自）进化反馈形成闭环，支持团队协作开发与统一工作环境](docs/assets/axcor-studio-hero.png)
+![axcor-studio：工作流一站式解决平台，贯通编写、执行、观测与评测，通过（自）进化反馈形成闭环，支持团队协作开发与统一工作环境](assets/axcor-studio-hero.png)
 
 axcor-studio 定位为**工作流一站式解决平台**，目标是贯通工作流的编写、执行、观测、评测、（自）进化，支持团队间协作开发，为用户提供统一的工作环境。
 

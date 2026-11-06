@@ -1,12 +1,12 @@
 # Agent Workbench：方案设计
 
 **日期：** 2026-10-22  
-**文档拆分：** 2026-11-06；竞品能力对照、Axon 专项分析与官方来源见[竞品调研](agent-ide-competitive-research.md)。
+**文档拆分：** 2026-11-06；竞品能力对照、Axon 专项分析与官方来源见[竞品调研](axcor-studio-competitive-research.md)。
 **定位：** 面向“用自然语言编写和运行工作流”的工程师工作台，而不是给传统代码编辑器增加一个聊天侧栏。
 
 ## 1. 结论先行
 
-本方案以**工作流本身**作为一等工程资产：可发现、可组合、可执行、可暂停接管、可回放、可评测、可发布。代码是工作流产生的一类产物。依据[竞品调研](agent-ide-competitive-research.md)，控制面和执行留痕已有相近竞品覆盖，差异化需要通过资产可移植性、证据对账和质量回归验证。
+本方案以**工作流本身**作为一等工程资产：可发现、可组合、可执行、可暂停接管、可回放、可评测、可发布。代码是工作流产生的一类产物。依据[竞品调研](axcor-studio-competitive-research.md)，控制面和执行留痕已有相近竞品覆盖，差异化需要通过资产可移植性、证据对账和质量回归验证。
 
 建议产品定位为：
 
@@ -252,7 +252,7 @@ gates: [tests-pass, sift-compliance, human-approval]
 采用三层形态：
 
 1. **主工作台：独立 Desktop App（当前路线）**
-   - 自研壳复用 VS Code 工作台边界（NavigationRail / Explorer / Editor Part / Panel，见 doc/vscode-workbench-adaptation.md）；编辑器能力用同源组件组装：**Monaco**（编辑、语法高亮、diff）、**xterm.js**（终端）、**monaco-languageclient**（LSP）。
+   - 自研壳复用 VS Code 工作台边界（NavigationRail / Explorer / Editor Part / Panel）；编辑器能力用同源组件组装：**Monaco**（编辑、语法高亮、diff）、**xterm.js**（终端）、**monaco-languageclient**（LSP）。
    - 不重造编辑器长尾：SCM 用 git CLI 封装、搜索用 ripgrep、调试器与扩展市场不在 MVP 范围，按需演进。
    - 用户不跳回 VS Code；如需在外部编辑器打开文件，由本工具发深链，反向不成立。
 

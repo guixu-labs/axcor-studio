@@ -6,7 +6,7 @@
 
 **范围：** Agent 编码工具、工作流资产与任务执行控制面。Axon 分析依据公开资料，未安装实测；其余竞品沿用原调研内容，本次未重新核验。
 
-产品方案见[Agent Workbench 方案设计](agent-ide-design.md)。
+产品方案见[Agent Workbench 方案设计](axcor-studio-design.md)。
 
 ## 1. 趋势与设计启示
 
