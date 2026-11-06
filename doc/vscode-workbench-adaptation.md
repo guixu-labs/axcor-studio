@@ -3,7 +3,7 @@
 This project follows the main workbench boundaries from VS Code without copying
 its implementation or extension host:
 
-| VS Code part | Agent Workbench |
+| VS Code part | axcor-studio |
 | --- | --- |
 | Activity Bar | NavigationRail |
 | Primary Side Bar | WorkspaceExplorer |

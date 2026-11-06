@@ -1,23 +1,30 @@
-# Agent Workbench
+# axcor-studio
 
-Electron Forge + Vite + React desktop console for workflow-oriented Opsbot runs.
+axcor-studio 定位为**工作流一站式解决平台**，目标是贯通工作流的编写、执行、观测、评测、（自）进化，支持团队间协作开发。
 
-## Development
+当前以 Electron Forge + Vite + React 构建桌面工作台，接入 Opsbot 提供工作流执行服务，并嵌入 Insight 观测视图。下文说明当前已实现的能力与开发方式。
+
+## 开发启动
 
 ```bash
 npm install
 npm run start
 ```
 
-The first scaffold uses a `MockOpsbotClient`. It supports workspace selection, Markdown editing, saving, and a simulated run event stream. The Python Opsbot integration will be added behind the shared protocol in a later step.
+桌面应用通过 `WorkbenchOpsbotClient` 和 Electron IPC 访问真实的 Opsbot 运行 API，支持选择工作区、使用 Monaco 编辑并保存 Markdown、查看/启动/停止运行、轮询运行事件，以及在内嵌 Insight 视图中打开已导入的会话。需要单独启动 Opsbot；默认地址为 `http://127.0.0.1:18600`，可在设置中修改，或在启动应用时通过 `OPSBOT_BASE_URL` 配置。
 
-The dependency tree pins `@electron/rebuild` to the published 4.2.0 package. This avoids the GitHub-hosted `@electron/node-gyp` source dependency pulled by older rebuild releases, which can fail in restricted networks.
+`MockOpsbotClient` 保留用于隔离测试。产物获取和 Evidence 面板仍为占位实现；运行完成本身不代表代码或业务验收通过。
 
-## Checks
+依赖配置将 `@electron/rebuild` 固定为已发布的 4.2.0 版本，避免旧版本引入托管在 GitHub 上的 `@electron/node-gyp` 源码依赖，降低受限网络环境下的安装失败风险。
+
+## 检查与验证
 
 ```bash
 npm run lint
 npm run test
+npm run test:e2e
 npm run package
 npm run make
 ```
+
+按改动范围选择检查。HTTP 和 Electron E2E 测试使用本地 fixture，真实 Opsbot/Insight 服务的验证结果需单独记录。构建或分发相关改动需要执行打包检查。

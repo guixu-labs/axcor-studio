@@ -11,7 +11,7 @@
 
 建议产品定位为：
 
-> **Workflow-first Agent Workbench：以 Markdown 工作流为源代码，以 Agent 运行时为执行引擎，以证据和评测为质量门，以 VS Code 级工作区为交互载体。**
+> **Workflow-first axcor-studio：以 Markdown 工作流为源代码，以 Agent 运行时为执行引擎，以证据和评测为质量门，以 VS Code 级工作区为交互载体。**
 
 内部已有组件可以形成五层闭环：
 
@@ -151,7 +151,7 @@ gates: [tests-pass, sift-compliance, human-approval]
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│ Agent Workbench UI                                        │
+│ axcor-studio UI                                        │
 │ Workflow Explorer | Markdown/Plan | Run Control | Evidence │
 └───────────────────────┬────────────────────────────────────┘
                         │ Run API / Event Stream
