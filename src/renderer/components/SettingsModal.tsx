@@ -308,7 +308,7 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   </div>;
 }
 
-const categories = ['appearance', 'general', 'providers'] as const;
+const categories = ['general', 'appearance', 'providers'] as const;
 
 export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
