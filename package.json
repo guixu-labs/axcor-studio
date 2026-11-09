@@ -1,9 +1,9 @@
 {
-  "name": "agent-workbench",
+  "name": "axcor-studio",
   "version": "0.1.0",
-  "description": "Electron workflow control console for Opsbot",
+  "description": "工作流一站式解决平台",
   "main": ".vite/build/main.js",
-  "author": "Agent Workbench",
+  "author": "axcor-studio",
   "license": "MIT",
   "private": true,
   "overrides": {
