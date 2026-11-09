@@ -107,6 +107,17 @@ test.describe('provider settings', () => {
     await window.getByRole('button', { name: '模型供应商' }).click();
     await expect(cardHead).toContainText('常用供应商');
     // Test the candidate form.
+    const runtime = window.locator('.providers-form').getByRole('button', { name: '运行时', exact: true });
+    await runtime.click();
+    await expect(window.getByRole('option', { name: 'Claude SDK', selected: true })).toBeFocused();
+    await window.keyboard.press('Escape');
+    await expect(runtime).toBeFocused();
+    await expect(window.getByRole('listbox', { name: '运行时' })).toBeHidden();
+    await window.keyboard.press('ArrowDown');
+    await expect(window.getByRole('option', { name: 'Claude SDK', selected: true })).toBeFocused();
+    await window.keyboard.press('ArrowDown');
+    await window.keyboard.press('Enter');
+    await expect(runtime).toHaveText(/Claude CLI/);
     await window.getByLabel('API 密钥').fill('sk-new-key');
     await window.getByLabel('模型').fill('claude-opus-4-6');
     await window.getByLabel('地址').fill('https://other.example.com');
@@ -118,6 +129,7 @@ test.describe('provider settings', () => {
     const save = captured.find(request => request.method === 'POST' && request.url === '/api/v1/auth/keys');
     expect((save?.body.keys as Array<Record<string, unknown>>).length).toBe(2);
     expect((save?.body.keys as Array<Record<string, unknown>>)[1].key).toBe('sk-new-key');
+    expect((save?.body.keys as Array<Record<string, unknown>>)[1].runtime).toBe('claude_cli');
     // Expand the first card and activate the provider.
     await window.locator('.provider-card').first().locator('.provider-card-head').click();
     await window.locator('.provider-card').first().getByRole('button', { name: '使用' }).click();

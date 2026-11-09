@@ -66,57 +66,77 @@ function BackgroundImageField({ title, description, icon, hasImage, chooseLabel,
   </div>;
 }
 
-interface SelectFieldProps {
+interface CustomSelectProps {
   title: string;
-  description: string;
-  icon: string;
   items: Array<{ id: string; label: string; group?: string }>;
   groupLabels?: Record<string, string>;
   selected: string;
-  defaultId: string;
-  defaultBadge: string;
+  defaultId?: string;
+  defaultBadge?: string;
   onSelect: (value: string) => void;
 }
 
-function SelectField({ title, description, icon, items, groupLabels, selected, defaultId, defaultBadge, onSelect }: SelectFieldProps): JSX.Element {
+function CustomSelect({ title, items, groupLabels, selected, defaultId, defaultBadge, onSelect }: CustomSelectProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const selectedItem = items.find(item => item.id === selected) ?? items[0];
   useEffect(() => {
     const close = (event: MouseEvent): void => { if (container.current && !container.current.contains(event.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
-  return <div className="settings-field" ref={container}>
+  useEffect(() => {
+    if (open) container.current?.querySelector<HTMLButtonElement>('[role="option"][aria-selected="true"]')?.focus();
+  }, [open]);
+
+  return <div className={'custom-select' + (open ? ' open' : '')} ref={container} onKeyDown={event => {
+    if (event.key === 'Escape' && open) {
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    if (!open) { setOpen(true); return; }
+    const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    const current = options.indexOf(event.target as HTMLButtonElement);
+    const next = Math.min(options.length - 1, Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1)));
+    options[next]?.focus();
+  }}>
+    <button className="custom-select-trigger" ref={trigger} type="button" aria-label={title} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(value => !value)}>
+      <span>{selectedItem?.label}</span>
+      <b aria-hidden="true">⌄</b>
+    </button>
+    {open && <div className="custom-select-menu" role="listbox" aria-label={title}>
+      {items.map((item, index) => <Fragment key={item.id}>
+        {item.group && item.group !== items[index - 1]?.group && <div className="custom-select-group" role="presentation">{groupLabels?.[item.group] ?? item.group}</div>}
+        <button
+          className={'custom-select-option' + (item.id === selected ? ' selected' : '')}
+          role="option"
+          aria-selected={item.id === selected}
+          type="button"
+          onClick={() => { onSelect(item.id); setOpen(false); trigger.current?.focus(); }}
+        >
+          <span>{item.label}</span>
+          <span className="custom-select-tags">
+            {item.id === defaultId && <em aria-hidden="true">{defaultBadge}</em>}
+            {item.id === selected && <b aria-hidden="true">✓</b>}
+          </span>
+        </button>
+      </Fragment>)}
+    </div>}
+  </div>;
+}
+
+function SelectField({ description, icon, ...select }: CustomSelectProps & { description: string; icon: string }): JSX.Element {
+  return <div className="settings-field">
     <span className="settings-field-icon" aria-hidden="true">{icon}</span>
     <div className="settings-field-main">
-      <div className="settings-field-title">{title}</div>
+      <div className="settings-field-title">{select.title}</div>
       <p className="settings-field-description">{description}</p>
       <div className="settings-field-control">
-        <div className={'custom-select' + (open ? ' open' : '')}>
-          <button className="custom-select-trigger" type="button" aria-label={title} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(value => !value)}>
-            <span>{selectedItem?.label}</span>
-            <b aria-hidden="true">⌄</b>
-          </button>
-          {open && <div className="custom-select-menu" role="listbox" aria-label={title}>
-            {items.map((item, index) => <Fragment key={item.id}>
-              {item.group && item.group !== items[index - 1]?.group && <div className="custom-select-group" role="presentation">{groupLabels?.[item.group] ?? item.group}</div>}
-              <button
-                className={'custom-select-option' + (item.id === selected ? ' selected' : '')}
-                role="option"
-                aria-selected={item.id === selected}
-                type="button"
-                onClick={() => { onSelect(item.id); setOpen(false); }}
-              >
-                <span>{item.label}</span>
-                <span className="custom-select-tags">
-                  {item.id === defaultId && <em aria-hidden="true">{defaultBadge}</em>}
-                  {item.id === selected && <b aria-hidden="true">✓</b>}
-                </span>
-              </button>
-            </Fragment>)}
-          </div>}
-        </div>
+        <CustomSelect {...select} />
       </div>
     </div>
   </div>;
@@ -272,12 +292,10 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
     <ProviderSection icon="＋" title={messages.addProvider}>
       <div className="providers-form">
         <div className="providers-form-grid">
-          <label className="run-config-field">
+          <div className="run-config-field">
             <span className="run-config-title">{messages.providerRuntime}</span>
-            <select className="run-config-select" value={runtime} aria-label={messages.providerRuntime} onChange={event => setRuntime(event.target.value)}>
-              {PROVIDER_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </select>
-          </label>
+            <CustomSelect title={messages.providerRuntime} items={PROVIDER_RUNTIME_OPTIONS} selected={runtime} onSelect={setRuntime} />
+          </div>
           <label className="run-config-field">
             <span className="run-config-title">{messages.providerBaseUrl}</span>
             <input className="run-config-input" type="text" value={baseUrl} aria-label={messages.providerBaseUrl} onChange={event => setBaseUrl(event.target.value)} />
@@ -355,6 +373,7 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
 }
 
 const categories = ['general', 'appearance', 'providers'] as const;
+const themeOptions = ['dark', 'light'].flatMap(group => themes.filter(theme => theme.group === group));
 
 export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
@@ -389,7 +408,7 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                 title={messages.theme}
                 description={messages.themeDescription}
                 icon="◐"
-                items={themes.map(item => ({ id: item.id, label: item.label, group: item.group }))}
+                items={themeOptions}
                 groupLabels={{ light: messages.lightThemes, dark: messages.darkThemes }}
                 selected={theme}
                 defaultId={defaultTheme.id}

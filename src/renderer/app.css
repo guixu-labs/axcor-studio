@@ -128,5 +128,7 @@ h3.settings-field-title { margin: 0; }
 .provider-chip-active { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .providers-form { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .providers-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.providers-form-grid .custom-select { max-width: none; }
+.providers-form-grid .custom-select-trigger { min-height: 28px; padding: 4px 8px; }
 .providers-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .providers-empty { margin: 0; color: var(--muted); font-size: 12px; }
