@@ -72,7 +72,7 @@ test.describe('provider settings', () => {
   test.beforeEach(async () => {
     captured = [];
     app = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
       env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: opsbotUrl },
     });
     window = await app.firstWindow();
@@ -91,11 +91,21 @@ test.describe('provider settings', () => {
   test('lists, adds, activates and deletes providers from settings', async () => {
     await window.locator('.rail-settings').click();
     await window.getByRole('button', { name: '模型供应商' }).click();
-    // The fixture provider renders as a card with masked key, model and validation chip.
-    await expect(window.locator('.provider-card')).toHaveCount(1);
-    await expect(window.locator('.provider-card')).toContainText('sk-a*****3');
-    await expect(window.locator('.provider-card')).toContainText('claude-sonnet-4-6');
-    await expect(window.locator('.provider-card')).toContainText('校验通过');
+    const card = window.locator('.provider-card');
+    const cardHead = card.locator('.provider-card-head');
+    await expect(card).toHaveCount(1);
+    await expect(cardHead).toContainText('Claude SDK · claude-sonnet-4-6');
+    await expect(cardHead).toContainText('校验通过');
+    await expect(card).not.toContainText('sk-a*****3');
+    await cardHead.click();
+    await expect(card.locator('.provider-meta > span')).toHaveText(['地址：https://api.example.com', 'API 密钥：sk-a*****3']);
+    await card.getByLabel('显示名称').fill('常用供应商');
+    await card.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(cardHead).toContainText('常用供应商');
+    await window.reload();
+    await window.locator('.rail-settings').click();
+    await window.getByRole('button', { name: '模型供应商' }).click();
+    await expect(cardHead).toContainText('常用供应商');
     // Test the candidate form.
     await window.getByLabel('API 密钥').fill('sk-new-key');
     await window.getByLabel('模型').fill('claude-opus-4-6');
@@ -113,6 +123,8 @@ test.describe('provider settings', () => {
     await window.locator('.provider-card').first().getByRole('button', { name: '使用' }).click();
     await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/activate')).toBe(true);
     expect(captured.find(request => request.url === '/api/v1/auth/activate')?.body.index).toBe(0);
+    await expect(card.locator('.provider-chip-active')).toBeVisible();
+    await expect(window.locator('.providers-notice')).toHaveCount(0);
     // Delete the first provider.
     await window.locator('.provider-card').first().getByRole('button', { name: '×' }).click();
     await expect.poll(() => captured.some(request => request.method === 'DELETE')).toBe(true);

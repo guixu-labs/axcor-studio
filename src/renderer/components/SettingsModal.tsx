@@ -1,6 +1,7 @@
 import { defaultFont, defaultTheme, fonts, themes } from '../settings';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { localeOptions, type LocaleId, type Messages } from '../i18n';
+import { loadWorkbenchState, saveWorkbenchState } from '../workbench/storage';
 import type { ProviderKey } from '../../shared/opsbotApi';
 
 export type ThemeId = string;
@@ -171,8 +172,28 @@ function providerRuntimeLabel(runtime?: string): string {
   return PROVIDER_RUNTIME_OPTIONS.find(item => item.id === runtime)?.label ?? runtime ?? '';
 }
 
-function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
-  const [providers, setProviders] = useState<ProviderKey[] | null>(null);
+function ProviderSection({ icon, title, children }: { icon: string; title: string; children: ReactNode }): JSX.Element {
+  return <section className="settings-field">
+    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
+    <div className="settings-field-main">
+      <h3 className="settings-field-title">{title}</h3>
+      <div className="settings-field-control">{children}</div>
+    </div>
+  </section>;
+}
+
+const providerNamesStorageKey = 'workbench.providerNames';
+
+async function providerIdentity(opsbotUrl: string, provider: ProviderKey): Promise<string> {
+  const config = [opsbotUrl.trim().replace(/\/+$/, ''), provider.key, provider.runtime, provider.model, provider.base_url];
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(config)));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl: string }): JSX.Element {
+  const [providers, setProviders] = useState<Array<ProviderKey & { identity: string }> | null>(null);
+  const [providerNames, setProviderNames] = useState(() => loadWorkbenchState<Record<string, string>>(providerNamesStorageKey, {}));
+  const [nameDraft, setNameDraft] = useState('');
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [activeIndex, setActiveIndex] = useState<number>();
@@ -181,17 +202,28 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const [baseUrl, setBaseUrl] = useState('');
   const [runtime, setRuntime] = useState('claude_sdk');
   const [busy, setBusy] = useState(false);
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   const refresh = async (): Promise<void> => {
     try {
-      setProviders(await window.opsbot.listProviders());
+      const rows = await window.opsbot.listProviders();
+      setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(opsbotUrl, provider) }))));
       setError(undefined);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
     }
   };
   useEffect(() => { void refresh(); }, []);
+
+  const saveProviderName = (identity: string): void => {
+    const names = { ...providerNames };
+    const name = nameDraft.trim();
+    if (name) names[identity] = name;
+    else delete names[identity];
+    setNameDraft(name);
+    setProviderNames(names);
+    saveWorkbenchState(providerNamesStorageKey, names);
+  };
 
   const run = async (action: () => Promise<void>): Promise<void> => {
     setBusy(true);
@@ -234,11 +266,10 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
     });
   };
 
-  return <div className="providers-panel">
+  return <div className="settings-fields">
     {error && <p className="run-list-error" role="alert">{error}</p>}
     {notice && <p className="providers-notice" role="status">{notice}</p>}
-    <section className="providers-section">
-      <h3 className="providers-heading">{messages.addProvider}</h3>
+    <ProviderSection icon="＋" title={messages.addProvider}>
       <div className="providers-form">
         <div className="providers-form-grid">
           <label className="run-config-field">
@@ -265,27 +296,37 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
           <button className="settings-image-button" type="button" disabled={busy} onClick={() => void addProvider()}>{messages.add}</button>
         </div>
       </div>
-    </section>
-    <section className="providers-section">
-      <h3 className="providers-heading">{messages.providersExisting}</h3>
+    </ProviderSection>
+    <ProviderSection icon="☷" title={messages.providersExisting}>
       <div className="provider-list">
         {providers === null && !error && <p className="providers-empty">{messages.providersDescription}</p>}
         {providers?.length === 0 && !error && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
         {providers?.map(provider => {
-          const isExpanded = provider.provider_index === expandedIndex;
-          return <div className={'provider-row provider-card' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={provider.provider_index}>
-            <button className="provider-card-head" type="button" aria-expanded={isExpanded} onClick={() => setExpandedIndex(isExpanded ? null : provider.provider_index)}>
-              <span className="provider-key">{provider.masked}</span>
-              {provider.model && <span className="provider-model">{provider.model}</span>}
+          const cardId = `${provider.provider_index}:${provider.identity}`;
+          const isExpanded = cardId === expandedCard;
+          const customName = providerNames[provider.identity] ?? '';
+          const defaultName = [providerRuntimeLabel(provider.runtime), provider.model].filter(Boolean).join(' · ') || messages.defaultBadge;
+          return <div className={'provider-row provider-card' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={cardId}>
+            <button className="provider-card-head" type="button" aria-expanded={isExpanded} onClick={() => {
+              setNameDraft(customName);
+              setExpandedCard(isExpanded ? null : cardId);
+            }}>
+              <span className="provider-name">{customName || defaultName}</span>
               {validationChip(provider.worker_validation, messages)}
               {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
               <span className="provider-chevron" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
             </button>
             {isExpanded && <div className="provider-card-detail">
+              <form className="provider-name-form" onSubmit={event => { event.preventDefault(); saveProviderName(provider.identity); }}>
+                <label className="run-config-field">
+                  <span className="run-config-title">{messages.providerName}</span>
+                  <input className="run-config-input" value={nameDraft} placeholder={defaultName} onChange={event => setNameDraft(event.target.value)} />
+                </label>
+                <button className="settings-image-button" type="submit" disabled={nameDraft.trim() === customName}>{messages.save}</button>
+              </form>
               <div className="provider-meta">
-                {provider.base_url && <span>{messages.providerBaseUrl}：{provider.base_url}</span>}
-                {provider.runtime && <span>{messages.providerRuntime}：{providerRuntimeLabel(provider.runtime)}</span>}
-                {provider.worker_validation?.checked_at !== undefined && provider.worker_validation.checked_at !== null && <span>{messages.providerCheckedAt}：{String(provider.worker_validation.checked_at).slice(0, 19).replace('T', ' ')}</span>}
+                <span>{messages.providerBaseUrl}：{provider.base_url || messages.defaultBadge}</span>
+                <span>{messages.providerKey}：{provider.masked}</span>
               </div>
               <div className="provider-actions">
                 <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
@@ -297,14 +338,19 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
                     await refresh();
                   }
                 })}>{messages.testKey}</button>
-                <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => { const result = await window.opsbot.activateProvider(provider.provider_index); if (!result.ok) { setError('激活失败'); return; } setActiveIndex(result.activeIndex); setNotice(messages.providerActivated); })}>{messages.providerActive}</button>
-                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
+                <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
+                  const result = await window.opsbot.activateProvider(provider.provider_index);
+                  if (!result.ok) { setError('激活失败'); return; }
+                  setError(undefined);
+                  setActiveIndex(result.activeIndex ?? provider.provider_index);
+                })}>{messages.providerActive}</button>
+                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setExpandedCard(null); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
               </div>
             </div>}
           </div>;
         })}
       </div>
-    </section>
+    </ProviderSection>
   </div>;
 }
 
@@ -401,7 +447,7 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                   onChange={onOpsbotUrlChange}
                 />
               </div>
-              : <ProvidersPanel messages={messages} />}
+              : <ProvidersPanel messages={messages} opsbotUrl={opsbotUrl} />}
         </div>
       </div>
     </section>
