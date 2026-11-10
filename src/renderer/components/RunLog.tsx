@@ -57,16 +57,6 @@ function isToolCall(event: RunEvent): boolean {
   return event.type === 'tool_call' || event.type === 'tool_use';
 }
 
-function toolPreview(row: ToolCall, fields: Payload | undefined, kind: string, subagent: boolean): string {
-  const name = row.name || kind;
-  if (subagent) return nonempty(fields?.description) ?? nonempty(fields?.prompt) ?? name;
-  const argument = fields
-    ? [fields.command, fields.query, fields.url, fields.file_path, fields.pattern, fields.path, fields.description]
-      .map(nonempty).find(Boolean)
-    : nonempty(row.argument ?? row.input);
-  return argument ? `${name} · ${argument}` : name;
-}
-
 function notificationText(data: Payload | undefined): string | undefined {
   if (!data || typeof data.subtype !== 'string') return undefined;
   if (data.subtype === 'hook_response') {
@@ -146,7 +136,7 @@ function buildLog(events: RunEvent[], labels: Labels): LogEntry[] {
     } else if (event.type === 'tool_result') {
       if (data && attachResult(event, data, true)) continue;
       kind = labels.toolResult;
-      blocks = [{ text: payloadText(data?.content ?? data?.output ?? data?.result ?? event.payload) }];
+      blocks = [{ text: payloadText(data?.content ?? data?.output ?? data?.result ?? event.payload), label: 'toolResult' }];
     } else if (event.type === 'notification') {
       const text = notificationText(data);
       if (!text) continue;
@@ -165,7 +155,7 @@ function buildLog(events: RunEvent[], labels: Labels): LogEntry[] {
     blocks = blocks.filter(block => block.text.trim());
     if (!blocks.length) continue;
     const sample = blocks.find(block => !block.label) ?? blocks[0];
-    preview ||= (sample.label ? labels[sample.label] + ' · ' : '') + sample.text;
+    preview ||= sample.label ? labels[sample.label] : sample.text;
     const code = event.type === 'process_output' || event.type === 'process_exit';
     rows.push({ event, key: runEventKey(event), kind, preview, blocks, subagent, code });
   }
@@ -177,10 +167,8 @@ function buildLog(events: RunEvent[], labels: Labels): LogEntry[] {
     const blocks: Block[] = [];
     const fields = toolArgumentRecord(row.input, row.argument);
     const input = payloadText(fields ?? row.input ?? row.argument);
-    const preview = toolPreview(row, fields, kind, subagent);
-    const inputAlreadyShown = !fields && preview === `${row.name || kind} · ${input}`
-      && preview.length <= 240 && !/[\r\n]/.test(preview);
-    if (input && (!inputAlreadyShown || row.result)) blocks.push({ text: input, label: 'toolInput', code: true });
+    const preview = row.name || kind;
+    if (input.trim()) blocks.push({ text: input, label: 'toolInput', code: true });
     if (row.result) blocks.push(row.result);
     const status = row.failed ? 'failed' : row.result ? 'returned' : undefined;
     return { event: row.event, key: callKey(row.event), kind, preview, blocks, subagent, code: !subagent, status };
@@ -195,8 +183,7 @@ const LogRow = memo(function LogRow({ row, labels }: { row: LogEntry; labels: La
   });
   const preview = row.preview.trim().split(/\r?\n/, 1)[0].slice(0, 240);
   const singleBlock = row.blocks.length === 1 ? row.blocks[0] : undefined;
-  const singleText = singleBlock && (singleBlock.label ? `${labels[singleBlock.label]} · ` : '') + singleBlock.text.trim();
-  const expandable = row.blocks.length > 0 && singleText !== preview;
+  const expandable = row.blocks.length > 0 && (!singleBlock || singleBlock.label !== undefined || singleBlock.text.trim() !== preview);
   const displayText = expandable ? preview : row.preview.trim();
   const summary = <span className={'event-preview' + (row.code ? ' event-mono' : '')} title={displayText}>{displayText}</span>;
   return <div className={'event' + (event.source === 'run_events' ? ' event-workflow' : '') + (row.subagent ? ' event-subagent' : '')}>

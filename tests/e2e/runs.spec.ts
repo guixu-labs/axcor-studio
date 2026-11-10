@@ -41,6 +41,7 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
       const cursor = params.get('cursor');
       const events = cursor === null ? [
         assistantEvent,
+        { ...assistantEvent, data: { content: [{ type: 'thinking', thinking: '下一步检查配置。' }] } },
         { ...assistantEvent, event_type: 'notification', data: { subtype: 'thinking_tokens', estimated_tokens_delta: 1 } },
         { ...assistantEvent, event_type: 'session_activated', data: { state: 'running' } },
         { ...assistantEvent, event_type: 'iteration_start', data: { iteration: 2 } },
@@ -53,6 +54,7 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
           { type: 'text', text: '继续检查。' }, { type: 'tool_result', tool_use_id: 'tool-a', content: '内嵌工具结果' },
         ] } },
         { ...assistantEvent, event_type: 'tool_result', data: { tool_use_id: 'tool-a', content: '读取到工作流定义。' } },
+        { ...assistantEvent, event_type: 'tool_result', data: { tool_use_id: 'unmatched-tool', content: '未关联的工具结果。' } },
         { ...assistantEvent, event_type: 'tool_call', data: { name: 'WebSearch', arg: JSON.stringify({ query: '检查示例'.repeat(40) }), is_error: true } },
         { ...assistantEvent, event_type: 'tool_call', data: { name: 'Glob', arg: '*.md' } },
         { ...assistantEvent, event_type: 'tool_call', data: { name: 'Agent', arg: '检查工作区' } },
@@ -167,7 +169,7 @@ test.describe('execution runs', () => {
     await window.getByRole('option', { name: /会话日志示例/ }).click();
     const log = window.getByRole('log', { name: '运行日志' });
     const overview = window.locator('.run-overview');
-    const assistant = log.locator('.event').filter({ hasText: '助手消息' });
+    const assistant = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^已读完工作区文件。$/ }) });
     await expect(assistant.locator('summary')).toHaveText('已读完工作区文件。');
     await expect(assistant.locator('.event-thinking')).toBeHidden();
     await assistant.locator('summary').click();
@@ -175,24 +177,45 @@ test.describe('execution runs', () => {
     await expect(assistant.locator('.event-thinking')).toContainText('先检查入口文件。');
     await assistant.locator('summary').press('Enter');
     await expect(assistant.locator('.event-thinking')).toBeHidden();
-    const tool = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^Read · workflow\.md$/ }) });
+    const thinking = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^思考$/ }) });
+    await expect(thinking.locator('summary')).toHaveText('思考');
+    await expect(thinking.getByText('下一步检查配置。')).toBeHidden();
+    await thinking.locator('summary').click();
+    await expect(thinking.getByText('下一步检查配置。')).toBeVisible();
+    const tool = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^Read$/ }) });
     await expect(tool).toHaveCount(1);
+    await expect(tool.locator('summary')).toHaveText('Read');
     await expect(tool).toHaveCSS('grid-template-columns', /^64px 80px /);
     await expect(tool.locator(':scope > .event-state')).toHaveText('已返回');
+    await expect(tool.locator('.event-content')).toBeHidden();
     await tool.locator('summary').click();
     await expect(tool.locator('.event-block')).toHaveText([/参数.*workflow\.md/s, /结果.*读取到工作流定义。/s]);
-    const failedTool = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^WebSearch · 检查示例/ }) });
+    await tool.locator('summary').click();
+    await expect(tool.locator('.event-content')).toBeHidden();
+    const failedTool = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^WebSearch$/ }) });
     await expect(failedTool.locator(':scope > .event-state')).toHaveText('失败');
-    const spacing = await failedTool.evaluate(node => {
+    await expect(failedTool.getByText(/检查示例/)).toBeHidden();
+    const gap = await failedTool.evaluate(node => {
       const preview = node.querySelector('.event-preview')!;
       const status = node.querySelector('.event-state')!;
-      return { clipped: preview.scrollWidth > preview.clientWidth, gap: status.getBoundingClientRect().left - preview.getBoundingClientRect().right };
+      return status.getBoundingClientRect().left - preview.getBoundingClientRect().right;
     });
-    expect(spacing.clipped).toBe(true);
-    expect(spacing.gap).toBeGreaterThanOrEqual(8);
-    const dispatch = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^查询北京天气$/ }) });
+    expect(gap).toBeGreaterThanOrEqual(8);
+    await failedTool.locator('summary').click();
+    await expect(failedTool.getByText(/检查示例/)).toBeVisible();
+    const dispatch = log.locator('.event').filter({ has: window.locator('.event-content', { hasText: '查询北京天气' }) });
     await expect(dispatch.locator('.event-kind')).toHaveText('子代理调用');
-    for (const text of ['继续检查。', '已检查任务。', 'Glob · *.md']) {
+    await expect(dispatch.locator('summary')).toHaveText('Agent');
+    await expect(dispatch.locator('.event-content')).toBeHidden();
+    const glob = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^Glob$/ }) });
+    await expect(glob.getByText('*.md', { exact: true })).toBeHidden();
+    await glob.locator('summary').click();
+    await expect(glob.getByText('*.md', { exact: true })).toBeVisible();
+    const result = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^结果$/ }) });
+    await expect(result.getByText('未关联的工具结果。')).toBeHidden();
+    await result.locator('summary').click();
+    await expect(result.getByText('未关联的工具结果。')).toBeVisible();
+    for (const text of ['继续检查。', '已检查任务。']) {
       const row = log.locator('.event').filter({ has: window.getByText(text, { exact: true }) });
       await expect(row.locator('.event-preview')).toHaveText(text);
       await expect(row.locator('details')).toHaveCount(0);
