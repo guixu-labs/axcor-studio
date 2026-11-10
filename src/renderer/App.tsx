@@ -28,6 +28,7 @@ const EXECUTION_BACKEND_URL_STORAGE_KEY = 'workbench.executionBackendUrl';
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
+  const workspaceRequiredDialog = useRef<HTMLDialogElement>(null);
   const [tree, setTree] = useState<WorkspaceNode[]>([]);
   const [openFiles, setOpenFiles] = useState(() => loadWorkbenchState('workbench.openFiles', ['workflow.md']));
   const [file, setFile] = useState(() => loadWorkbenchState('workbench.activeFile', 'workflow.md'));
@@ -260,8 +261,8 @@ export default function App(): JSX.Element {
     setSessionModels('loading');
   };
   const startRun = async (): Promise<void> => {
+    if (!workspace) { workspaceRequiredDialog.current?.showModal(); return; }
     setExecutionError(undefined);
-    if (!workspace) { setExecutionError('运行工作流需要先选择工作区'); return; }
     let created: Run;
     try {
       if (runtime === 'session') {
@@ -408,6 +409,17 @@ export default function App(): JSX.Element {
       </div>
     </div>
     <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></footer>
+    <dialog className="workspace-required-dialog" ref={workspaceRequiredDialog} aria-labelledby="workspace-required-title" aria-describedby="workspace-required-message">
+      <h2 id="workspace-required-title">{t.workspaceRequiredTitle}</h2>
+      <p id="workspace-required-message">{t.workspaceRequiredMessage}</p>
+      <div className="workspace-required-actions">
+        <button className="secondary-button" type="button" onClick={() => workspaceRequiredDialog.current?.close()}>{t.cancel}</button>
+        <button className="primary-button" type="button" onClick={() => {
+          workspaceRequiredDialog.current?.close();
+          void chooseWorkspace();
+        }}>{t.openWorkspace}</button>
+      </div>
+    </dialog>
     {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} executionBackendUrl={effectiveExecutionBackendUrl} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onExecutionBackendUrlChange={url => { setExecutionBackendUrl(url); saveWorkbenchState(EXECUTION_BACKEND_URL_STORAGE_KEY, url); void window.executionBackend.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setExecutionError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
   </main>;
 }

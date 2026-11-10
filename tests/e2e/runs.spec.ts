@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import { mkdir } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -244,9 +245,30 @@ test.describe('execution runs', () => {
     await expect(context.locator('.run-context-free')).toHaveCSS('background-color', track);
   });
 
-  test('shows a guard error when starting a run without a workspace', async () => {
-    await window.getByRole('button', { name: '运行工作流' }).click();
-    await expect(window.locator('.run-list-error')).toContainText('选择工作区');
+  test('opens a centered workspace prompt when starting a run without a workspace', async () => {
+    const runButton = window.getByRole('button', { name: '运行工作流' });
+    await runButton.click();
+    const prompt = window.getByRole('dialog', { name: '选择工作区' });
+    await expect(prompt).toBeVisible();
+    await expect(prompt).toContainText('运行工作流需要先选择工作区。');
+    const offset = await prompt.evaluate(dialog => {
+      const bounds = dialog.getBoundingClientRect();
+      return [bounds.x + bounds.width / 2 - innerWidth / 2, bounds.y + bounds.height / 2 - innerHeight / 2];
+    });
+    expect(offset.every(value => Math.abs(value) <= 1)).toBe(true);
+    await window.keyboard.press('Escape');
+    await expect(prompt).toBeHidden();
+    await expect(runButton).toBeFocused();
+
+    const directory = test.info().outputPath('workspace');
+    await mkdir(directory, { recursive: true });
+    await app.evaluate(({ dialog }, selected) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
+    }, directory);
+    await runButton.click();
+    await prompt.getByRole('button', { name: '打开工作区' }).click();
+    await expect(prompt).toBeHidden();
+    await expect(window.locator('.workspace-pill')).toHaveText(directory);
   });
 
   test('restores the backend URL and session mode from legacy settings', async () => {

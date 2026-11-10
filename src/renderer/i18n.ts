@@ -6,6 +6,7 @@ export type LocaleId = 'zh-CN' | 'en-US';
 export interface Messages {
   brand: string; back: string; forward: string; search: string; openWorkspace: string; toggleSidebar: string;
   noWorkspace: string; workspaceReady: string; workbench: string; runs: string; settings: string;
+  workspaceRequiredTitle: string; workspaceRequiredMessage: string;
   files: string; save: string; runWorkflow: string; markdown: string; splitVertical: string; splitHorizontal: string;
   executionCenter: string; monitorRuns: string; cancel: string; readyForRun: string; eventsCaptured: (count: number) => string;
   noRuns: string; runToSeeEvents: string; settingsDescription: string; appearance: string; lightThemes: string; darkThemes: string;
@@ -35,6 +36,7 @@ export interface Messages {
 
 export const messages: Record<LocaleId, Messages> = {
   'zh-CN': {
+    workspaceRequiredTitle: '选择工作区', workspaceRequiredMessage: '运行工作流需要先选择工作区。',
     runDetail: {
       log: '运行日志', waiting: '等待运行事件…', overview: '概览', id: '运行 ID', iteration: '迭代', elapsed: '耗时',
       members: '成员会话', running: '运行中', createdAt: '创建时间', context: '上下文用量',
@@ -47,6 +49,7 @@ export const messages: Record<LocaleId, Messages> = {
     brand: 'axcor-studio', back: '后退', forward: '前进', search: '搜索文件和命令', openWorkspace: '打开工作区', toggleSidebar: '切换侧边栏', noWorkspace: '未选择工作区', workspaceReady: '工作区已就绪', workbench: '工作台', runs: '运行', settings: '设置', files: '文件', save: '保存', runWorkflow: '运行工作流', markdown: 'Markdown', splitVertical: '左右拆分编辑器', splitHorizontal: '上下拆分编辑器', executionCenter: '执行中心', monitorRuns: '查看工作流运行状态和执行证据。', cancel: '取消', readyForRun: '准备开始新的运行', eventsCaptured: count => `${count} 条日志`, noRuns: '暂无运行记录', runToSeeEvents: '运行工作流后，执行事件会显示在这里。', settingsDescription: '调整工作台的主题和字体。', appearance: '外观', lightThemes: '浅色主题', darkThemes: '深色主题', editorFont: '编辑器字体', theme: '主题', language: '语言', general: '常规', savedAutomatically: '更改会自动保存', done: '完成', selected: '已选择', themeDescription: '选择工作台使用的颜色主题，界面、编辑器和面板会同步切换。', editorFontDescription: '设置编辑器正文使用的字体，影响所有 Markdown 编辑区域。', languageDescription: '设置工作台界面语言，更改后会立即生效。', defaultBadge: '默认', selectRun: '未选择运行', selectRunHint: '在左侧执行中心选择一个运行，查看执行详情。', executionBackendUrl: `${EXECUTION_BACKEND_NAME} 地址`, executionBackendUrlDescription: `执行后端 ${EXECUTION_BACKEND_NAME} 的 HTTP 地址（默认 ${DEFAULT_EXECUTION_BACKEND_URL}）。`, workflowWarning: '⚠ 程序声明缺失', insight: '观测', insightHint: `Insight 观测视图加载中。若长时间无响应，请确认 ${EXECUTION_BACKEND_NAME} 已启动（${EXECUTION_BACKEND_COMMAND} web --insight）。`, insightLoadFailed: `观测视图加载失败：${EXECUTION_BACKEND_NAME} 或 Insight 可能未运行。`, openInInsight: '在 Insight 中查看', noObservableSessions: '该运行没有可观测的会话', backgroundImage: '背景图', backgroundImageDescription: '运行中心空态的背景图片，支持常见图片格式（不超过 3MB）。', backgroundFit: '背景图显示方式', backgroundFitDescription: '选择背景图在运行中心空态的显示方式。', fitCover: '铺满', fitContain: '完整显示', chooseImage: '选择图片', removeImage: '移除', emptyWorkspace: '工作区为空', runConfig: '运行配置', runtime: '运行时', runLabel: '运行名称', runLabelPlaceholder: '默认使用文件名', runParams: '运行参数', addParam: '添加参数', paramKeyPlaceholder: '键', paramValuePlaceholder: '值', maxParallel: '最大并行数', removeParam: '移除参数', agentRuntime: 'Agent 运行时', sessionPrompt: '提示词', sessionModel: '模型', sessionSelectModel: '请选择模型', sessionModelsLoading: '正在加载模型…', sessionModelsUnavailable: '无法加载模型列表', sessionModelsEmpty: '该运行时没有可用模型', sessionSystemPrompt: '系统提示词', sessionMaxIterations: '最大迭代', sessionReviewerEnabled: '启用 Reviewer', prompt: '提示词', promptPlaceholder: '可选的初始提示词，运行开始后注入到执行会话', providers: '模型供应商', providersDescription: `配置 ${EXECUTION_BACKEND_NAME} 的模型供应商密钥与端点，供会话运行使用。`, providerKey: 'API 密钥', providerModel: '模型', providerBaseUrl: '地址', providerRuntime: '运行时', providerActive: '使用', providerValidated: '校验通过', providerFailed: '校验失败', providerUntested: '未校验', addProvider: '添加供应商', testKey: '测试', saveProviders: '保存供应商', providerTestPassed: '测试通过', providerTestFailed: '测试失败', providerSaved: '供应商已保存', providerDeleted: '供应商已删除', providerName: '显示名称', providersExisting: '已有供应商', add: '添加',
   },
   'en-US': {
+    workspaceRequiredTitle: 'Choose a workspace', workspaceRequiredMessage: 'Choose a workspace before running a workflow.',
     runDetail: {
       log: 'Run log', waiting: 'Waiting for run events…', overview: 'Overview', id: 'Run ID', iteration: 'Iteration', elapsed: 'Elapsed',
       members: 'Member sessions', running: 'Running', createdAt: 'Created', context: 'Context usage',
