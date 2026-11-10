@@ -64,6 +64,7 @@ test.describe('execution backend auto-start', () => {
   });
 
   test('spawns the execution backend when the configured URL is not answering', async () => {
+    await window.getByRole('button', { name: '运行', exact: true }).click();
     await expect(window.getByRole('option', { name: /auto-started/ })).toBeVisible({ timeout: 20_000 });
     await expect(window.locator('.run-list-error')).toHaveCount(0);
     // Quitting the workbench must stop the instance it started.

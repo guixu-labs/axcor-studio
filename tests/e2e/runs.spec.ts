@@ -132,6 +132,7 @@ test.describe('execution runs', () => {
     await window.evaluate(() => localStorage.clear());
     await window.reload();
     await expect(window.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
+    await window.getByRole('button', { name: '运行', exact: true }).click();
   });
 
   test.afterEach(async () => {
@@ -278,6 +279,7 @@ test.describe('execution runs', () => {
       localStorage.setItem('workbench.runtime', JSON.stringify('opsbot-session'));
     }, savedUrl);
     await window.reload();
+    await window.getByRole('button', { name: '运行', exact: true }).click();
     await expect(window.getByLabel('运行时', { exact: true })).toHaveValue('session');
     await window.locator('.rail-settings').click();
     await window.getByRole('button', { name: '常规' }).click();
@@ -295,6 +297,7 @@ test.describe('execution runs', () => {
     const defaultWindow = await defaultApp.firstWindow();
     await defaultWindow.waitForLoadState('domcontentloaded');
     await expect(defaultWindow.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
+    await defaultWindow.getByRole('button', { name: '运行', exact: true }).click();
     await expect(defaultWindow.locator('.run-list-error')).toContainText('无法连接 Workflow Controller', { timeout: 20_000 });
     await defaultWindow.locator('.rail-settings').click();
     await defaultWindow.getByRole('button', { name: '常规' }).click();

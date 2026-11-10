@@ -38,7 +38,7 @@ export default function App(): JSX.Element {
   const [eventsByRun, setEventsByRun] = useState<Record<string, RunEvent[]>>({});
   const selectedRun = runs.find(item => item.id === selectedRunId);
   const selectedEvents = selectedRunId ? eventsByRun[selectedRunId] ?? [] : [];
-  const [activeNavigation, setActiveNavigation] = useState('runs');
+  const [activeNavigation, setActiveNavigation] = useState('workbench');
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
   const [settingsOpen, setSettingsOpen] = useState(false);

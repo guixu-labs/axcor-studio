@@ -100,6 +100,7 @@ test.describe('insight observability view', () => {
   });
 
   test('opens the insight session view for a completed run', async () => {
+    await window.getByRole('button', { name: '运行', exact: true }).click();
     await window.getByRole('option', { name: /workflow\.md/ }).click();
     await window.getByRole('button', { name: '在 Insight 中查看' }).click();
     await expect.poll(() => insightUrl(app, '/insight/session/sess-1')).toContain('/insight/session/sess-1');
