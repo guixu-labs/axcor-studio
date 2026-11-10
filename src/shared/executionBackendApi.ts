@@ -130,6 +130,8 @@ export function mapRun(record: BackendRun): Run {
     createdAt: record.created_at,
     updatedAt: record.finished_at ?? record.reopened_at ?? record.created_at,
     runtimeId: 'workflow',
+    memberCount: record.member_count,
+    runningCount: record.running_count,
   };
 }
 
@@ -139,8 +141,19 @@ export interface BackendSessionRecord {
   role?: string | null;
   state?: string;
   created_at?: string | null;
+  created_at_iso?: string | null;
   stop_reason?: string | null;
   loop_status?: string | null;
+  model?: string | null;
+  current_iteration?: number;
+  max_iterations?: number;
+  elapsed_seconds?: number;
+  context_window?: number | null;
+}
+
+export interface BackendSessionEventPage {
+  cursor: string;
+  events: Array<Pick<BackendEvent, 'timestamp' | 'event_type' | 'data' | 'iteration'>>;
 }
 
 const SESSION_STATUS_MAP: Record<string, RunStatus> = {
@@ -155,14 +168,21 @@ const SESSION_STATUS_MAP: Record<string, RunStatus> = {
 };
 
 export function mapSession(session: BackendSessionRecord): Run {
-  const createdAt = session.created_at ?? '';
+  const createdAt = session.created_at_iso || session.created_at || '';
+  const status = session.state === 'idle' && session.stop_reason === 'max_iterations'
+    ? 'completed' : SESSION_STATUS_MAP[session.state ?? ''] ?? 'queued';
   return {
     id: session.id,
     workflowId: session.name || session.id,
-    status: SESSION_STATUS_MAP[session.state ?? ''] ?? 'queued',
+    status,
     createdAt,
     updatedAt: createdAt,
     runtimeId: 'session',
+    model: session.model || undefined,
+    iteration: session.current_iteration,
+    maxIterations: session.max_iterations,
+    elapsedSeconds: session.elapsed_seconds,
+    contextWindow: session.context_window ?? undefined,
   };
 }
 
@@ -173,6 +193,7 @@ export function mapEvent(raw: BackendEvent): RunEvent {
     type: raw.event_type,
     timestamp: raw.timestamp,
     ...(raw.session_id ? { stepId: raw.session_id } : {}),
+    source: raw.source,
     payload: parseEventData(raw.data),
   };
 }

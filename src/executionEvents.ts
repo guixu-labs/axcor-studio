@@ -1,10 +1,16 @@
 import { BrowserWindow } from 'electron';
+import { createHash } from 'node:crypto';
 import type { RunEvent } from './shared/protocol';
-import { mapEvent, type BackendEventPage } from './shared/executionBackendApi';
+import { mapEvent, type BackendEventPage, type BackendSessionEventPage } from './shared/executionBackendApi';
 import { getRun, isSessionRun, backendRequest } from './executionBackendHttp';
 
 const POLL_INTERVAL_MS = 1_000;
 const POLL_PAGE_SIZE = 200;
+
+function isThinkingTokenNotification(type: string, payload: unknown): boolean {
+  return type === 'notification' && typeof payload === 'object' && payload !== null
+    && 'subtype' in payload && payload.subtype === 'thinking_tokens';
+}
 
 class EventPoller {
   private readonly runId: string;
@@ -35,8 +41,7 @@ class EventPoller {
       if (isSessionRun(this.runId)) await this.pollSession();
       else await this.pollRunEvents();
     } catch (error) {
-      // If the backend is down or restarting, keep the cursor and retry
-      // on the next tick so a transient outage recovers without a resubscribe.
+      // Keep the cursor and retry if the backend is down or restarting.
       console.error(`[execution] event poll failed for run ${this.runId}: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       this.running = false;
@@ -49,24 +54,41 @@ class EventPoller {
       const params = new URLSearchParams({ limit: String(POLL_PAGE_SIZE) });
       if (this.cursor) params.set('cursor', this.cursor);
       const page = await backendRequest<BackendEventPage>('GET', `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`);
+      if (!this.timer) return;
       this.cursor = page.next_cursor;
       hasMore = page.events.length >= page.limit;
-      for (const raw of page.events) emitExecutionEvent(mapEvent(raw));
+      for (const raw of page.events) {
+        const event = mapEvent(raw);
+        if (!isThinkingTokenNotification(event.type, event.payload)) emitExecutionEvent(event);
+      }
     }
   }
 
   private async pollSession(): Promise<void> {
     const run = await getRun(this.runId);
-    if (run.status === this.lastSessionStatus) return;
-    this.lastSessionStatus = run.status;
-    const event: RunEvent = {
-      id: `session-${Date.now()}`,
-      runId: this.runId,
-      type: 'session_state_changed',
-      timestamp: new Date().toISOString(),
-      payload: { state: run.status },
-    };
-    emitExecutionEvent(event);
+    if (!this.timer) return;
+    if (run.status !== this.lastSessionStatus) {
+      this.lastSessionStatus = run.status;
+      emitExecutionEvent({
+        id: `session-${Date.now()}`,
+        runId: this.runId,
+        type: 'session_state_changed',
+        timestamp: new Date().toISOString(),
+        payload: { state: run.status },
+      });
+    }
+    const params = new URLSearchParams({ session_id: this.runId });
+    if (this.cursor) params.set('cursor', this.cursor);
+    else params.set('since', '0');
+    const page = await backendRequest<BackendSessionEventPage>('GET', `/api/v1/events?${params.toString()}`);
+    if (!this.timer) return;
+    this.cursor = page.cursor;
+    for (const event of page.events) {
+      if (isThinkingTokenNotification(event.event_type, event.data)) continue;
+      // The session endpoint can replay the history/cursor boundary and returns rowid=0.
+      const id = createHash('sha256').update(JSON.stringify([event.timestamp, event.event_type, event.iteration, event.data])).digest('base64url');
+      emitExecutionEvent({ id, runId: this.runId, type: event.event_type, timestamp: event.timestamp, payload: event.data });
+    }
   }
 }
 

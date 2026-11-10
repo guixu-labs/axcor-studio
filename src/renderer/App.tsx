@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { WorkbenchExecutionClient } from './services/executionClient';
 import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackend';
 import type { Run, RunEvent, RuntimeId } from '../shared/protocol';
-import { isTerminalRun } from '../shared/run';
+import { isTerminalRun, runEventKey } from '../shared/run';
 import type { RunParamsRow } from './components/RunsPanel';
 import type { WorkspaceNode } from '../workspaceFiles';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
 import { MonacoEditor } from './components/MonacoEditor';
-import { RunDetail, RunsList } from './components/RunsPanel';
+import { RunDetail } from './components/RunDetail';
+import { RunsList } from './components/RunsPanel';
 import { ResizeHandle } from './components/ResizeHandle';
 import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
 import type { EditorGroupOrientation } from './workbench/layout';
@@ -105,9 +106,26 @@ export default function App(): JSX.Element {
   }, []);
   useEffect(() => {
     if (!selectedRunId) return;
-    return client.subscribeRunEvents(selectedRunId, event => {
-      setEventsByRun(previous => ({ ...previous, [selectedRunId]: [...(previous[selectedRunId] ?? []), event] }));
+    let pending: RunEvent[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let active = true;
+    let refreshVersion = 0;
+    const flushEvents = (): void => {
+      const batch = pending;
+      pending = [];
+      if (!batch.length) return;
+      setEventsByRun(previous => {
+        const current = previous[selectedRunId] ?? [];
+        const combined = new Map(current.map(event => [runEventKey(event), event]));
+        for (const event of batch) combined.set(runEventKey(event), event);
+        if (combined.size === current.length) return previous;
+        return { ...previous, [selectedRunId]: [...combined.values()].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)) };
+      });
+    };
+    const refreshRun = (): void => {
+      const version = ++refreshVersion;
       void client.getRun(selectedRunId).then(async latest => {
+        if (!active || version !== refreshVersion) return;
         setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
         if (isTerminalRun(latest) && !importedToInsight.current.has(latest.id)) {
           importedToInsight.current.add(latest.id);
@@ -122,8 +140,22 @@ export default function App(): JSX.Element {
             // Observability import is best-effort; the run view stays usable.
           }
         }
-      });
+      }).catch(() => { /* A subsequent poll will retry. */ });
+    };
+    const unsubscribe = client.subscribeRunEvents(selectedRunId, event => {
+      pending.push(event);
+      timer ??= setTimeout(() => {
+        timer = undefined;
+        flushEvents();
+        refreshRun();
+      }, 150);
     });
+    return () => {
+      active = false;
+      unsubscribe();
+      clearTimeout(timer);
+      flushEvents();
+    };
   }, [selectedRunId]);
   useEffect(() => {
     if (activeNavigation !== 'insight') { void window.insight.hide(); return; }
@@ -337,7 +369,7 @@ export default function App(): JSX.Element {
             </div>
           </section>}
           {activeNavigation === 'runs' && (selectedRun
-            ? <section className="single-panel"><RunDetail run={selectedRun} events={selectedEvents} onCancel={cancelRun} onOpenInsight={openInsightForRun} messages={t} /></section>
+            ? <section className="single-panel"><RunDetail key={selectedRun.id} run={selectedRun} events={selectedEvents} onCancel={cancelRun} onOpenInsight={openInsightForRun} messages={t} /></section>
             : <section className="single-panel"><section className="run-detail run-empty-bg"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></section></section>)}
           {activeNavigation === 'insight' && <section className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
         </div>

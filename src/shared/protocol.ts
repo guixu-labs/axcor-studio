@@ -18,6 +18,13 @@ export interface Run {
   createdAt: string;
   updatedAt: string;
   runtimeId: RuntimeId;
+  model?: string;
+  iteration?: number;
+  maxIterations?: number;
+  elapsedSeconds?: number;
+  contextWindow?: number;
+  memberCount?: number;
+  runningCount?: number;
 }
 
 export type RuntimeId = 'workflow' | 'session';
@@ -54,6 +61,7 @@ export interface RunEvent {
   type: string;
   timestamp: string;
   stepId?: string;
+  source?: 'run_events' | 'events';
   payload: unknown;
 }
 

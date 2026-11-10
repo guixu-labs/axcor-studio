@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import type { Run, RunEvent, RuntimeId } from '../../shared/protocol';
+import type { Run, RuntimeId } from '../../shared/protocol';
 import { RUNTIMES } from '../../shared/protocol';
 
 export interface RunsPanelMessages {
-  runs: string; executionCenter: string; monitorRuns: string; runWorkflow: string; cancel: string;
-  readyForRun: string; eventsCaptured: (count: number) => string; noRuns: string; runToSeeEvents: string;
-  selectRun: string; selectRunHint: string; openInInsight: string;
+  runs: string; executionCenter: string; runWorkflow: string;
+  noRuns: string; runToSeeEvents: string;
   runConfig: string; runtime: string; runLabel: string; runLabelPlaceholder: string;
   runParams: string; addParam: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
   maxParallel: string; removeParam: string;
@@ -139,27 +138,4 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
     </div>
     <button className="run-action" type="button" onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
   </aside>;
-}
-
-interface RunDetailProps {
-  run: Run;
-  events: RunEvent[];
-  onCancel: () => void;
-  onOpenInsight: () => void;
-  messages: RunsPanelMessages;
-}
-
-export function RunDetail({ run, events, onCancel, onOpenInsight, messages }: RunDetailProps): JSX.Element {
-  return <section className="run-detail">
-    <header className="run-detail-header">
-      <div>
-        <span className="eyebrow">{messages.executionCenter}</span>
-        <h1>{run.workflowId}</h1>
-        <p className="panel-subtitle">{run.id} · {new Date(run.createdAt).toLocaleString()}</p>
-      </div>
-      <div className="run-actions"><button className="secondary-button" type="button" onClick={onOpenInsight}>{messages.openInInsight}</button><button className="secondary-button" type="button" onClick={onCancel} disabled={['completed', 'cancelled', 'failed'].includes(run.status)}>{messages.cancel}</button></div>
-    </header>
-    <div className="run-summary"><div className={'status-badge status-' + run.status}><i aria-hidden="true" />{run.status}</div><span>{events.length ? messages.eventsCaptured(events.length) : messages.readyForRun}</span></div>
-    <div className="event-list">{events.length ? events.map(event => <div className="event" key={event.id}><span><i className="event-dot" aria-hidden="true" /><b>{event.type}</b></span><small>{new Date(event.timestamp).toLocaleTimeString()}</small></div>) : <div className="empty-state"><span className="empty-icon">✦</span><strong>{messages.noRuns}</strong><p>{messages.runToSeeEvents}</p></div>}</div>
-  </section>;
 }
