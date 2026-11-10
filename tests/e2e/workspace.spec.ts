@@ -40,7 +40,7 @@ test.describe('workspace tree', () => {
 
   test('opens the workspace tree on startup and opens non-markdown files', async () => {
     await expect(window.getByRole('button', { name: '工作台', exact: true })).toHaveAttribute('aria-current', 'page');
-    await expect(window.getByRole('heading', { name: '文件', exact: true })).toBeVisible();
+    await expect(window.getByRole('heading', { name: '工作区', exact: true })).toBeVisible();
     // Top-level files and the src directory are all visible; the first markdown is active.
     await expect(window.locator('.file-entry', { hasText: 'src' })).toBeVisible();
     await expect(window.locator('.file-entry', { hasText: 'workflow.md' })).toBeVisible();

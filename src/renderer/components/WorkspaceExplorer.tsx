@@ -6,7 +6,7 @@ interface WorkspaceExplorerProps {
   activeFile: string;
   onSelect: (filePath: string) => void;
   onSave: () => void;
-  messages: { files: string; save: string; emptyWorkspace: string };
+  messages: { workspace: string; save: string; emptyWorkspace: string };
 }
 
 interface TreeNode {
@@ -90,7 +90,10 @@ export function WorkspaceExplorer({ tree, activeFile, onSelect, onSave, messages
   };
 
   return <aside className="workspace-explorer">
-    <div className="explorer-heading"><div><span className="eyebrow">Workspace</span><h2>{messages.files}</h2></div><div><button className="text-button" type="button" onClick={onSave}>{messages.save}</button></div></div>
+    <div className="explorer-heading">
+      <h2>{messages.workspace}</h2>
+      <button className="text-button" type="button" onClick={onSave}>{messages.save}</button>
+    </div>
     <div className="file-list">
       {roots.length ? roots.map(node => renderNode(node, 0)) : <div className="run-list-empty"><strong>{messages.emptyWorkspace}</strong></div>}
     </div>

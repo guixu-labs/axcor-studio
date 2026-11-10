@@ -4,7 +4,7 @@ import type { Run, RuntimeId } from '../../shared/protocol';
 import { RUNTIMES } from '../../shared/protocol';
 
 export interface RunsPanelMessages {
-  runs: string; executionCenter: string; runWorkflow: string;
+  runs: string; runWorkflow: string;
   noRuns: string; runToSeeEvents: string;
   runConfig: string; runtime: string; runLabel: string; runLabelPlaceholder: string;
   runParams: string; addParam: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
@@ -59,8 +59,8 @@ interface RunsListProps {
 export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
-    <div className="explorer-heading"><div><span className="eyebrow">{messages.runs}</span><h2>{messages.executionCenter}</h2></div></div>
-    <div className="run-list" role="listbox" aria-label={messages.executionCenter}>
+    <div className="explorer-heading"><h2>{messages.runs}</h2></div>
+    <div className="run-list" role="listbox" aria-label={messages.runs}>
       {runs.length ? runs.map(run => <button
         className={'run-entry' + (run.id === selectedRunId ? ' active' : '')}
         role="option"

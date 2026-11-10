@@ -140,6 +140,7 @@ test.describe('execution runs', () => {
   });
 
   test('lists runs and streams events for the selected run', async () => {
+    await expect(window.getByRole('heading', { name: '运行', exact: true })).toBeVisible();
     const entry = window.getByRole('option', { name: /workflow\.md/ });
     await expect(entry).toBeVisible();
     await entry.click();
