@@ -4,11 +4,11 @@ import {
   mapEvent,
   mapRun,
   mapRunStatus,
-  type OpsbotEvent,
-  type OpsbotRun,
-} from '../src/shared/opsbotApi';
+  type BackendEvent,
+  type BackendRun,
+} from '../src/shared/executionBackendApi';
 
-const baseRecord: OpsbotRun = {
+const baseRecord: BackendRun = {
   run_id: 'run-1',
   kind: 'workflow',
   format: 'markdown',
@@ -27,7 +27,7 @@ const baseRecord: OpsbotRun = {
   running_count: 0,
 };
 
-test('mapRunStatus translates opsbot statuses', () => {
+test('mapRunStatus translates backend statuses', () => {
   assert.equal(mapRunStatus('pending'), 'queued');
   assert.equal(mapRunStatus('running'), 'running');
   assert.equal(mapRunStatus('paused'), 'paused');
@@ -57,7 +57,7 @@ test('mapRun prefers finished_at for updatedAt', () => {
 });
 
 test('mapEvent parses JSON string payloads and maps fields', () => {
-  const raw: OpsbotEvent = {
+  const raw: BackendEvent = {
     id: 42,
     run_id: 'run-1',
     session_id: 'sess-1',

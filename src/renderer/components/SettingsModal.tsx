@@ -2,7 +2,7 @@ import { defaultFont, defaultTheme, fonts, themes } from '../settings';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { localeOptions, type LocaleId, type Messages } from '../i18n';
 import { loadWorkbenchState, saveWorkbenchState } from '../workbench/storage';
-import type { ProviderKey } from '../../shared/opsbotApi';
+import type { ProviderKey } from '../../shared/executionBackendApi';
 
 export type ThemeId = string;
 export type FontId = string;
@@ -14,8 +14,8 @@ interface SettingsModalProps {
   onFontChange: (font: FontId) => void;
   locale: LocaleId;
   onLocaleChange: (locale: LocaleId) => void;
-  opsbotUrl: string;
-  onOpsbotUrlChange: (url: string) => void;
+  executionBackendUrl: string;
+  onExecutionBackendUrlChange: (url: string) => void;
   backgroundImage: string;
   backgroundFit: 'cover' | 'contain';
   onBackgroundImageChange: (dataUrl: string) => void;
@@ -173,7 +173,7 @@ const PROVIDER_RUNTIME_OPTIONS = [
 
 function validationChip(validation: ProviderKey['worker_validation'], messages: Messages): JSX.Element {
   if (!validation) return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
-  // Opsbot reports validation either as a success boolean (test responses)
+  // The backend reports validation either as a success boolean (test responses)
   // or as a status string (persisted provider state).
   if (typeof validation.success === 'boolean') {
     return validation.success
@@ -204,13 +204,13 @@ function ProviderSection({ icon, title, children }: { icon: string; title: strin
 
 const providerNamesStorageKey = 'workbench.providerNames';
 
-async function providerIdentity(opsbotUrl: string, provider: ProviderKey): Promise<string> {
-  const config = [opsbotUrl.trim().replace(/\/+$/, ''), provider.key, provider.runtime, provider.model, provider.base_url];
+async function providerIdentity(executionBackendUrl: string, provider: ProviderKey): Promise<string> {
+  const config = [executionBackendUrl.trim().replace(/\/+$/, ''), provider.key, provider.runtime, provider.model, provider.base_url];
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(config)));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl: string }): JSX.Element {
+function ProvidersPanel({ messages, executionBackendUrl }: { messages: Messages; executionBackendUrl: string }): JSX.Element {
   const [providers, setProviders] = useState<Array<ProviderKey & { identity: string }> | null>(null);
   const [providerNames, setProviderNames] = useState(() => loadWorkbenchState<Record<string, string>>(providerNamesStorageKey, {}));
   const [nameDraft, setNameDraft] = useState('');
@@ -226,8 +226,8 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
 
   const refresh = async (): Promise<void> => {
     try {
-      const rows = await window.opsbot.listProviders();
-      setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(opsbotUrl, provider) }))));
+      const rows = await window.executionBackend.listProviders();
+      setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(executionBackendUrl, provider) }))));
       setError(undefined);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
@@ -261,7 +261,7 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
     setNotice(undefined);
     setError(undefined);
     try {
-      const result = await window.opsbot.testProviderKey(key.trim(), model.trim(), baseUrl.trim(), runtime);
+      const result = await window.executionBackend.testProviderKey(key.trim(), model.trim(), baseUrl.trim(), runtime);
       setNotice(result.success === false || result.error ? `${messages.providerTestFailed}：${result.error ?? 'unknown'}` : messages.providerTestPassed);
     } catch (testError) {
       setError(testError instanceof Error ? testError.message : String(testError));
@@ -278,7 +278,7 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
         ...(provider.runtime ? { runtime: provider.runtime } : {}),
       }));
       rows.push({ key: key.trim(), ...(model.trim() ? { model: model.trim() } : {}), ...(baseUrl.trim() ? { base_url: baseUrl.trim() } : {}), runtime });
-      const saved = await window.opsbot.saveProviders(rows);
+      const saved = await window.executionBackend.saveProviders(rows);
       if (!saved.ok) { setError(saved.error ?? '保存失败'); return; }
       setKey(''); setModel(''); setBaseUrl('');
       setNotice(messages.providerSaved);
@@ -348,7 +348,7 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
               </div>
               <div className="provider-actions">
                 <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
-                  const result = await window.opsbot.testProvider(provider.provider_index);
+                  const result = await window.executionBackend.testProvider(provider.provider_index);
                   if (result.success === false || result.error) {
                     setError(`${messages.providerTestFailed}：${result.error ?? 'unknown'}`);
                   } else {
@@ -357,12 +357,12 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
                   }
                 })}>{messages.testKey}</button>
                 <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
-                  const result = await window.opsbot.activateProvider(provider.provider_index);
+                  const result = await window.executionBackend.activateProvider(provider.provider_index);
                   if (!result.ok) { setError('激活失败'); return; }
                   setError(undefined);
                   setActiveIndex(result.activeIndex ?? provider.provider_index);
                 })}>{messages.providerActive}</button>
-                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.opsbot.deleteProvider(provider.provider_index); setExpandedCard(null); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
+                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.executionBackend.deleteProvider(provider.provider_index); setExpandedCard(null); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
               </div>
             </div>}
           </div>;
@@ -375,7 +375,7 @@ function ProvidersPanel({ messages, opsbotUrl }: { messages: Messages; opsbotUrl
 const categories = ['general', 'appearance', 'providers'] as const;
 const themeOptions = ['dark', 'light'].flatMap(group => themes.filter(theme => theme.group === group));
 
-export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, opsbotUrl, onOpsbotUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
+export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, executionBackendUrl, onExecutionBackendUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
   const categoryLabels: Record<typeof categories[number], string> = { appearance: messages.appearance, general: messages.general, providers: messages.providers };
   const categoryLabel = categoryLabels[activeCategory];
@@ -458,15 +458,15 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                   onSelect={value => onLocaleChange(value as LocaleId)}
                 />
                 <InputField
-                  title={messages.opsbotUrl}
-                  description={messages.opsbotUrlDescription}
+                  title={messages.executionBackendUrl}
+                  description={messages.executionBackendUrlDescription}
                   icon="⇄"
-                  value={opsbotUrl}
-                  ariaLabel={messages.opsbotUrl}
-                  onChange={onOpsbotUrlChange}
+                  value={executionBackendUrl}
+                  ariaLabel={messages.executionBackendUrl}
+                  onChange={onExecutionBackendUrlChange}
                 />
               </div>
-              : <ProvidersPanel messages={messages} opsbotUrl={opsbotUrl} />}
+              : <ProvidersPanel messages={messages} executionBackendUrl={executionBackendUrl} />}
         </div>
       </div>
     </section>

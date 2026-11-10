@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CreateRunInput, Run, RunEvent } from './shared/protocol';
-import type { InsightImportResult, InsightStatusResult, OpsbotSession, ProviderKey, ProviderKeyInput, ProviderTestResult } from './shared/opsbotApi';
+import type { InsightImportResult, InsightStatusResult, BackendSession, ProviderKey, ProviderKeyInput, ProviderTestResult } from './shared/executionBackendApi';
 import type { WorkspaceNode } from './workspaceFiles';
 
 contextBridge.exposeInMainWorld('workbench', {
@@ -11,32 +11,32 @@ contextBridge.exposeInMainWorld('workbench', {
   writeFile: (filePath: string, content: string): Promise<void> => ipcRenderer.invoke('workspace:write-file', filePath, content),
 });
 
-contextBridge.exposeInMainWorld('opsbot', {
-  setBaseUrl: (url: string): Promise<void> => ipcRenderer.invoke('opsbot:set-base-url', url),
-  getBaseUrl: (): Promise<string> => ipcRenderer.invoke('opsbot:get-base-url'),
-  startRun: (input: CreateRunInput): Promise<Run> => ipcRenderer.invoke('opsbot:start-run', input),
-  listRuns: (): Promise<Run[]> => ipcRenderer.invoke('opsbot:list-runs'),
-  getRun: (runId: string): Promise<Run> => ipcRenderer.invoke('opsbot:get-run', runId),
-  cancelRun: (runId: string): Promise<void> => ipcRenderer.invoke('opsbot:cancel-run', runId),
-  getRunSessions: (runId: string): Promise<OpsbotSession[]> => ipcRenderer.invoke('opsbot:get-run-sessions', runId),
-  injectPrompt: (runId: string, sessionId: string, prompt: string): Promise<void> => ipcRenderer.invoke('opsbot:inject-prompt', runId, sessionId, prompt),
-  importToInsight: (sessionId: string): Promise<InsightImportResult> => ipcRenderer.invoke('opsbot:import-to-insight', sessionId),
-  insightStatus: (): Promise<InsightStatusResult> => ipcRenderer.invoke('opsbot:insight-status'),
-  listProviders: (): Promise<ProviderKey[]> => ipcRenderer.invoke('opsbot:list-providers'),
-  saveProviders: (keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('opsbot:save-providers', keys),
-  deleteProvider: (providerIndex: number): Promise<void> => ipcRenderer.invoke('opsbot:delete-provider', providerIndex),
-  activateProvider: (providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> => ipcRenderer.invoke('opsbot:activate-provider', providerIndex),
-  testProvider: (providerIndex: number): Promise<ProviderTestResult> => ipcRenderer.invoke('opsbot:test-provider', providerIndex),
-  testProviderKey: (key: string, model: string, baseUrl: string, runtime?: string): Promise<ProviderTestResult> => ipcRenderer.invoke('opsbot:test-provider-key', key, model, baseUrl, runtime),
+contextBridge.exposeInMainWorld('executionBackend', {
+  setBaseUrl: (url: string): Promise<void> => ipcRenderer.invoke('execution:set-base-url', url),
+  getBaseUrl: (): Promise<string> => ipcRenderer.invoke('execution:get-base-url'),
+  startRun: (input: CreateRunInput): Promise<Run> => ipcRenderer.invoke('execution:start-run', input),
+  listRuns: (): Promise<Run[]> => ipcRenderer.invoke('execution:list-runs'),
+  getRun: (runId: string): Promise<Run> => ipcRenderer.invoke('execution:get-run', runId),
+  cancelRun: (runId: string): Promise<void> => ipcRenderer.invoke('execution:cancel-run', runId),
+  getRunSessions: (runId: string): Promise<BackendSession[]> => ipcRenderer.invoke('execution:get-run-sessions', runId),
+  injectPrompt: (runId: string, sessionId: string, prompt: string): Promise<void> => ipcRenderer.invoke('execution:inject-prompt', runId, sessionId, prompt),
+  importToInsight: (sessionId: string): Promise<InsightImportResult> => ipcRenderer.invoke('execution:import-to-insight', sessionId),
+  insightStatus: (): Promise<InsightStatusResult> => ipcRenderer.invoke('execution:insight-status'),
+  listProviders: (): Promise<ProviderKey[]> => ipcRenderer.invoke('execution:list-providers'),
+  saveProviders: (keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('execution:save-providers', keys),
+  deleteProvider: (providerIndex: number): Promise<void> => ipcRenderer.invoke('execution:delete-provider', providerIndex),
+  activateProvider: (providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> => ipcRenderer.invoke('execution:activate-provider', providerIndex),
+  testProvider: (providerIndex: number): Promise<ProviderTestResult> => ipcRenderer.invoke('execution:test-provider', providerIndex),
+  testProviderKey: (key: string, model: string, baseUrl: string, runtime?: string): Promise<ProviderTestResult> => ipcRenderer.invoke('execution:test-provider-key', key, model, baseUrl, runtime),
   subscribeRunEvents: (runId: string, listener: (event: RunEvent) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, runEvent: RunEvent): void => {
       if (runEvent.runId === runId) listener(runEvent);
     };
-    ipcRenderer.on('opsbot:event', handler);
-    ipcRenderer.send('opsbot:subscribe-events', runId);
+    ipcRenderer.on('execution:event', handler);
+    ipcRenderer.send('execution:subscribe-events', runId);
     return () => {
-      ipcRenderer.removeListener('opsbot:event', handler);
-      ipcRenderer.send('opsbot:unsubscribe-events', runId);
+      ipcRenderer.removeListener('execution:event', handler);
+      ipcRenderer.send('execution:unsubscribe-events', runId);
     };
   },
 });

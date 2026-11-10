@@ -6,21 +6,21 @@ import {
   activateProvider,
   deleteProvider,
   getInsightStatus,
-  getOpsbotRun,
-  getOpsbotRunSessions,
-  importOpsbotSessionToInsight,
-  injectOpsbotSessionPrompt,
-  listOpsbotRuns,
+  getRun,
+  getRunSessions,
+  importSessionToInsight,
+  injectSessionPrompt,
+  listRuns,
   listProviders,
   saveProviders,
-  setOpsbotBaseUrl,
-  startOpsbotRun,
-  startOpsbotSession,
-  stopOpsbotRun,
+  setBackendBaseUrl,
+  startWorkflowRun,
+  startSessionRun,
+  stopRun,
   testProvider,
   testProviderKey,
-} from '../src/opsbotHttp';
-import { OpsbotApiError } from '../src/shared/opsbotApi';
+} from '../src/executionBackendHttp';
+import { ExecutionBackendApiError } from '../src/shared/executionBackendApi';
 
 interface CapturedRequest {
   method: string;
@@ -143,13 +143,13 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
   }) as unknown as { server: http.Server; baseUrl: string; requests: CapturedRequest[] };
 }
 
-test('opsbot http client', async t => {
+test('execution backend HTTP client', async t => {
   const fixture = await createFixtureServer();
-  setOpsbotBaseUrl(fixture.baseUrl);
+  setBackendBaseUrl(fixture.baseUrl);
   t.after(() => fixture.server.close());
 
-  await t.test('startOpsbotRun posts the workflow payload and maps the run', async () => {
-    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot-run' });
+  await t.test('startWorkflowRun posts the workflow payload and maps the run', async () => {
+    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow' });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs');
     assert.ok(post);
     assert.equal(post.body.program_path, '/tmp/ws/workflow.md');
@@ -160,8 +160,8 @@ test('opsbot http client', async t => {
     assert.equal(run.workflowId, 'workflow.md');
   });
 
-  await t.test('startOpsbotRun passes label, params and max_parallel when provided', async () => {
-    const run = await startOpsbotRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'opsbot-run', label: 'release-check', params: { dataset: 'core', mode: 'fast' }, maxParallel: 4 });
+  await t.test('startWorkflowRun passes label, params and max_parallel when provided', async () => {
+    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow', label: 'release-check', params: { dataset: 'core', mode: 'fast' }, maxParallel: 4 });
     const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
     assert.ok(post);
     assert.equal(post.body.label, 'release-check');
@@ -170,28 +170,28 @@ test('opsbot http client', async t => {
     assert.equal(run.id, 'run-1');
   });
 
-  await t.test('startOpsbotRun refuses without a workspace', async () => {
+  await t.test('startWorkflowRun refuses without a workspace', async () => {
     await assert.rejects(
-      () => startOpsbotRun({ workflowId: 'workflow.md', runtime: 'opsbot-run' }),
-      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 422,
+      () => startWorkflowRun({ workflowId: 'workflow.md', runtime: 'workflow' }),
+      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 422,
     );
   });
 
-  await t.test('listOpsbotRuns merges runs and sessions with runtime ids', async () => {
-    const runs = await listOpsbotRuns();
+  await t.test('listRuns merges runs and sessions with runtime ids', async () => {
+    const runs = await listRuns();
     assert.equal(runs.length, 3);
     assert.equal(runs[0].status, 'running');
-    assert.equal(runs[0].runtimeId, 'opsbot-run');
+    assert.equal(runs[0].runtimeId, 'workflow');
     assert.equal(runs[1].status, 'cancelled');
     assert.equal(runs[1].workflowId, 'run-2');
     assert.equal(runs[1].updatedAt, '2026-11-03T09:30:00+00:00');
     assert.equal(runs[2].id, 'sess-9');
-    assert.equal(runs[2].runtimeId, 'opsbot-session');
+    assert.equal(runs[2].runtimeId, 'session');
     assert.equal(runs[2].workflowId, 'ad-hoc-session');
   });
 
-  await t.test('startOpsbotSession posts the session payload and maps the run', async () => {
-    const run = await startOpsbotSession({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'opsbot-session', prompt: 'my prompt', sessionRuntime: 'claude_sdk', model: 'claude-sonnet', systemPrompt: 'be brief', maxIterations: 12, reviewerEnabled: true });
+  await t.test('startSessionRun posts the session payload and maps the run', async () => {
+    const run = await startSessionRun({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'session', prompt: 'my prompt', sessionRuntime: 'claude_sdk', model: 'claude-sonnet', systemPrompt: 'be brief', maxIterations: 12, reviewerEnabled: true });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/sessions/start');
     assert.ok(post);
     assert.equal(post.body.project_dir, '/tmp/ws');
@@ -202,47 +202,47 @@ test('opsbot http client', async t => {
     assert.equal(post.body.max_iterations, 12);
     assert.equal(post.body.reviewer_enabled, true);
     assert.equal(run.id, 'sess-new');
-    assert.equal(run.runtimeId, 'opsbot-session');
+    assert.equal(run.runtimeId, 'session');
   });
 
-  await t.test('startOpsbotSession requires a prompt', async () => {
+  await t.test('startSessionRun requires a prompt', async () => {
     await assert.rejects(
-      () => startOpsbotSession({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'opsbot-session' }),
-      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 422 && error.message.includes('提示词'),
+      () => startSessionRun({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'session' }),
+      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 422 && error.message.includes('提示词'),
     );
   });
 
-  await t.test('stopOpsbotRun dispatches to the session stop endpoint for sessions', async () => {
-    await stopOpsbotRun('sess-new');
+  await t.test('stopRun dispatches to the session stop endpoint for sessions', async () => {
+    await stopRun('sess-new');
     assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url === '/api/v1/sessions/sess-new/stop'));
   });
 
-  await t.test('getOpsbotRun fetches the run detail', async () => {
-    const run = await getOpsbotRun('run-1');
+  await t.test('getRun fetches the run detail', async () => {
+    const run = await getRun('run-1');
     assert.equal(run.id, 'run-1');
   });
 
-  await t.test('stopOpsbotRun posts stop and refreshes', async () => {
-    await stopOpsbotRun('run-1');
+  await t.test('stopRun posts stop and refreshes', async () => {
+    await stopRun('run-1');
     assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/stop'));
   });
 
-  await t.test('getOpsbotRunSessions returns the run members', async () => {
-    const sessions = await getOpsbotRunSessions('run-1');
+  await t.test('getRunSessions returns the run members', async () => {
+    const sessions = await getRunSessions('run-1');
     assert.equal(sessions.length, 1);
     assert.equal(sessions[0].session_id, 'sess-1');
     assert.equal(sessions[0].role, 'executor');
   });
 
-  await t.test('importOpsbotSessionToInsight posts the import and maps the result', async () => {
-    const result = await importOpsbotSessionToInsight('sess-1');
+  await t.test('importSessionToInsight posts the import and maps the result', async () => {
+    const result = await importSessionToInsight('sess-1');
     assert.equal(result.ok, true);
     assert.equal(result.insightUrl, '/insight/session/sess-1');
     assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url?.startsWith('/api/v1/insight/import?session_id=sess-1')));
   });
 
-  await t.test('importOpsbotSessionToInsight surfaces service-level errors', async () => {
-    const result = await importOpsbotSessionToInsight('sess-missing');
+  await t.test('importSessionToInsight surfaces service-level errors', async () => {
+    const result = await importSessionToInsight('sess-missing');
     assert.equal(result.ok, false);
     assert.match(result.error ?? '', /Cannot connect/);
   });
@@ -253,8 +253,8 @@ test('opsbot http client', async t => {
     assert.equal(status.port, 21025);
   });
 
-  await t.test('injectOpsbotSessionPrompt posts to the inject endpoint', async () => {
-    await injectOpsbotSessionPrompt('run-1', 'sess-1', '请继续推进');
+  await t.test('injectSessionPrompt posts to the inject endpoint', async () => {
+    await injectSessionPrompt('run-1', 'sess-1', '请继续推进');
     const inject = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject');
     assert.ok(inject);
     assert.equal(inject.body.prompt, '请继续推进');
@@ -304,18 +304,28 @@ test('opsbot http client', async t => {
     assert.equal(post?.body.base_url, 'https://api.example.com');
   });
 
-  await t.test('404 surfaces the opsbot detail message', async () => {
+  await t.test('404 surfaces the backend detail message', async () => {
     await assert.rejects(
-      () => getOpsbotRun('missing'),
-      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 404 && error.message.includes('session 不在账面：missing'),
+      () => getRun('missing'),
+      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 404 && error.message.includes('session 不在账面：missing'),
     );
   });
 
-  await t.test('unreachable opsbot reports a connection error', async () => {
-    setOpsbotBaseUrl('http://127.0.0.1:1');
+  await t.test('a missing run collection identifies the incompatible backend URL', async () => {
+    const url = fixture.baseUrl + '/legacy';
+    setBackendBaseUrl(url);
     await assert.rejects(
-      () => listOpsbotRuns(),
-      (error: OpsbotApiError) => error instanceof OpsbotApiError && error.status === 0 && error.message.includes('无法连接 Opsbot'),
+      () => listRuns(),
+      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 404 &&
+        error.message.includes(url) && error.message.includes('GET /api/v1/runs'),
+    );
+  });
+
+  await t.test('unreachable backend reports a connection error', async () => {
+    setBackendBaseUrl('http://127.0.0.1:1');
+    await assert.rejects(
+      () => listRuns(),
+      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 0 && error.message.includes('无法连接 Workflow Controller'),
     );
   });
 });

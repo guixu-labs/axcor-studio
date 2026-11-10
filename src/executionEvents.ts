@@ -1,9 +1,7 @@
 import { BrowserWindow } from 'electron';
 import type { RunEvent } from './shared/protocol';
-import { mapEvent, type OpsbotEventPage } from './shared/opsbotApi';
-import { getOpsbotRun, isSessionRun, opsbotRequest } from './opsbotHttp';
-
-export { getOpsbotBaseUrl, setOpsbotBaseUrl } from './opsbotHttp';
+import { mapEvent, type BackendEventPage } from './shared/executionBackendApi';
+import { getRun, isSessionRun, backendRequest } from './executionBackendHttp';
 
 const POLL_INTERVAL_MS = 1_000;
 const POLL_PAGE_SIZE = 200;
@@ -37,9 +35,9 @@ class EventPoller {
       if (isSessionRun(this.runId)) await this.pollSession();
       else await this.pollRunEvents();
     } catch (error) {
-      // A down or mid-restart Opsbot is not fatal: keep the cursor and retry
+      // If the backend is down or restarting, keep the cursor and retry
       // on the next tick so a transient outage recovers without a resubscribe.
-      console.error(`[opsbot] event poll failed for run ${this.runId}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[execution] event poll failed for run ${this.runId}: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       this.running = false;
     }
@@ -50,15 +48,15 @@ class EventPoller {
     while (hasMore) {
       const params = new URLSearchParams({ limit: String(POLL_PAGE_SIZE) });
       if (this.cursor) params.set('cursor', this.cursor);
-      const page = await opsbotRequest<OpsbotEventPage>('GET', `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`);
+      const page = await backendRequest<BackendEventPage>('GET', `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`);
       this.cursor = page.next_cursor;
       hasMore = page.events.length >= page.limit;
-      for (const raw of page.events) emitOpsbotEvent(mapEvent(raw));
+      for (const raw of page.events) emitExecutionEvent(mapEvent(raw));
     }
   }
 
   private async pollSession(): Promise<void> {
-    const run = await getOpsbotRun(this.runId);
+    const run = await getRun(this.runId);
     if (run.status === this.lastSessionStatus) return;
     this.lastSessionStatus = run.status;
     const event: RunEvent = {
@@ -68,19 +66,19 @@ class EventPoller {
       timestamp: new Date().toISOString(),
       payload: { state: run.status },
     };
-    emitOpsbotEvent(event);
+    emitExecutionEvent(event);
   }
 }
 
 const pollers = new Map<string, EventPoller>();
 
-function emitOpsbotEvent(event: RunEvent): void {
+function emitExecutionEvent(event: RunEvent): void {
   for (const window of BrowserWindow.getAllWindows()) {
-    window.webContents.send('opsbot:event', event);
+    window.webContents.send('execution:event', event);
   }
 }
 
-export function subscribeOpsbotEvents(runId: string): void {
+export function subscribeExecutionEvents(runId: string): void {
   const existing = pollers.get(runId);
   if (existing) {
     existing.start();
@@ -91,14 +89,14 @@ export function subscribeOpsbotEvents(runId: string): void {
   poller.start();
 }
 
-export function unsubscribeOpsbotEvents(runId: string): void {
+export function unsubscribeExecutionEvents(runId: string): void {
   const poller = pollers.get(runId);
   if (!poller) return;
   poller.stop();
   pollers.delete(runId);
 }
 
-export function stopAllOpsbotPolls(): void {
+export function stopAllExecutionPolls(): void {
   for (const poller of pollers.values()) poller.stop();
   pollers.clear();
 }

@@ -1,17 +1,14 @@
 import type { Run, RunEvent, RunStatus } from './protocol';
 
-// Wire shapes of the Opsbot public API v1 (runs). The source of truth is
-// opsbot's src/opsbot/web/routes/runs_routes.py and api/run_api.py
-// (baseline: feat/reasoning-0day-adaptation). This module only declares
-// what the workbench consumes and maps it onto the shared protocol.
+// API v1 wire types consumed by the workbench and their mappings to the shared protocol.
 
-export type OpsbotRunStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped';
+export type BackendRunStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped';
 
-export interface OpsbotRun {
+export interface BackendRun {
   run_id: string;
   kind: string;
   format: string;
-  status: OpsbotRunStatus;
+  status: BackendRunStatus;
   program_ref: string;
   params: Record<string, string>;
   label: string | null;
@@ -26,16 +23,16 @@ export interface OpsbotRun {
   running_count: number;
 }
 
-export interface OpsbotRunListResponse {
-  runs: OpsbotRun[];
+export interface BackendRunListResponse {
+  runs: BackendRun[];
 }
 
-export interface OpsbotRunDetailResponse {
-  run: OpsbotRun;
-  sessions: OpsbotSession[];
+export interface BackendRunDetailResponse {
+  run: BackendRun;
+  sessions: BackendSession[];
 }
 
-export interface OpsbotSession {
+export interface BackendSession {
   session_id: string;
   role: string;
   context: string | null;
@@ -88,20 +85,20 @@ export interface ProviderTestResult {
   [key: string]: unknown;
 }
 
-export interface OpsbotStartRunResponse {
+export interface BackendStartRunResponse {
   run_id: string;
-  status: OpsbotRunStatus;
+  status: BackendRunStatus;
   format: string;
   kind: string;
 }
 
-export interface OpsbotEventPage {
-  events: OpsbotEvent[];
+export interface BackendEventPage {
+  events: BackendEvent[];
   next_cursor: string;
   limit: number;
 }
 
-export interface OpsbotEvent {
+export interface BackendEvent {
   id: number;
   run_id: string;
   session_id?: string | null;
@@ -112,7 +109,7 @@ export interface OpsbotEvent {
   source: 'run_events' | 'events';
 }
 
-const RUN_STATUS_MAP: Record<OpsbotRunStatus, RunStatus> = {
+const RUN_STATUS_MAP: Record<BackendRunStatus, RunStatus> = {
   pending: 'queued',
   running: 'running',
   paused: 'paused',
@@ -122,21 +119,21 @@ const RUN_STATUS_MAP: Record<OpsbotRunStatus, RunStatus> = {
 };
 
 export function mapRunStatus(status: string): RunStatus {
-  return RUN_STATUS_MAP[status as OpsbotRunStatus] ?? 'queued';
+  return RUN_STATUS_MAP[status as BackendRunStatus] ?? 'queued';
 }
 
-export function mapRun(record: OpsbotRun): Run {
+export function mapRun(record: BackendRun): Run {
   return {
     id: record.run_id,
     workflowId: record.label || record.program_ref || record.run_id,
     status: mapRunStatus(record.status),
     createdAt: record.created_at,
     updatedAt: record.finished_at ?? record.reopened_at ?? record.created_at,
-    runtimeId: 'opsbot-run',
+    runtimeId: 'workflow',
   };
 }
 
-export interface OpsbotSessionRecord {
+export interface BackendSessionRecord {
   id: string;
   name?: string | null;
   role?: string | null;
@@ -157,7 +154,7 @@ const SESSION_STATUS_MAP: Record<string, RunStatus> = {
   stopped: 'cancelled',
 };
 
-export function mapSession(session: OpsbotSessionRecord): Run {
+export function mapSession(session: BackendSessionRecord): Run {
   const createdAt = session.created_at ?? '';
   return {
     id: session.id,
@@ -165,11 +162,11 @@ export function mapSession(session: OpsbotSessionRecord): Run {
     status: SESSION_STATUS_MAP[session.state ?? ''] ?? 'queued',
     createdAt,
     updatedAt: createdAt,
-    runtimeId: 'opsbot-session',
+    runtimeId: 'session',
   };
 }
 
-export function mapEvent(raw: OpsbotEvent): RunEvent {
+export function mapEvent(raw: BackendEvent): RunEvent {
   return {
     id: String(raw.id),
     runId: raw.run_id,
@@ -189,12 +186,12 @@ function parseEventData(data: unknown): unknown {
   }
 }
 
-export class OpsbotApiError extends Error {
+export class ExecutionBackendApiError extends Error {
   readonly status: number;
 
   constructor(status: number, message: string) {
     super(message);
-    this.name = 'OpsbotApiError';
+    this.name = 'ExecutionBackendApiError';
     this.status = status;
   }
 }

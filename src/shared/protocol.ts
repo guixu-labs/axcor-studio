@@ -1,3 +1,5 @@
+import { EXECUTION_BACKEND_NAME } from './executionBackend';
+
 export type RunStatus = 'queued' | 'running' | 'paused' | 'failed' | 'completed' | 'cancelled';
 
 export type RunEventType =
@@ -18,7 +20,7 @@ export interface Run {
   runtimeId: RuntimeId;
 }
 
-export type RuntimeId = 'opsbot-run' | 'opsbot-session';
+export type RuntimeId = 'workflow' | 'session';
 
 export interface RuntimeDescriptor {
   id: RuntimeId;
@@ -26,8 +28,8 @@ export interface RuntimeDescriptor {
 }
 
 export const RUNTIMES: RuntimeDescriptor[] = [
-  { id: 'opsbot-run', label: 'Opsbot Run' },
-  { id: 'opsbot-session', label: 'Opsbot Session' },
+  { id: 'workflow', label: `${EXECUTION_BACKEND_NAME} Run` },
+  { id: 'session', label: `${EXECUTION_BACKEND_NAME} Session` },
 ];
 
 export interface CreateRunInput {
@@ -63,7 +65,7 @@ export interface Artifact {
   path?: string;
 }
 
-export interface OpsbotClient {
+export interface ExecutionClient {
   createRun(input: CreateRunInput): Promise<Run>;
   listRuns(): Promise<Run[]>;
   getRun(runId: string): Promise<Run>;

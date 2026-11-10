@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MockOpsbotClient } from '../src/renderer/services/opsbotClient';
+import { MockExecutionClient } from '../src/renderer/services/executionClient';
 
 test('mock client emits a completed run', async () => {
-  const client = new MockOpsbotClient();
-  const run = await client.createRun({ workflowId: 'workflow.md', runtime: 'opsbot-run' });
+  const client = new MockExecutionClient();
+  const run = await client.createRun({ workflowId: 'workflow.md', runtime: 'workflow' });
   const events: string[] = [];
   client.subscribeRunEvents(run.id, event => events.push(event.type));
   await new Promise(resolve => setTimeout(resolve, 1400));

@@ -12,7 +12,7 @@ const runRecord = {
 };
 const sessionRecord = { session_id: 'sess-1', role: 'executor', context: null, state: 'completed', stop_reason: null, in_flight: false };
 
-function startFixtureOpsbot(): Promise<{ url: string; close: () => void }> {
+function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/api/v1/sessions') {
       res.setHeader('Content-Type', 'application/json');
@@ -74,7 +74,7 @@ test.describe('insight observability view', () => {
   let fixture: { url: string; close: () => void };
 
   test.beforeAll(async () => {
-    fixture = await startFixtureOpsbot();
+    fixture = await startFixtureBackend();
   });
 
   test.afterAll(() => {
@@ -83,8 +83,8 @@ test.describe('insight observability view', () => {
 
   test.beforeEach(async () => {
     app = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: fixture.url },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
+      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: fixture.url },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

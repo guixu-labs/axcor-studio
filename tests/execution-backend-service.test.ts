@@ -5,12 +5,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { ensureOpsbotRunning, isOpsbotReachable, stopOpsbotIfStarted } from '../src/opsbotService';
-import { setOpsbotBaseUrl } from '../src/opsbotHttp';
+import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackendService';
+import { setBackendBaseUrl } from '../src/executionBackendHttp';
 
 const FAKE_SERVER = `
 const http = require('http');
 const args = process.argv.slice(2);
+if (args[0] !== 'web' || !args.includes('--no-open')) process.exit(1);
 const portIndex = args.indexOf('--port');
 const port = Number(portIndex >= 0 ? args[portIndex + 1] : 18600);
 const server = http.createServer((req, res) => {
@@ -32,14 +33,19 @@ async function freePort(): Promise<number> {
 
 async function unreachable(url: string): Promise<boolean> {
   for (let i = 0; i < 20; i += 1) {
-    if (!(await isOpsbotReachable(url))) return true;
+    if (!(await isExecutionBackendReachable(url))) return true;
     await new Promise(resolve => setTimeout(resolve, 200));
   }
   return false;
 }
 
-test('isOpsbotReachable', async t => {
-  const server = http.createServer((_req, res) => {
+test('isExecutionBackendReachable', async t => {
+  const server = http.createServer((req, res) => {
+    if (req.url !== '/api/v1/runs') {
+      res.setHeader('Content-Type', 'text/html');
+      res.end('<html></html>');
+      return;
+    }
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ runs: [] }));
   });
@@ -47,22 +53,26 @@ test('isOpsbotReachable', async t => {
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   t.after(() => server.close());
 
-  await t.test('reports true for a healthy opsbot', async () => {
-    assert.equal(await isOpsbotReachable(url), true);
+  await t.test('reports true for a healthy backend', async () => {
+    assert.equal(await isExecutionBackendReachable(url), true);
   });
 
-  await t.test('reports false for an unreachable opsbot', async () => {
-    assert.equal(await isOpsbotReachable('http://127.0.0.1:1'), false);
+  await t.test('reports false for an unreachable backend', async () => {
+    assert.equal(await isExecutionBackendReachable('http://127.0.0.1:1'), false);
+  });
+
+  await t.test('rejects an HTML response from the runs endpoint', async () => {
+    assert.equal(await isExecutionBackendReachable(url + '/frontend'), false);
   });
 });
 
-test('opsbot lifecycle', async t => {
+test('execution backend lifecycle', async t => {
   const binDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-service-'));
   await fs.writeFile(path.join(binDir, 'fake-server.js'), FAKE_SERVER);
-  await fs.writeFile(path.join(binDir, 'opsbot'), `#!/bin/sh\nexec node "${path.join(binDir, 'fake-server.js')}" "$@"\n`, { mode: 0o755 });
+  await fs.writeFile(path.join(binDir, 'workflow-controller'), `#!/bin/sh\nexec node "${path.join(binDir, 'fake-server.js')}" "$@"\n`, { mode: 0o755 });
   const originalPath = process.env.PATH;
   t.after(async () => {
-    stopOpsbotIfStarted();
+    stopExecutionBackendIfStarted();
     process.env.PATH = originalPath;
     await fs.rm(binDir, { recursive: true, force: true });
   });
@@ -70,10 +80,10 @@ test('opsbot lifecycle', async t => {
   await t.test('stops the instance it started on quit', async () => {
     process.env.PATH = binDir + ':' + (process.env.PATH ?? '');
     const url = `http://127.0.0.1:${await freePort()}`;
-    setOpsbotBaseUrl(url);
-    assert.equal(await ensureOpsbotRunning(), true);
-    assert.equal(await isOpsbotReachable(url), true);
-    stopOpsbotIfStarted();
+    setBackendBaseUrl(url);
+    assert.equal(await ensureExecutionBackendRunning(), true);
+    assert.equal(await isExecutionBackendReachable(url), true);
+    stopExecutionBackendIfStarted();
     assert.equal(await unreachable(url), true);
   });
 
@@ -84,10 +94,10 @@ test('opsbot lifecycle', async t => {
     });
     await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', () => resolve()); });
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    setOpsbotBaseUrl(url);
-    assert.equal(await ensureOpsbotRunning(), true);
-    stopOpsbotIfStarted();
-    assert.equal(await isOpsbotReachable(url), true);
+    setBackendBaseUrl(url);
+    assert.equal(await ensureExecutionBackendRunning(), true);
+    stopExecutionBackendIfStarted();
+    assert.equal(await isExecutionBackendReachable(url), true);
     await new Promise<void>(resolve => { server.close(() => resolve()); });
   });
 });

@@ -22,8 +22,8 @@ test.describe('workspace tree', () => {
 
   test.beforeEach(async () => {
     app = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
+      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
@@ -54,11 +54,11 @@ test.describe('workspace tree', () => {
     await expect(window.locator('.frontmatter-warn')).toBeVisible();
   });
 
-  test('rejects running a file that is not a workflow program before calling opsbot', async () => {
+  test('rejects running a file that is not a workflow program before calling the backend', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     // workflow.md has no front matter declaration, so starting a run must
-    // fail locally with the front matter message (opsbot is not even running).
+    // fail locally with the front matter message (the backend is unavailable).
     await window.locator('.rail-item', { hasText: '运行' }).click();
     await window.getByRole('button', { name: '运行工作流' }).click();
     await expect(window.locator('.run-list-error')).toContainText('front matter');

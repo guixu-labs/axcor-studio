@@ -4,34 +4,34 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import started from 'electron-squirrel-startup';
 import {
-  stopAllOpsbotPolls,
-  subscribeOpsbotEvents,
-  unsubscribeOpsbotEvents,
-} from './opsbotClient';
+  stopAllExecutionPolls,
+  subscribeExecutionEvents,
+  unsubscribeExecutionEvents,
+} from './executionEvents';
 import {
-  getOpsbotRun,
-  getOpsbotRunSessions,
+  getRun,
+  getRunSessions,
   getInsightStatus,
-  getOpsbotBaseUrl,
-  importOpsbotSessionToInsight,
-  injectOpsbotSessionPrompt,
-  listOpsbotRuns,
-  setOpsbotBaseUrl,
-  startOpsbotRun,
-  startOpsbotSession,
-  stopOpsbotRun,
+  getBackendBaseUrl,
+  importSessionToInsight,
+  injectSessionPrompt,
+  listRuns,
+  setBackendBaseUrl,
+  startWorkflowRun,
+  startSessionRun,
+  stopRun,
   listProviders,
   saveProviders,
   deleteProvider,
   activateProvider,
   testProvider,
   testProviderKey,
-} from './opsbotHttp';
+} from './executionBackendHttp';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
 import { walkWorkspace } from './workspaceFiles';
-import { ensureOpsbotRunning, stopOpsbotIfStarted } from './opsbotService';
+import { ensureExecutionBackendRunning, stopExecutionBackendIfStarted } from './executionBackendService';
 import type { CreateRunInput } from './shared/protocol';
-import type { ProviderKeyInput } from './shared/opsbotApi';
+import type { ProviderKeyInput } from './shared/executionBackendApi';
 
 if (started) app.quit();
 
@@ -75,7 +75,7 @@ const createWindow = (): void => {
 }
 
 app.whenReady().then(() => {
-  void ensureOpsbotRunning();
+  void ensureExecutionBackendRunning();
   ipcMain.handle('workspace:choose', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
     selectedWorkspace = result.canceled ? undefined : result.filePaths[0];
@@ -88,37 +88,37 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('workspace:read-file', (_event, fileName: string) => fs.readFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), 'utf8'));
   ipcMain.handle('workspace:write-file', (_event, fileName: string, content: string) => fs.writeFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), content, 'utf8'));
-  ipcMain.handle('opsbot:start-run', (_event, input: CreateRunInput) => input.runtime === 'opsbot-session' ? startOpsbotSession(input) : startOpsbotRun(input));
-  ipcMain.handle('opsbot:list-runs', () => listOpsbotRuns());
-  ipcMain.handle('opsbot:get-run', (_event, runId: string) => getOpsbotRun(runId));
-  ipcMain.handle('opsbot:cancel-run', (_event, runId: string) => stopOpsbotRun(runId));
-  ipcMain.handle('opsbot:set-base-url', (_event, url: string) => { setOpsbotBaseUrl(url); });
-  ipcMain.handle('opsbot:get-base-url', () => getOpsbotBaseUrl());
-  ipcMain.handle('opsbot:get-run-sessions', (_event, runId: string) => getOpsbotRunSessions(runId));
-  ipcMain.handle('opsbot:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectOpsbotSessionPrompt(runId, sessionId, prompt));
-  ipcMain.handle('opsbot:import-to-insight', (_event, sessionId: string) => importOpsbotSessionToInsight(sessionId));
-  ipcMain.handle('opsbot:insight-status', () => getInsightStatus());
-  ipcMain.handle('opsbot:list-providers', () => listProviders());
-  ipcMain.handle('opsbot:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));
-  ipcMain.handle('opsbot:delete-provider', (_event, providerIndex: number) => deleteProvider(providerIndex));
-  ipcMain.handle('opsbot:activate-provider', (_event, providerIndex: number) => activateProvider(providerIndex));
-  ipcMain.handle('opsbot:test-provider', (_event, providerIndex: number) => testProvider(providerIndex));
-  ipcMain.handle('opsbot:test-provider-key', (_event, key: string, model: string, baseUrl: string, runtime: string | undefined) => testProviderKey(key, model, baseUrl, runtime));
+  ipcMain.handle('execution:start-run', (_event, input: CreateRunInput) => input.runtime === 'session' ? startSessionRun(input) : startWorkflowRun(input));
+  ipcMain.handle('execution:list-runs', () => listRuns());
+  ipcMain.handle('execution:get-run', (_event, runId: string) => getRun(runId));
+  ipcMain.handle('execution:cancel-run', (_event, runId: string) => stopRun(runId));
+  ipcMain.handle('execution:set-base-url', (_event, url: string) => { setBackendBaseUrl(url); });
+  ipcMain.handle('execution:get-base-url', () => getBackendBaseUrl());
+  ipcMain.handle('execution:get-run-sessions', (_event, runId: string) => getRunSessions(runId));
+  ipcMain.handle('execution:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectSessionPrompt(runId, sessionId, prompt));
+  ipcMain.handle('execution:import-to-insight', (_event, sessionId: string) => importSessionToInsight(sessionId));
+  ipcMain.handle('execution:insight-status', () => getInsightStatus());
+  ipcMain.handle('execution:list-providers', () => listProviders());
+  ipcMain.handle('execution:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));
+  ipcMain.handle('execution:delete-provider', (_event, providerIndex: number) => deleteProvider(providerIndex));
+  ipcMain.handle('execution:activate-provider', (_event, providerIndex: number) => activateProvider(providerIndex));
+  ipcMain.handle('execution:test-provider', (_event, providerIndex: number) => testProvider(providerIndex));
+  ipcMain.handle('execution:test-provider-key', (_event, key: string, model: string, baseUrl: string, runtime: string | undefined) => testProviderKey(key, model, baseUrl, runtime));
   ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => { showInsight(path, bounds, isDark); });
   ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => { updateInsightBounds(bounds); });
   ipcMain.handle('insight:hide', () => { hideInsight(); });
-  ipcMain.on('opsbot:subscribe-events', (_event, runId: string) => subscribeOpsbotEvents(runId));
-  ipcMain.on('opsbot:unsubscribe-events', (_event, runId: string) => unsubscribeOpsbotEvents(runId));
+  ipcMain.on('execution:subscribe-events', (_event, runId: string) => subscribeExecutionEvents(runId));
+  ipcMain.on('execution:unsubscribe-events', (_event, runId: string) => unsubscribeExecutionEvents(runId));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
 app.on('before-quit', () => {
-  stopAllOpsbotPolls();
-  stopOpsbotIfStarted();
+  stopAllExecutionPolls();
+  stopExecutionBackendIfStarted();
 });
 
 app.on('window-all-closed', () => {
-  stopAllOpsbotPolls();
+  stopAllExecutionPolls();
   if (process.platform !== 'darwin') app.quit();
 });

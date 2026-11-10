@@ -13,7 +13,7 @@ export interface WorkflowProgramIssues {
 const MAX_FRONT_MATTER_LINES = 60;
 
 // Minimal YAML front matter for workflow programs: a leading `---` block of
-// `key: value` lines. Opsbot rejects programs without a format field, so the
+// `key: value` lines. The backend rejects programs without a format field, so the
 // only hard requirement we surface is the format declaration.
 export function parseWorkflowFrontMatter(content: string): WorkflowFrontMatter {
   const lines = content.split(/\r?\n/);

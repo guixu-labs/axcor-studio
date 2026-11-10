@@ -293,4 +293,4 @@ gates: [tests-pass, sift-compliance, human-approval]
 - 需要官方扩展市场或 VS Code 级调试/Remote 能力，且 Monaco 组装路径已被证明覆盖不了；
 - 团队规模足以承担上游同步。
 
-架构纪律保证该决策无沉没成本：**服务层与 UI 经协议解耦**（`shared/protocol.ts`、OpsbotClient、insight 服务调用均壳无关）。若未来转向 fork，运行控制面可整体迁入 VS Code 的 webview/panel，损失仅限于 React UI 层。
+架构纪律保证该决策无沉没成本：**服务层与 UI 经协议解耦**（`shared/protocol.ts`、ExecutionClient、insight 服务调用均壳无关）。若未来转向 fork，运行控制面可整体迁入 VS Code 的 webview/panel，损失仅限于 React UI 层。

@@ -84,7 +84,7 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
             {RUNTIMES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
-        {runtime === 'opsbot-run' && <>
+        {runtime === 'workflow' && <>
           <label className="run-config-field">
             <span className="run-config-title">{messages.runLabel}</span>
             <input className="run-config-input" type="text" value={runLabel} placeholder={messages.runLabelPlaceholder} aria-label={messages.runLabel} onChange={event => onRunLabelChange(event.target.value)} />
@@ -107,7 +107,7 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
             <textarea className="run-config-input run-config-textarea" rows={3} value={runPrompt} placeholder={messages.promptPlaceholder} aria-label={messages.prompt} onChange={event => onRunPromptChange(event.target.value)} />
           </label>
         </>}
-        {runtime === 'opsbot-session' && <>
+        {runtime === 'session' && <>
           <label className="run-config-field">
             <span className="run-config-title">{messages.sessionPrompt}</span>
             <textarea className="run-config-input run-config-textarea" rows={4} value={sessionPrompt} aria-label={messages.sessionPrompt} onChange={event => onSessionPromptChange(event.target.value)} />

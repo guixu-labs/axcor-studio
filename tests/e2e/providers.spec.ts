@@ -7,12 +7,12 @@ import type { AddressInfo } from 'node:net';
 test.describe('provider settings', () => {
   let app: ElectronApplication;
   let window: Page;
-  let opsbotUrl: string;
-  let opsbotServer: http.Server;
+  let executionBackendUrl: string;
+  let backendServer: http.Server;
   let captured: Array<{ method: string; url: string; body: Record<string, unknown> }> = [];
 
   test.beforeAll(async () => {
-    opsbotServer = http.createServer((req, res) => {
+    backendServer = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
       let raw = '';
       req.on('data', chunk => { raw += chunk; });
@@ -61,19 +61,19 @@ test.describe('provider settings', () => {
         res.end(JSON.stringify({ detail: `unexpected ${req.method} ${req.url}` }));
       });
     });
-    await new Promise<void>(resolve => { opsbotServer.listen(0, '127.0.0.1', () => resolve()); });
-    opsbotUrl = `http://127.0.0.1:${(opsbotServer.address() as AddressInfo).port}`;
+    await new Promise<void>(resolve => { backendServer.listen(0, '127.0.0.1', () => resolve()); });
+    executionBackendUrl = `http://127.0.0.1:${(backendServer.address() as AddressInfo).port}`;
   });
 
   test.afterAll(() => {
-    opsbotServer.close();
+    backendServer.close();
   });
 
   test.beforeEach(async () => {
     captured = [];
     app = await electron.launch({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: opsbotUrl },
+      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: executionBackendUrl },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

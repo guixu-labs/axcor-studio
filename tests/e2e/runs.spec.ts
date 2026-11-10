@@ -11,7 +11,7 @@ const runRecord = {
   finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1,
 };
 
-function startFixtureOpsbot(): Promise<{ url: string; close: () => void }> {
+function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
   let eventCursorSeen = false;
   const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -48,13 +48,13 @@ function startFixtureOpsbot(): Promise<{ url: string; close: () => void }> {
   });
 }
 
-test.describe('opsbot runs', () => {
+test.describe('execution runs', () => {
   let app: ElectronApplication;
   let window: Page;
   let fixture: { url: string; close: () => void };
 
   test.beforeAll(async () => {
-    fixture = await startFixtureOpsbot();
+    fixture = await startFixtureBackend();
   });
 
   test.afterAll(() => {
@@ -63,8 +63,8 @@ test.describe('opsbot runs', () => {
 
   test.beforeEach(async () => {
     app = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: fixture.url },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
+      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: fixture.url },
     });
     window = await app.firstWindow();
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
@@ -80,7 +80,7 @@ test.describe('opsbot runs', () => {
     if (app) await app.close();
   });
 
-  test('lists opsbot runs and streams events for the selected run', async () => {
+  test('lists runs and streams events for the selected run', async () => {
     const entry = window.getByRole('option', { name: /workflow\.md/ });
     await expect(entry).toBeVisible();
     await entry.click();
@@ -94,20 +94,36 @@ test.describe('opsbot runs', () => {
     await expect(window.locator('.run-list-error')).toContainText('选择工作区');
   });
 
-  test('reconnects when the opsbot URL is changed in settings', async () => {
+  test('restores the backend URL and session mode from legacy settings', async () => {
+    const savedUrl = fixture.url + '/';
+    await window.evaluate(url => {
+      localStorage.setItem('workbench.opsbotUrl', JSON.stringify(url));
+      localStorage.setItem('workbench.runtime', JSON.stringify('opsbot-session'));
+    }, savedUrl);
+    await window.reload();
+    await expect(window.getByLabel('运行时', { exact: true })).toHaveValue('session');
+    await window.locator('.rail-settings').click();
+    await window.getByRole('button', { name: '常规' }).click();
+    await expect(window.getByLabel('Workflow Controller 地址')).toHaveValue(savedUrl);
+    await expect.poll(() => window.evaluate(() => globalThis.window.executionBackend.getBaseUrl())).toBe(fixture.url);
+  });
+
+  test('reconnects when the execution backend URL is changed in settings', async () => {
     const defaultApp = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('reconnect-profile')}`, path.resolve('.vite/build/main.js')],
       // Point the app at an unreachable port so the boot-time list fails
-      // deterministically, independent of any opsbot running on the host.
-      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', OPSBOT_BASE_URL: 'http://127.0.0.1:1' },
+      // deterministically, independent of any backend running on the host.
+      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: 'http://127.0.0.1:1' },
     });
     const defaultWindow = await defaultApp.firstWindow();
     await defaultWindow.waitForLoadState('domcontentloaded');
     await expect(defaultWindow.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
-    await expect(defaultWindow.locator('.run-list-error')).toContainText('无法连接 Opsbot', { timeout: 20_000 });
+    await expect(defaultWindow.locator('.run-list-error')).toContainText('无法连接 Workflow Controller', { timeout: 20_000 });
     await defaultWindow.locator('.rail-settings').click();
     await defaultWindow.getByRole('button', { name: '常规' }).click();
-    await defaultWindow.getByLabel('Opsbot 地址').fill(fixture.url);
+    await defaultWindow.getByLabel('Workflow Controller 地址').fill(fixture.url);
+    await expect.poll(() => defaultWindow.evaluate(() => localStorage.getItem('workbench.executionBackendUrl')))
+      .toBe(JSON.stringify(fixture.url));
     await defaultWindow.locator('.modal-close').click();
     await expect(defaultWindow.getByRole('option', { name: /workflow\.md/ })).toBeVisible();
     await defaultApp.close();

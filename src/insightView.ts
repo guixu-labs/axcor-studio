@@ -1,5 +1,5 @@
 import { BrowserWindow, WebContentsView } from 'electron';
-import { getOpsbotBaseUrl } from './opsbotHttp';
+import { getBackendBaseUrl } from './executionBackendHttp';
 
 export interface InsightBounds {
   x: number;
@@ -48,7 +48,7 @@ export function showInsight(path: string, bounds: InsightBounds, isDark: boolean
   view.setBounds(bounds);
   if (insightPath !== loadedPath) {
     loadedPath = insightPath;
-    void view.webContents.loadURL(getOpsbotBaseUrl() + insightPath).catch(() => {});
+    void view.webContents.loadURL(getBackendBaseUrl() + insightPath).catch(() => {});
   }
   view.setVisible(true);
   insightVisible = true;

@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 
-const FAKE_OPSBOT_SERVER = `
+const FAKE_BACKEND_SERVER = `
 const http = require('http');
 const args = process.argv.slice(2);
 const portIndex = args.indexOf('--port');
@@ -24,20 +24,20 @@ const server = http.createServer((req, res) => {
 server.listen(port, '127.0.0.1');
 `;
 
-test.describe('opsbot auto-start', () => {
+test.describe('execution backend auto-start', () => {
   let app: ElectronApplication;
   let window: Page;
   let binDir: string;
-  let opsbotPort: number;
+  let backendPort: number;
 
   test.beforeAll(async () => {
     binDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-autostart-'));
-    await fs.writeFile(path.join(binDir, 'fake-opsbot-server.js'), FAKE_OPSBOT_SERVER);
-    await fs.writeFile(path.join(binDir, 'opsbot'), `#!/bin/sh\nexec node "${path.join(binDir, 'fake-opsbot-server.js')}" "$@"\n`, { mode: 0o755 });
-    // Find a free port for the fake opsbot.
+    await fs.writeFile(path.join(binDir, 'fake-backend-server.js'), FAKE_BACKEND_SERVER);
+    await fs.writeFile(path.join(binDir, 'workflow-controller'), `#!/bin/sh\nexec node "${path.join(binDir, 'fake-backend-server.js')}" "$@"\n`, { mode: 0o755 });
+    // Find a free port for the fake backend.
     const probe = http.createServer(() => {});
     await new Promise<void>(resolve => { probe.listen(0, '127.0.0.1', () => resolve()); });
-    opsbotPort = (probe.address() as AddressInfo).port;
+    backendPort = (probe.address() as AddressInfo).port;
     await new Promise<void>(resolve => { probe.close(() => resolve()); });
   });
 
@@ -47,8 +47,8 @@ test.describe('opsbot auto-start', () => {
 
   test.beforeEach(async () => {
     app = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, PATH: binDir + ':' + (process.env.PATH ?? ''), OPSBOT_BASE_URL: `http://127.0.0.1:${opsbotPort}` },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
+      env: { ...process.env, PATH: binDir + ':' + (process.env.PATH ?? ''), EXECUTION_BACKEND_BASE_URL: `http://127.0.0.1:${backendPort}` },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
@@ -63,15 +63,13 @@ test.describe('opsbot auto-start', () => {
     if (app) await app.close();
   });
 
-  test('spawns opsbot when the configured URL is not answering', async () => {
-    // The main process probes, fails, spawns the fake opsbot via PATH and
-    // the renderer retries until the run list arrives.
+  test('spawns the execution backend when the configured URL is not answering', async () => {
     await expect(window.getByRole('option', { name: /auto-started/ })).toBeVisible({ timeout: 20_000 });
     await expect(window.locator('.run-list-error')).toHaveCount(0);
     // Quitting the workbench must stop the instance it started.
     await app.close();
     app = undefined as unknown as ElectronApplication;
-    const url = `http://127.0.0.1:${opsbotPort}/api/v1/runs`;
+    const url = `http://127.0.0.1:${backendPort}/api/v1/runs`;
     let stopped = false;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       try { await fetch(url, { signal: AbortSignal.timeout(500) }); } catch { stopped = true; break; }

@@ -10,8 +10,8 @@ test.describe('run configuration', () => {
   let app: ElectronApplication;
   let window: Page;
   let workspaceDir: string;
-  let opsbotUrl: string;
-  let opsbotServer: http.Server;
+  let executionBackendUrl: string;
+  let backendServer: http.Server;
   let capturedBodies: Record<string, unknown>[] = [];
   let postedLabel = 'workflow.md';
   let postedSessionPrompt = 'session-prompt';
@@ -19,7 +19,7 @@ test.describe('run configuration', () => {
   test.beforeAll(async () => {
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-run-params-'));
     await fs.writeFile(path.join(workspaceDir, 'workflow.md'), '---\nformat: graph-yaml@1\n---\n\n# Program\n');
-    opsbotServer = http.createServer((req, res) => {
+    backendServer = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
       let raw = '';
       req.on('data', chunk => { raw += chunk; });
@@ -70,20 +70,20 @@ test.describe('run configuration', () => {
         res.end(JSON.stringify({ detail: `unexpected ${req.method} ${req.url}` }));
       });
     });
-    await new Promise<void>(resolve => { opsbotServer.listen(0, '127.0.0.1', () => resolve()); });
-    opsbotUrl = `http://127.0.0.1:${(opsbotServer.address() as AddressInfo).port}`;
+    await new Promise<void>(resolve => { backendServer.listen(0, '127.0.0.1', () => resolve()); });
+    executionBackendUrl = `http://127.0.0.1:${(backendServer.address() as AddressInfo).port}`;
   });
 
   test.afterAll(async () => {
-    opsbotServer.close();
+    backendServer.close();
     await fs.rm(workspaceDir, { recursive: true, force: true });
   });
 
   test.beforeEach(async () => {
     capturedBodies = [];
     app = await electron.launch({
-      args: ['--no-sandbox', path.resolve('.vite/build/main.js')],
-      env: { ...process.env, OPSBOT_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir, OPSBOT_BASE_URL: opsbotUrl },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
+      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir, EXECUTION_BACKEND_BASE_URL: executionBackendUrl },
     });
     window = await app.firstWindow();
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
@@ -102,7 +102,7 @@ test.describe('run configuration', () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     await window.locator('.rail-item', { hasText: '运行' }).click();
-    await expect(window.getByLabel('运行时')).toHaveValue('opsbot-run');
+    await expect(window.getByLabel('运行时')).toHaveValue('workflow');
     await window.getByLabel('运行名称').fill('release-check');
     await window.getByRole('button', { name: '添加参数' }).click();
     const rows = window.locator('.run-param-row');
@@ -121,9 +121,9 @@ test.describe('run configuration', () => {
     expect(capturedBodies[0]['max_parallel']).toBe(4);
   });
 
-  test('starts an opsbot session with prompt and agent options', async () => {
+  test('starts a session with prompt and agent options', async () => {
     await window.locator('.rail-item', { hasText: '运行' }).click();
-    await window.getByLabel('运行时').selectOption('opsbot-session');
+    await window.getByLabel('运行时').selectOption('session');
     await window.getByLabel('提示词', { exact: true }).fill('整理当前项目结构');
     await window.getByLabel('Agent 运行时').selectOption('opencode');
     await window.getByLabel('模型').fill('glm-4.7');

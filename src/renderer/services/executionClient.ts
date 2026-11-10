@@ -1,15 +1,15 @@
-import type { Artifact, CreateRunInput, OpsbotClient, Run, RunEvent } from '../../shared/protocol';
+import type { Artifact, CreateRunInput, ExecutionClient, Run, RunEvent } from '../../shared/protocol';
 
-export class WorkbenchOpsbotClient implements OpsbotClient {
-  createRun(input: CreateRunInput): Promise<Run> { return window.opsbot.startRun(input); }
-  getRun(runId: string): Promise<Run> { return window.opsbot.getRun(runId); }
-  cancelRun(runId: string): Promise<void> { return window.opsbot.cancelRun(runId); }
-  subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void { return window.opsbot.subscribeRunEvents(runId, listener); }
-  async listRuns(): Promise<Run[]> { return window.opsbot.listRuns(); }
+export class WorkbenchExecutionClient implements ExecutionClient {
+  createRun(input: CreateRunInput): Promise<Run> { return window.executionBackend.startRun(input); }
+  getRun(runId: string): Promise<Run> { return window.executionBackend.getRun(runId); }
+  cancelRun(runId: string): Promise<void> { return window.executionBackend.cancelRun(runId); }
+  subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void { return window.executionBackend.subscribeRunEvents(runId, listener); }
+  async listRuns(): Promise<Run[]> { return window.executionBackend.listRuns(); }
   async listArtifacts(): Promise<Artifact[]> { return []; }
 }
 
-export class MockOpsbotClient implements OpsbotClient {
+export class MockExecutionClient implements ExecutionClient {
   private readonly runs = new Map<string, Run>();
   private readonly listeners = new Map<string, Set<(event: RunEvent) => void>>();
 

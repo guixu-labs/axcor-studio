@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { WorkbenchOpsbotClient } from './services/opsbotClient';
+import { WorkbenchExecutionClient } from './services/executionClient';
+import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackend';
 import type { Run, RunEvent, RuntimeId } from '../shared/protocol';
 import { isTerminalRun } from '../shared/run';
 import type { RunParamsRow } from './components/RunsPanel';
@@ -20,8 +21,8 @@ import { defaultFont, defaultTheme, fonts, migrateLegacyThemeId, themes } from '
 import { messages, type LocaleId } from './i18n';
 import { workflowProgramIssues } from './workflowProgram';
 
-const client = new WorkbenchOpsbotClient();
-const DEFAULT_OPSBOT_URL = 'http://127.0.0.1:18600';
+const client = new WorkbenchExecutionClient();
+const EXECUTION_BACKEND_URL_STORAGE_KEY = 'workbench.executionBackendUrl';
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
@@ -43,12 +44,13 @@ export default function App(): JSX.Element {
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
   const [backgroundImage, setBackgroundImage] = useState(() => loadWorkbenchState('workbench.backgroundImage', ''));
   const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
-  const [opsbotUrl, setOpsbotUrl] = useState<string | undefined>(() => loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
-  const [opsbotError, setOpsbotError] = useState<string>();
+  const [executionBackendUrl, setExecutionBackendUrl] = useState<string | undefined>(() =>
+    loadWorkbenchState<string | undefined>(EXECUTION_BACKEND_URL_STORAGE_KEY, undefined)
+    ?? loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
+  const [executionError, setExecutionError] = useState<string>();
   const [runtime, setRuntime] = useState<RuntimeId>(() => {
-    // Legacy stored value 'opsbot' maps to the run mode.
-    const stored = loadWorkbenchState<string>('workbench.runtime', 'opsbot-run');
-    return stored === 'opsbot-session' ? 'opsbot-session' : 'opsbot-run';
+    const stored = loadWorkbenchState<string>('workbench.runtime', 'workflow');
+    return stored === 'session' || stored === 'opsbot-session' ? 'session' : 'workflow';
   });
   const [runLabel, setRunLabel] = useState('');
   const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
@@ -62,7 +64,7 @@ export default function App(): JSX.Element {
   const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
   const [insightPath, setInsightPath] = useState('/insight/');
   const [insightFailed, setInsightFailed] = useState(false);
-  const effectiveOpsbotUrl = opsbotUrl ?? DEFAULT_OPSBOT_URL;
+  const effectiveExecutionBackendUrl = executionBackendUrl ?? DEFAULT_EXECUTION_BACKEND_URL;
   const appContent = useRef<HTMLDivElement>(null);
   const importedToInsight = useRef(new Set<string>());
   const t = messages[locale];
@@ -79,21 +81,21 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
   const bootListRuns = async (): Promise<void> => {
-    // Opsbot may be starting up under us; retry for a while before
+    // The backend may still be starting up; retry for a while before
     // surfacing a connection error.
     for (let attempt = 0; attempt < 6; attempt += 1) {
       try {
         setRuns(await client.listRuns());
-        setOpsbotError(undefined);
+        setExecutionError(undefined);
         return;
       } catch (error) {
-        if (attempt === 5) setOpsbotError(error instanceof Error ? error.message : String(error));
+        if (attempt === 5) setExecutionError(error instanceof Error ? error.message : String(error));
         else await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   };
   useEffect(() => {
-    void window.opsbot.setBaseUrl(opsbotUrl ?? '');
+    void window.executionBackend.setBaseUrl(executionBackendUrl ?? '');
     void window.workbench.getWorkspace().then(current => {
       if (!current) return;
       setWorkspace(current);
@@ -110,11 +112,11 @@ export default function App(): JSX.Element {
         if (isTerminalRun(latest) && !importedToInsight.current.has(latest.id)) {
           importedToInsight.current.add(latest.id);
           try {
-            if (latest.runtimeId === 'opsbot-session') {
-              await window.opsbot.importToInsight(latest.id);
+            if (latest.runtimeId === 'session') {
+              await window.executionBackend.importToInsight(latest.id);
             } else {
-              const sessions = await window.opsbot.getRunSessions(latest.id);
-              for (const session of sessions) await window.opsbot.importToInsight(session.session_id);
+              const sessions = await window.executionBackend.getRunSessions(latest.id);
+              for (const session of sessions) await window.executionBackend.importToInsight(session.session_id);
             }
           } catch {
             // Observability import is best-effort; the run view stays usable.
@@ -196,12 +198,12 @@ export default function App(): JSX.Element {
   };
   const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
   const startRun = async (): Promise<void> => {
-    setOpsbotError(undefined);
-    if (!workspace) { setOpsbotError('运行工作流需要先选择工作区'); return; }
+    setExecutionError(undefined);
+    if (!workspace) { setExecutionError('运行工作流需要先选择工作区'); return; }
     let created: Run;
     try {
-      if (runtime === 'opsbot-session') {
-        if (!sessionPrompt.trim()) { setOpsbotError('会话模式需要填写提示词'); return; }
+      if (runtime === 'session') {
+        if (!sessionPrompt.trim()) { setExecutionError('会话模式需要填写提示词'); return; }
         const parsedMaxIterations = Number.parseInt(sessionMaxIterations, 10);
         created = await client.createRun({
           workflowId: '',
@@ -215,9 +217,9 @@ export default function App(): JSX.Element {
           reviewerEnabled: sessionReviewerEnabled,
         });
       } else {
-        if (!file) { setOpsbotError('没有打开的工作流文件'); return; }
+        if (!file) { setExecutionError('没有打开的工作流文件'); return; }
         const issues = workflowProgramIssues(content);
-        if (issues.error) { setOpsbotError(issues.error); return; }
+        if (issues.error) { setExecutionError(issues.error); return; }
         await save();
         const params: Record<string, string> = {};
         for (const row of runParams) if (row.key.trim()) params[row.key.trim()] = row.value;
@@ -233,7 +235,7 @@ export default function App(): JSX.Element {
         });
       }
     } catch (error) {
-      setOpsbotError(error instanceof Error ? error.message : String(error));
+      setExecutionError(error instanceof Error ? error.message : String(error));
       return;
     }
     setRuns(previous => [created, ...previous]);
@@ -241,16 +243,16 @@ export default function App(): JSX.Element {
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
-    if (runtime === 'opsbot-run') {
+    if (runtime === 'workflow') {
       const trimmedPrompt = runPrompt.trim();
       if (trimmedPrompt) {
         let injected = false;
         for (let attempt = 0; attempt < 6 && !injected; attempt += 1) {
           try {
-            const sessions = await window.opsbot.getRunSessions(created.id);
+            const sessions = await window.executionBackend.getRunSessions(created.id);
             const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
             if (target) {
-              await window.opsbot.injectPrompt(created.id, target.session_id, trimmedPrompt);
+              await window.executionBackend.injectPrompt(created.id, target.session_id, trimmedPrompt);
               injected = true;
             }
           } catch {
@@ -259,7 +261,7 @@ export default function App(): JSX.Element {
           }
           if (!injected) await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        if (!injected) setOpsbotError('提示词注入失败：执行会话尚未就绪，run 已照常启动');
+        if (!injected) setExecutionError('提示词注入失败：执行会话尚未就绪，run 已照常启动');
       }
     }
   };
@@ -274,7 +276,7 @@ export default function App(): JSX.Element {
     try {
       await client.cancelRun(selectedRun.id);
     } catch (error) {
-      setOpsbotError(error instanceof Error ? error.message : String(error));
+      setExecutionError(error instanceof Error ? error.message : String(error));
       return;
     }
     const latest = await client.getRun(selectedRun.id);
@@ -282,24 +284,24 @@ export default function App(): JSX.Element {
   };
   const openInsightForRun = async (): Promise<void> => {
     if (!selectedRun) return;
-    setOpsbotError(undefined);
+    setExecutionError(undefined);
     try {
-      if (selectedRun.runtimeId === 'opsbot-session') {
-        const result = await window.opsbot.importToInsight(selectedRun.id);
-        if (!result.ok) { setOpsbotError(result.error ?? t.insightLoadFailed); return; }
+      if (selectedRun.runtimeId === 'session') {
+        const result = await window.executionBackend.importToInsight(selectedRun.id);
+        if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
         setInsightPath('/insight/session/' + encodeURIComponent(selectedRun.id));
         setActiveNavigation('insight');
         return;
       }
-      const sessions = await window.opsbot.getRunSessions(selectedRun.id);
+      const sessions = await window.executionBackend.getRunSessions(selectedRun.id);
       const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
-      if (!target) { setOpsbotError(t.noObservableSessions); return; }
-      const result = await window.opsbot.importToInsight(target.session_id);
-      if (!result.ok) { setOpsbotError(result.error ?? t.insightLoadFailed); return; }
+      if (!target) { setExecutionError(t.noObservableSessions); return; }
+      const result = await window.executionBackend.importToInsight(target.session_id);
+      if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
       setInsightPath('/insight/session/' + encodeURIComponent(target.session_id));
       setActiveNavigation('insight');
     } catch (error) {
-      setOpsbotError(error instanceof Error ? error.message : String(error));
+      setExecutionError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -322,7 +324,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={opsbotError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={setSessionRuntime} sessionModel={sessionModel} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={setSessionRuntime} sessionModel={sessionModel} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>
@@ -342,6 +344,6 @@ export default function App(): JSX.Element {
       </div>
     </div>
     <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></footer>
-    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} opsbotUrl={effectiveOpsbotUrl} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onOpsbotUrlChange={url => { setOpsbotUrl(url); saveWorkbenchState('workbench.opsbotUrl', url); void window.opsbot.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setOpsbotError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
+    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} executionBackendUrl={effectiveExecutionBackendUrl} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onExecutionBackendUrlChange={url => { setExecutionBackendUrl(url); saveWorkbenchState(EXECUTION_BACKEND_URL_STORAGE_KEY, url); void window.executionBackend.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setExecutionError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
   </main>;
 }

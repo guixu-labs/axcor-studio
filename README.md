@@ -4,7 +4,7 @@
 
 axcor-studio 定位为**工作流一站式解决平台**，目标是贯通工作流的编写、执行、观测、评测、（自）进化，支持团队间协作开发，为用户提供统一的工作环境。
 
-当前以 Electron Forge + Vite + React 构建桌面工作台，接入 Opsbot 提供工作流执行服务，并嵌入 Insight 观测视图。下文说明当前已实现的能力与开发方式。
+当前以 Electron Forge + Vite + React 构建桌面工作台，接入 Workflow Controller 提供工作流执行服务，并嵌入 Insight 观测视图。下文说明当前已实现的能力与开发方式。
 
 ## 开发启动
 
@@ -13,9 +13,13 @@ npm install
 npm run start
 ```
 
-桌面应用通过 `WorkbenchOpsbotClient` 和 Electron IPC 访问真实的 Opsbot 运行 API，支持选择工作区、使用 Monaco 编辑并保存 Markdown、查看/启动/停止运行、轮询运行事件，以及在内嵌 Insight 视图中打开已导入的会话。需要单独启动 Opsbot；默认地址为 `http://127.0.0.1:18600`，可在设置中修改，或在启动应用时通过 `OPSBOT_BASE_URL` 配置。
+桌面应用通过 Electron IPC 访问 Workflow Controller API，支持选择工作区、使用 Monaco 编辑并保存 Markdown、查看和控制运行、轮询运行事件，以及在内嵌 Insight 视图中打开已导入的会话。
 
-`MockOpsbotClient` 保留用于隔离测试。产物获取和 Evidence 面板仍为占位实现；运行完成本身不代表代码或业务验收通过。
+默认地址为 `http://127.0.0.1:18600`。工作台启动时会复用可访问的服务，本地服务不可用时会尝试执行 `workflow-controller web --port 18600 --no-open`。可通过「设置 → 常规」修改连接地址，或在启动工作台时通过 `EXECUTION_BACKEND_BASE_URL` 配置地址。设定 `EXECUTION_BACKEND_NO_AUTOSTART=1` 可关闭自动启动。
+
+执行后端的显示名称和 CLI 命令集中定义在 `src/shared/executionBackend.ts`。
+
+`MockExecutionClient` 保留用于隔离测试。产物获取和 Evidence 面板仍为占位实现；运行完成本身不代表代码或业务验收通过。
 
 依赖配置将 `@electron/rebuild` 固定为已发布的 4.2.0 版本，避免旧版本引入托管在 GitHub 上的 `@electron/node-gyp` 源码依赖，降低受限网络环境下的安装失败风险。
 
@@ -29,4 +33,4 @@ npm run package
 npm run make
 ```
 
-按改动范围选择检查。HTTP 和 Electron E2E 测试使用本地 fixture，真实 Opsbot/Insight 服务的验证结果需单独记录。构建或分发相关改动需要执行打包检查。
+按改动范围选择检查。HTTP 和 Electron E2E 测试使用本地 fixture，真实 Workflow Controller 和 Insight 服务的验证结果需单独记录。构建或分发相关改动需要执行打包检查。
