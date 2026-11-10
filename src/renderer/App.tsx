@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchExecutionClient } from './services/executionClient';
+import type { SessionModelOption } from '../shared/executionBackendApi';
 import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackend';
 import type { Run, RunEvent, RuntimeId } from '../shared/protocol';
 import { isTerminalRun, runEventKey } from '../shared/run';
@@ -60,6 +61,7 @@ export default function App(): JSX.Element {
   const [sessionPrompt, setSessionPrompt] = useState('');
   const [sessionRuntime, setSessionRuntime] = useState('claude_sdk');
   const [sessionModel, setSessionModel] = useState('');
+  const [sessionModels, setSessionModels] = useState<SessionModelOption[] | 'loading' | 'unavailable'>('loading');
   const [sessionSystemPrompt, setSessionSystemPrompt] = useState('');
   const [sessionMaxIterations, setSessionMaxIterations] = useState('');
   const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
@@ -69,6 +71,11 @@ export default function App(): JSX.Element {
   const appContent = useRef<HTMLDivElement>(null);
   const importedToInsight = useRef(new Set<string>());
   const t = messages[locale];
+  const sessionModelOptions = Array.isArray(sessionModels) ? sessionModels : [];
+  const selectedSessionModel = sessionModelOptions.find(option => option.model === sessionModel);
+  const sessionModelPlaceholder = sessionModels === 'loading' ? t.sessionModelsLoading
+    : sessionModels === 'unavailable' ? t.sessionModelsUnavailable
+    : sessionModelOptions.length ? t.sessionSelectModel : t.sessionModelsEmpty;
   const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
   const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
   const services = useRef(createWorkbenchServices()).current;
@@ -104,6 +111,24 @@ export default function App(): JSX.Element {
     }).catch(() => {});
     void bootListRuns();
   }, []);
+  useEffect(() => {
+    if (runtime !== 'session' || activeNavigation !== 'runs' || settingsOpen) return;
+    let cancelled = false;
+    setSessionModels('loading');
+    void (async () => {
+      try {
+        const options = await window.executionBackend.listSessionModels(sessionRuntime);
+        if (cancelled) return;
+        setSessionModels(options);
+        setSessionModel(current => options.some(option => option.model === current) ? current : '');
+      } catch {
+        if (cancelled) return;
+        setSessionModels('unavailable');
+        setSessionModel('');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [runtime, sessionRuntime, activeNavigation, settingsOpen, executionBackendUrl]);
   useEffect(() => {
     if (!selectedRunId) return;
     let pending: RunEvent[] = [];
@@ -229,6 +254,11 @@ export default function App(): JSX.Element {
     }
   };
   const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
+  const changeSessionRuntime = (value: string): void => {
+    setSessionRuntime(value);
+    setSessionModel('');
+    setSessionModels('loading');
+  };
   const startRun = async (): Promise<void> => {
     setExecutionError(undefined);
     if (!workspace) { setExecutionError('运行工作流需要先选择工作区'); return; }
@@ -236,6 +266,7 @@ export default function App(): JSX.Element {
     try {
       if (runtime === 'session') {
         if (!sessionPrompt.trim()) { setExecutionError('会话模式需要填写提示词'); return; }
+        if (!selectedSessionModel) { setExecutionError(sessionModelPlaceholder); return; }
         const parsedMaxIterations = Number.parseInt(sessionMaxIterations, 10);
         created = await client.createRun({
           workflowId: '',
@@ -243,7 +274,8 @@ export default function App(): JSX.Element {
           runtime,
           prompt: sessionPrompt,
           sessionRuntime,
-          ...(sessionModel.trim() ? { model: sessionModel.trim() } : {}),
+          model: selectedSessionModel.model,
+          providerIndex: selectedSessionModel.providerIndex,
           ...(sessionSystemPrompt.trim() ? { systemPrompt: sessionSystemPrompt.trim() } : {}),
           ...(Number.isInteger(parsedMaxIterations) && parsedMaxIterations >= 1 ? { maxIterations: parsedMaxIterations } : {}),
           reviewerEnabled: sessionReviewerEnabled,
@@ -356,7 +388,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={setSessionRuntime} sessionModel={sessionModel} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedSessionModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>

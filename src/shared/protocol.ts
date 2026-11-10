@@ -50,6 +50,7 @@ export interface CreateRunInput {
   prompt?: string;
   sessionRuntime?: string;
   model?: string;
+  providerIndex?: number;
   systemPrompt?: string;
   maxIterations?: number;
   reviewerEnabled?: boolean;

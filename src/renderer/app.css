@@ -180,6 +180,7 @@ footer { margin: 0 6px 6px; }
 .run-config-textarea { resize: vertical; min-height: 64px; }
 .run-config-check { display: flex; align-items: center; gap: 8px; }
 .run-config-check input { accent-color: var(--accent); }
+.run-action:disabled { opacity: .5; cursor: default; transform: none; }
 .providers-notice { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #77d6a1 45%, var(--border)); border-radius: 7px; background: color-mix(in srgb, #77d6a1 12%, transparent); color: var(--text); font-size: 11px; }
 h3.settings-field-title { margin: 0; }
 .provider-list { display: grid; gap: 8px; }

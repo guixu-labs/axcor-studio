@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { SessionModelOption } from '../../shared/executionBackendApi';
 import type { Run, RuntimeId } from '../../shared/protocol';
 import { RUNTIMES } from '../../shared/protocol';
 
@@ -43,6 +44,8 @@ interface RunsListProps {
   sessionRuntime: string;
   onSessionRuntimeChange: (value: string) => void;
   sessionModel: string;
+  sessionModels: SessionModelOption[];
+  sessionModelPlaceholder: string;
   onSessionModelChange: (value: string) => void;
   sessionSystemPrompt: string;
   onSessionSystemPromptChange: (value: string) => void;
@@ -53,7 +56,7 @@ interface RunsListProps {
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><div><span className="eyebrow">{messages.runs}</span><h2>{messages.executionCenter}</h2></div></div>
@@ -119,7 +122,10 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
           </label>
           <label className="run-config-field">
             <span className="run-config-title">{messages.sessionModel}</span>
-            <input className="run-config-input" type="text" value={sessionModel} aria-label={messages.sessionModel} onChange={event => onSessionModelChange(event.target.value)} />
+            <select className="run-config-select" value={sessionModel} aria-label={messages.sessionModel} disabled={!sessionModels.length} onChange={event => onSessionModelChange(event.target.value)}>
+              <option value="" disabled hidden={sessionModels.length > 0}>{sessionModelPlaceholder}</option>
+              {sessionModels.map(option => <option key={option.model} value={option.model}>{option.model}</option>)}
+            </select>
           </label>
           <label className="run-config-field">
             <span className="run-config-title">{messages.sessionSystemPrompt}</span>
@@ -136,6 +142,6 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
         </>}
       </>}
     </div>
-    <button className="run-action" type="button" onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
+    <button className="run-action" type="button" disabled={runtime === 'session' && !sessionModel} onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
   </aside>;
 }

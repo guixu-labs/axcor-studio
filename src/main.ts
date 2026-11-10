@@ -16,6 +16,7 @@ import {
   importSessionToInsight,
   injectSessionPrompt,
   listRuns,
+  listSessionModels,
   setBackendBaseUrl,
   startWorkflowRun,
   startSessionRun,
@@ -99,6 +100,7 @@ app.whenReady().then(() => {
   ipcMain.handle('execution:import-to-insight', (_event, sessionId: string) => importSessionToInsight(sessionId));
   ipcMain.handle('execution:insight-status', () => getInsightStatus());
   ipcMain.handle('execution:list-providers', () => listProviders());
+  ipcMain.handle('execution:list-session-models', (_event, runtime: string) => listSessionModels(runtime));
   ipcMain.handle('execution:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));
   ipcMain.handle('execution:delete-provider', (_event, providerIndex: number) => deleteProvider(providerIndex));
   ipcMain.handle('execution:activate-provider', (_event, providerIndex: number) => activateProvider(providerIndex));

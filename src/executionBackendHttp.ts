@@ -16,6 +16,7 @@ import {
   type ProviderKeyInput,
   type ProviderTestResult,
   type ProviderValidation,
+  type SessionModelOption,
 } from './shared/executionBackendApi';
 
 const DEFAULT_BASE_URL = process.env.EXECUTION_BACKEND_BASE_URL ?? DEFAULT_EXECUTION_BACKEND_URL;
@@ -100,6 +101,7 @@ export async function startSessionRun(input: CreateRunInput): Promise<Run> {
   };
   if (input.sessionRuntime) body.runtime = input.sessionRuntime;
   if (input.model?.trim()) body.model = input.model.trim();
+  if (input.providerIndex !== undefined) body.provider_index = input.providerIndex;
   if (input.systemPrompt?.trim()) body.system_prompt = input.systemPrompt.trim();
   if (input.maxIterations !== undefined) body.max_iterations = input.maxIterations;
   if (input.reviewerEnabled !== undefined) body.reviewer_enabled = input.reviewerEnabled;
@@ -169,6 +171,26 @@ export async function getInsightStatus(): Promise<InsightStatusResult> {
 export async function listProviders(): Promise<ProviderKey[]> {
   const result = await backendRequest<{ keys?: ProviderKey[] }>('GET', '/api/v1/auth/keys');
   return result.keys ?? [];
+}
+
+export async function listSessionModels(runtime: string): Promise<SessionModelOption[]> {
+  const result = await backendRequest<{ providers?: Array<{
+    index: number;
+    runtime?: string;
+    model?: string;
+    status: string;
+    is_active?: boolean;
+    worker_validation?: ProviderValidation;
+  }> }>('GET', '/api/v1/auth/status');
+  const models = new Map<string, SessionModelOption>();
+  for (const provider of result.providers ?? []) {
+    const model = provider.model?.trim();
+    if (provider.runtime !== runtime || !model) continue;
+    if (provider.status !== 'unused' && provider.status !== 'active') continue;
+    if (provider.worker_validation?.status === 'invalid' || provider.worker_validation?.success === false) continue;
+    if (!models.has(model) || provider.is_active) models.set(model, { model, providerIndex: provider.index });
+  }
+  return [...models.values()];
 }
 
 export async function saveProviders(keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> {

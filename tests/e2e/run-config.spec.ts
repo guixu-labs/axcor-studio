@@ -37,6 +37,16 @@ test.describe('run configuration', () => {
           res.end(JSON.stringify({ runs: [] }));
           return;
         }
+        if (req.method === 'GET' && req.url === '/api/v1/auth/status') {
+          res.end(JSON.stringify({ providers: [
+            { index: 0, runtime: 'opencode', model: 'glm-4.7', status: 'active', is_active: true },
+            { index: 1, runtime: 'claude_sdk', model: 'claude-sonnet-4-6', status: 'unused' },
+            { index: 2, runtime: 'opencode', model: 'glm-4.7', status: 'unused' },
+            { index: 3, runtime: 'opencode', model: 'exhausted-model', status: 'exhausted' },
+            { index: 4, runtime: 'opencode', model: 'invalid-model', status: 'unused', worker_validation: { status: 'invalid' } },
+          ] }));
+          return;
+        }
         if (req.method === 'POST' && req.url === '/api/v1/sessions/start') {
           capturedBodies.push(body);
           if (typeof body['prompt'] === 'string') postedSessionPrompt = body['prompt'];
@@ -125,17 +135,32 @@ test.describe('run configuration', () => {
     await window.locator('.rail-item', { hasText: '运行' }).click();
     await window.getByLabel('运行时').selectOption('session');
     await window.getByLabel('提示词', { exact: true }).fill('整理当前项目结构');
-    await window.getByLabel('Agent 运行时').selectOption('opencode');
-    await window.getByLabel('模型').fill('glm-4.7');
+    const agentRuntime = window.getByLabel('Agent 运行时');
+    const model = window.getByLabel('模型', { exact: true });
+    const run = window.getByRole('button', { name: '运行工作流' });
+    await expect(model.locator('option:not([disabled])')).toHaveText(['claude-sonnet-4-6']);
+    await expect(model).toHaveValue('');
+    await model.selectOption('claude-sonnet-4-6');
+    await agentRuntime.selectOption('codex_cli');
+    await expect(model.locator('option')).toHaveText(['该运行时没有可用模型']);
+    await expect(model).toBeDisabled();
+    await expect(run).toBeDisabled();
+    expect(capturedBodies).toHaveLength(0);
+    await agentRuntime.selectOption('opencode');
+    await expect(model.locator('option:not([disabled])')).toHaveText(['glm-4.7']);
+    await expect(model).toHaveValue('');
+    await expect(run).toBeDisabled();
+    await model.selectOption('glm-4.7');
     await window.getByLabel('最大迭代').fill('20');
     await window.getByLabel('启用 Reviewer').check();
-    await window.getByRole('button', { name: '运行工作流' }).click();
+    await run.click();
     await expect(window.getByRole('option', { name: /整理当前项目结构/ })).toBeVisible();
     await expect.poll(() => capturedBodies.length).toBe(1);
     expect(capturedBodies[0]['project_dir']).toBe(workspaceDir);
     expect(capturedBodies[0]['prompt']).toBe('整理当前项目结构');
     expect(capturedBodies[0]['runtime']).toBe('opencode');
     expect(capturedBodies[0]['model']).toBe('glm-4.7');
+    expect(capturedBodies[0]['provider_index']).toBe(0);
     expect(capturedBodies[0]['max_iterations']).toBe(20);
     expect(capturedBodies[0]['reviewer_enabled']).toBe(true);
   });

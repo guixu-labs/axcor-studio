@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CreateRunInput, Run, RunEvent } from './shared/protocol';
-import type { InsightImportResult, InsightStatusResult, BackendSession, ProviderKey, ProviderKeyInput, ProviderTestResult } from './shared/executionBackendApi';
+import type { InsightImportResult, InsightStatusResult, BackendSession, ProviderKey, ProviderKeyInput, ProviderTestResult, SessionModelOption } from './shared/executionBackendApi';
 import type { WorkspaceNode } from './workspaceFiles';
 
 contextBridge.exposeInMainWorld('workbench', {
@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('executionBackend', {
   importToInsight: (sessionId: string): Promise<InsightImportResult> => ipcRenderer.invoke('execution:import-to-insight', sessionId),
   insightStatus: (): Promise<InsightStatusResult> => ipcRenderer.invoke('execution:insight-status'),
   listProviders: (): Promise<ProviderKey[]> => ipcRenderer.invoke('execution:list-providers'),
+  listSessionModels: (runtime: string): Promise<SessionModelOption[]> => ipcRenderer.invoke('execution:list-session-models', runtime),
   saveProviders: (keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('execution:save-providers', keys),
   deleteProvider: (providerIndex: number): Promise<void> => ipcRenderer.invoke('execution:delete-provider', providerIndex),
   activateProvider: (providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> => ipcRenderer.invoke('execution:activate-provider', providerIndex),

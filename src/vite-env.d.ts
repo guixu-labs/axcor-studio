@@ -23,6 +23,7 @@ interface Window {
     importToInsight(sessionId: string): Promise<import('./shared/executionBackendApi').InsightImportResult>;
     insightStatus(): Promise<import('./shared/executionBackendApi').InsightStatusResult>;
     listProviders(): Promise<import('./shared/executionBackendApi').ProviderKey[]>;
+    listSessionModels(runtime: string): Promise<import('./shared/executionBackendApi').SessionModelOption[]>;
     saveProviders(keys: import('./shared/executionBackendApi').ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }>;
     deleteProvider(providerIndex: number): Promise<void>;
     activateProvider(providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }>;

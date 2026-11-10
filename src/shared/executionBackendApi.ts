@@ -60,6 +60,11 @@ export interface ProviderValidation {
   [key: string]: unknown;
 }
 
+export interface SessionModelOption {
+  model: string;
+  providerIndex: number;
+}
+
 export interface ProviderKey {
   key: string;
   masked: string;
