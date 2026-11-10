@@ -30,9 +30,9 @@ export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
   const workspaceRequiredDialog = useRef<HTMLDialogElement>(null);
   const [tree, setTree] = useState<WorkspaceNode[]>([]);
-  const [openFiles, setOpenFiles] = useState(() => loadWorkbenchState('workbench.openFiles', ['workflow.md']));
-  const [file, setFile] = useState(() => loadWorkbenchState('workbench.activeFile', 'workflow.md'));
-  const [contents, setContents] = useState<Record<string, string>>({ 'workflow.md': '# New workflow\n\nDescribe the workflow steps here.' });
+  const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [file, setFile] = useState('');
+  const [contents, setContents] = useState<Record<string, string>>({});
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>();
   const [eventsByRun, setEventsByRun] = useState<Record<string, RunEvent[]>>({});
@@ -84,8 +84,6 @@ export default function App(): JSX.Element {
   const editorLayout = layout.editorLayout;
   const splitDirection = editorLayout.groups.length > 1 ? editorLayout.orientation : 'none';
   useEffect(() => saveWorkbenchState('workbench.layout', layout), [layout]);
-  useEffect(() => saveWorkbenchState('workbench.openFiles', openFiles), [openFiles]);
-  useEffect(() => saveWorkbenchState('workbench.activeFile', file), [file]);
   useEffect(() => saveWorkbenchState('workbench.theme', theme), [theme]);
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
@@ -254,7 +252,7 @@ export default function App(): JSX.Element {
       setContents(previous => ({ ...previous, [nextFile]: nextContent }));
     }
   };
-  const save = async (): Promise<void> => { if (workspace) await window.workbench.writeFile(file, content); };
+  const save = async (): Promise<void> => { if (workspace && file) await window.workbench.writeFile(file, content); };
   const changeSessionRuntime = (value: string): void => {
     setSessionRuntime(value);
     setSessionModel('');
@@ -331,10 +329,9 @@ export default function App(): JSX.Element {
     }
   };
   const closeFile = (closedFile: string): void => {
-    if (openFiles.length === 1) return;
     const nextFiles = openFiles.filter(openFile => openFile !== closedFile);
     setOpenFiles(nextFiles);
-    if (file === closedFile) setFile(nextFiles[nextFiles.length - 1]);
+    if (file === closedFile) setFile(nextFiles.at(-1) ?? '');
   };
   const cancelRun = async (): Promise<void> => {
     if (!selectedRun) return;
@@ -396,19 +393,19 @@ export default function App(): JSX.Element {
       <div className="workbench-body">
         <div className="workbench-main" style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
           {activeNavigation === 'workbench' && <section className="workspace-grid">
-            <div className={'editor-groups split-' + splitDirection}>
+            {file ? <div className={'editor-groups split-' + splitDirection}>
               <MonacoEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />
               {splitDirection !== 'none' && <MonacoEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />}
-            </div>
+            </div> : <div className="empty-panel" />}
           </section>}
           {activeNavigation === 'runs' && (selectedRun
             ? <section className="single-panel"><RunDetail key={selectedRun.id} run={selectedRun} events={selectedEvents} onCancel={cancelRun} onOpenInsight={openInsightForRun} messages={t} /></section>
-            : <section className="single-panel"><section className="run-detail run-empty-bg"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></section></section>)}
+            : <section className="single-panel"><div className="empty-panel"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></div></section>)}
           {activeNavigation === 'insight' && <section className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
         </div>
       </div>
     </div>
-    <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></footer>
+    <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span>{file && <><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></>}</footer>
     <dialog className="workspace-required-dialog" ref={workspaceRequiredDialog} aria-labelledby="workspace-required-title" aria-describedby="workspace-required-message">
       <h2 id="workspace-required-title">{t.workspaceRequiredTitle}</h2>
       <p id="workspace-required-message">{t.workspaceRequiredMessage}</p>
