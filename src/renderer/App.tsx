@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchExecutionClient } from './services/executionClient';
-import type { SessionModelOption } from '../shared/executionBackendApi';
-import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackend';
+import type { SessionModelOption } from '../shared/executionBackendIpc';
+import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackendConfig';
 import type { Run, RunEvent, RuntimeId } from '../shared/protocol';
 import { isTerminalRun, runEventKey } from '../shared/run';
 import type { RunParamsRow } from './components/RunsPanel';

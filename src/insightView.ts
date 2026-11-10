@@ -1,5 +1,5 @@
 import { BrowserWindow, WebContentsView } from 'electron';
-import { getBackendBaseUrl } from './executionBackendHttp';
+import { getBackendBaseUrl } from './executionBackend/http';
 
 export interface InsightBounds {
   x: number;

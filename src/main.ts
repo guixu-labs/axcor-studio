@@ -3,36 +3,11 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import started from 'electron-squirrel-startup';
-import {
-  stopAllExecutionPolls,
-  subscribeExecutionEvents,
-  unsubscribeExecutionEvents,
-} from './executionEvents';
-import {
-  getRun,
-  getRunSessions,
-  getInsightStatus,
-  getBackendBaseUrl,
-  importSessionToInsight,
-  injectSessionPrompt,
-  listRuns,
-  listSessionModels,
-  setBackendBaseUrl,
-  startWorkflowRun,
-  startSessionRun,
-  stopRun,
-  listProviders,
-  saveProviders,
-  deleteProvider,
-  activateProvider,
-  testProvider,
-  testProviderKey,
-} from './executionBackendHttp';
+import { stopAllExecutionPolls } from './executionBackend/events';
+import { registerExecutionBackendIpc } from './executionBackend/ipc';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
 import { walkWorkspace } from './workspaceFiles';
-import { ensureExecutionBackendRunning, stopExecutionBackendIfStarted } from './executionBackendService';
-import type { CreateRunInput } from './shared/protocol';
-import type { ProviderKeyInput } from './shared/executionBackendApi';
+import { ensureExecutionBackendRunning, stopExecutionBackendIfStarted } from './executionBackend/lifecycle';
 
 if (started) app.quit();
 
@@ -89,28 +64,10 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('workspace:read-file', (_event, fileName: string) => fs.readFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), 'utf8'));
   ipcMain.handle('workspace:write-file', (_event, fileName: string, content: string) => fs.writeFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), content, 'utf8'));
-  ipcMain.handle('execution:start-run', (_event, input: CreateRunInput) => input.runtime === 'session' ? startSessionRun(input) : startWorkflowRun(input));
-  ipcMain.handle('execution:list-runs', () => listRuns());
-  ipcMain.handle('execution:get-run', (_event, runId: string) => getRun(runId));
-  ipcMain.handle('execution:cancel-run', (_event, runId: string) => stopRun(runId));
-  ipcMain.handle('execution:set-base-url', (_event, url: string) => { setBackendBaseUrl(url); });
-  ipcMain.handle('execution:get-base-url', () => getBackendBaseUrl());
-  ipcMain.handle('execution:get-run-sessions', (_event, runId: string) => getRunSessions(runId));
-  ipcMain.handle('execution:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectSessionPrompt(runId, sessionId, prompt));
-  ipcMain.handle('execution:import-to-insight', (_event, sessionId: string) => importSessionToInsight(sessionId));
-  ipcMain.handle('execution:insight-status', () => getInsightStatus());
-  ipcMain.handle('execution:list-providers', () => listProviders());
-  ipcMain.handle('execution:list-session-models', (_event, runtime: string) => listSessionModels(runtime));
-  ipcMain.handle('execution:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));
-  ipcMain.handle('execution:delete-provider', (_event, providerIndex: number) => deleteProvider(providerIndex));
-  ipcMain.handle('execution:activate-provider', (_event, providerIndex: number) => activateProvider(providerIndex));
-  ipcMain.handle('execution:test-provider', (_event, providerIndex: number) => testProvider(providerIndex));
-  ipcMain.handle('execution:test-provider-key', (_event, key: string, model: string, baseUrl: string, runtime: string | undefined) => testProviderKey(key, model, baseUrl, runtime));
+  registerExecutionBackendIpc();
   ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => { showInsight(path, bounds, isDark); });
   ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => { updateInsightBounds(bounds); });
   ipcMain.handle('insight:hide', () => { hideInsight(); });
-  ipcMain.on('execution:subscribe-events', (_event, runId: string) => subscribeExecutionEvents(runId));
-  ipcMain.on('execution:unsubscribe-events', (_event, runId: string) => unsubscribeExecutionEvents(runId));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
-import { getBackendBaseUrl } from './executionBackendHttp';
-import { DEFAULT_EXECUTION_BACKEND_PORT, EXECUTION_BACKEND_COMMAND } from './shared/executionBackend';
+import { getBackendBaseUrl } from './http';
+import { DEFAULT_EXECUTION_BACKEND_PORT, EXECUTION_BACKEND_COMMAND } from '../shared/executionBackendConfig';
 
 const PROBE_TIMEOUT_MS = 1_500;
 const STARTUP_WAIT_MS = 20_000;

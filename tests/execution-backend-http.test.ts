@@ -19,8 +19,8 @@ import {
   stopRun,
   testProvider,
   testProviderKey,
-} from '../src/executionBackendHttp';
-import { ExecutionBackendApiError } from '../src/shared/executionBackendApi';
+} from '../src/executionBackend/http';
+import { ExecutionBackendApiError } from '../src/executionBackend/api';
 
 interface CapturedRequest {
   method: string;

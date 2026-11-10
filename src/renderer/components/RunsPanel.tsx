@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SessionModelOption } from '../../shared/executionBackendApi';
+import type { SessionModelOption } from '../../shared/executionBackendIpc';
 import type { Run, RuntimeId } from '../../shared/protocol';
 import { RUNTIMES } from '../../shared/protocol';
 

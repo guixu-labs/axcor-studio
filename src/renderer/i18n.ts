@@ -1,4 +1,4 @@
-import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_COMMAND, EXECUTION_BACKEND_NAME } from '../shared/executionBackend';
+import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_COMMAND, EXECUTION_BACKEND_NAME } from '../shared/executionBackendConfig';
 import type { RunStatus } from '../shared/protocol';
 
 export type LocaleId = 'zh-CN' | 'en-US';

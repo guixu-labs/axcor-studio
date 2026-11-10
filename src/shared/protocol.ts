@@ -1,4 +1,4 @@
-import { EXECUTION_BACKEND_NAME } from './executionBackend';
+import { EXECUTION_BACKEND_NAME } from './executionBackendConfig';
 
 export type RunStatus = 'queued' | 'running' | 'paused' | 'failed' | 'completed' | 'cancelled';
 

@@ -2,7 +2,7 @@ import { defaultFont, defaultTheme, fonts, themes } from '../settings';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { localeOptions, type LocaleId, type Messages } from '../i18n';
 import { loadWorkbenchState, saveWorkbenchState } from '../workbench/storage';
-import type { ProviderKey } from '../../shared/executionBackendApi';
+import type { ProviderKey } from '../../shared/executionBackendIpc';
 
 export type ThemeId = string;
 export type FontId = string;

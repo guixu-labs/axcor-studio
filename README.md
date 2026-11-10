@@ -17,7 +17,7 @@ npm run start
 
 默认地址为 `http://127.0.0.1:18600`。工作台启动时会复用可访问的服务，本地服务不可用时会尝试执行 `workflow-controller web --port 18600 --no-open`。可通过「设置 → 常规」修改连接地址，或在启动工作台时通过 `EXECUTION_BACKEND_BASE_URL` 配置地址。设定 `EXECUTION_BACKEND_NO_AUTOSTART=1` 可关闭自动启动。
 
-执行后端的显示名称和 CLI 命令集中定义在 `src/shared/executionBackend.ts`。
+执行后端的显示名称和 CLI 命令集中定义在 `src/shared/executionBackendConfig.ts`。
 
 `MockExecutionClient` 保留用于隔离测试。产物获取和 Evidence 面板仍为占位实现；运行完成本身不代表代码或业务验收通过。
 

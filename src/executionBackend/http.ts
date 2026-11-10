@@ -1,23 +1,25 @@
 import path from 'node:path';
-import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_NAME } from './shared/executionBackend';
-import type { CreateRunInput, Run } from './shared/protocol';
+import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_NAME } from '../shared/executionBackendConfig';
+import type { CreateRunInput, Run } from '../shared/protocol';
 import {
   mapRun,
   mapSession,
   ExecutionBackendApiError,
-  type InsightImportResult,
-  type InsightStatusResult,
   type BackendRunDetailResponse,
   type BackendRunListResponse,
-  type BackendSession,
   type BackendSessionRecord,
   type BackendStartRunResponse,
-  type ProviderKey,
-  type ProviderKeyInput,
-  type ProviderTestResult,
-  type ProviderValidation,
-  type SessionModelOption,
-} from './shared/executionBackendApi';
+} from './api';
+import type {
+  InsightImportResult,
+  InsightStatusResult,
+  ProviderKey,
+  ProviderKeyInput,
+  ProviderTestResult,
+  ProviderValidation,
+  SessionModelOption,
+  RunSession,
+} from '../shared/executionBackendIpc';
 
 const DEFAULT_BASE_URL = process.env.EXECUTION_BACKEND_BASE_URL ?? DEFAULT_EXECUTION_BACKEND_URL;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -146,7 +148,7 @@ export async function stopRun(runId: string): Promise<Run> {
   return getRun(runId);
 }
 
-export async function getRunSessions(runId: string): Promise<BackendSession[]> {
+export async function getRunSessions(runId: string): Promise<RunSession[]> {
   const response = await backendRequest<BackendRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
   return response.sessions;
 }

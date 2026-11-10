@@ -1,8 +1,8 @@
 import { BrowserWindow } from 'electron';
 import { createHash } from 'node:crypto';
-import type { RunEvent } from './shared/protocol';
-import { mapEvent, type BackendEventPage, type BackendSessionEventPage } from './shared/executionBackendApi';
-import { getRun, isSessionRun, backendRequest } from './executionBackendHttp';
+import type { RunEvent } from '../shared/protocol';
+import { mapEvent, type BackendEventPage, type BackendSessionEventPage } from './api';
+import { getRun, isSessionRun, backendRequest } from './http';
 
 const POLL_INTERVAL_MS = 1_000;
 const POLL_PAGE_SIZE = 200;

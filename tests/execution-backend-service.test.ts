@@ -5,8 +5,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackendService';
-import { setBackendBaseUrl } from '../src/executionBackendHttp';
+import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackend/lifecycle';
+import { setBackendBaseUrl } from '../src/executionBackend/http';
 
 const FAKE_SERVER = `
 const http = require('http');

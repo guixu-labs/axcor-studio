@@ -6,7 +6,7 @@ import {
   mapRunStatus,
   type BackendEvent,
   type BackendRun,
-} from '../src/shared/executionBackendApi';
+} from '../src/executionBackend/api';
 
 const baseRecord: BackendRun = {
   run_id: 'run-1',

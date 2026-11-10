@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CreateRunInput, Run, RunEvent } from './shared/protocol';
-import type { InsightImportResult, InsightStatusResult, BackendSession, ProviderKey, ProviderKeyInput, ProviderTestResult, SessionModelOption } from './shared/executionBackendApi';
+import type { RunEvent } from './shared/protocol';
+import type { ExecutionBackendBridge } from './shared/executionBackendIpc';
 import type { WorkspaceNode } from './workspaceFiles';
 
 contextBridge.exposeInMainWorld('workbench', {
@@ -11,25 +11,25 @@ contextBridge.exposeInMainWorld('workbench', {
   writeFile: (filePath: string, content: string): Promise<void> => ipcRenderer.invoke('workspace:write-file', filePath, content),
 });
 
-contextBridge.exposeInMainWorld('executionBackend', {
-  setBaseUrl: (url: string): Promise<void> => ipcRenderer.invoke('execution:set-base-url', url),
-  getBaseUrl: (): Promise<string> => ipcRenderer.invoke('execution:get-base-url'),
-  startRun: (input: CreateRunInput): Promise<Run> => ipcRenderer.invoke('execution:start-run', input),
-  listRuns: (): Promise<Run[]> => ipcRenderer.invoke('execution:list-runs'),
-  getRun: (runId: string): Promise<Run> => ipcRenderer.invoke('execution:get-run', runId),
-  cancelRun: (runId: string): Promise<void> => ipcRenderer.invoke('execution:cancel-run', runId),
-  getRunSessions: (runId: string): Promise<BackendSession[]> => ipcRenderer.invoke('execution:get-run-sessions', runId),
-  injectPrompt: (runId: string, sessionId: string, prompt: string): Promise<void> => ipcRenderer.invoke('execution:inject-prompt', runId, sessionId, prompt),
-  importToInsight: (sessionId: string): Promise<InsightImportResult> => ipcRenderer.invoke('execution:import-to-insight', sessionId),
-  insightStatus: (): Promise<InsightStatusResult> => ipcRenderer.invoke('execution:insight-status'),
-  listProviders: (): Promise<ProviderKey[]> => ipcRenderer.invoke('execution:list-providers'),
-  listSessionModels: (runtime: string): Promise<SessionModelOption[]> => ipcRenderer.invoke('execution:list-session-models', runtime),
-  saveProviders: (keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('execution:save-providers', keys),
-  deleteProvider: (providerIndex: number): Promise<void> => ipcRenderer.invoke('execution:delete-provider', providerIndex),
-  activateProvider: (providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> => ipcRenderer.invoke('execution:activate-provider', providerIndex),
-  testProvider: (providerIndex: number): Promise<ProviderTestResult> => ipcRenderer.invoke('execution:test-provider', providerIndex),
-  testProviderKey: (key: string, model: string, baseUrl: string, runtime?: string): Promise<ProviderTestResult> => ipcRenderer.invoke('execution:test-provider-key', key, model, baseUrl, runtime),
-  subscribeRunEvents: (runId: string, listener: (event: RunEvent) => void): (() => void) => {
+const executionBackend: ExecutionBackendBridge = {
+  setBaseUrl: url => ipcRenderer.invoke('execution:set-base-url', url),
+  getBaseUrl: () => ipcRenderer.invoke('execution:get-base-url'),
+  startRun: input => ipcRenderer.invoke('execution:start-run', input),
+  listRuns: () => ipcRenderer.invoke('execution:list-runs'),
+  getRun: runId => ipcRenderer.invoke('execution:get-run', runId),
+  cancelRun: runId => ipcRenderer.invoke('execution:cancel-run', runId),
+  getRunSessions: runId => ipcRenderer.invoke('execution:get-run-sessions', runId),
+  injectPrompt: (runId, sessionId, prompt) => ipcRenderer.invoke('execution:inject-prompt', runId, sessionId, prompt),
+  importToInsight: sessionId => ipcRenderer.invoke('execution:import-to-insight', sessionId),
+  insightStatus: () => ipcRenderer.invoke('execution:insight-status'),
+  listProviders: () => ipcRenderer.invoke('execution:list-providers'),
+  listSessionModels: runtime => ipcRenderer.invoke('execution:list-session-models', runtime),
+  saveProviders: keys => ipcRenderer.invoke('execution:save-providers', keys),
+  deleteProvider: providerIndex => ipcRenderer.invoke('execution:delete-provider', providerIndex),
+  activateProvider: providerIndex => ipcRenderer.invoke('execution:activate-provider', providerIndex),
+  testProvider: providerIndex => ipcRenderer.invoke('execution:test-provider', providerIndex),
+  testProviderKey: (key, model, baseUrl, runtime) => ipcRenderer.invoke('execution:test-provider-key', key, model, baseUrl, runtime),
+  subscribeRunEvents: (runId, listener) => {
     const handler = (_event: Electron.IpcRendererEvent, runEvent: RunEvent): void => {
       if (runEvent.runId === runId) listener(runEvent);
     };
@@ -40,7 +40,8 @@ contextBridge.exposeInMainWorld('executionBackend', {
       ipcRenderer.send('execution:unsubscribe-events', runId);
     };
   },
-});
+};
+contextBridge.exposeInMainWorld('executionBackend', executionBackend);
 
 contextBridge.exposeInMainWorld('insight', {
   show: (path: string, bounds: { x: number; y: number; width: number; height: number }, isDark: boolean): Promise<void> => ipcRenderer.invoke('insight:show', path, bounds, isDark),
