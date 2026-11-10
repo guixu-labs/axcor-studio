@@ -141,7 +141,8 @@ export async function getRun(runId: string): Promise<Run> {
 
 export async function stopRun(runId: string): Promise<Run> {
   if (sessionRunIds.has(runId)) {
-    await backendRequest<Record<string, unknown>>('POST', `/api/v1/sessions/${encodeURIComponent(runId)}/stop`);
+    const target = await sessionControlTarget(runId);
+    await backendRequest('POST', `${target.path}/stop`);
     return getRun(runId);
   }
   await backendRequest<{ run_id: string; status: string; accepted: boolean }>('POST', `/api/v1/runs/${encodeURIComponent(runId)}/stop`);
@@ -151,6 +152,35 @@ export async function stopRun(runId: string): Promise<Run> {
 export async function getRunSessions(runId: string): Promise<RunSession[]> {
   const response = await backendRequest<BackendRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
   return response.sessions;
+}
+
+async function sessionControlTarget(sessionId: string): Promise<{ path: string; workflowMember: boolean }> {
+  const sessionPath = `/sessions/${encodeURIComponent(sessionId)}`;
+  const path = '/api/v1' + sessionPath;
+  const session = await backendRequest<BackendSessionRecord>('GET', path);
+  if (session.id !== sessionId) throw new ExecutionBackendApiError(404, `Session not found: ${sessionId}`);
+  if (session.run_id) {
+    const runPath = `/api/v1/runs/${encodeURIComponent(session.run_id)}`;
+    try {
+      const { run } = await backendRequest<BackendRunDetailResponse>('GET', runPath);
+      if (run.kind === 'workflow') return { path: runPath + sessionPath, workflowMember: true };
+    } catch (error) {
+      if (!(error instanceof ExecutionBackendApiError && error.status === 404)) throw error;
+    }
+  }
+  return { path, workflowMember: false };
+}
+
+export async function setSessionPaused(sessionId: string, paused: boolean): Promise<void> {
+  const target = await sessionControlTarget(sessionId);
+  await backendRequest('POST', `${target.path}/${paused ? 'pause' : 'resume'}`);
+}
+
+export async function sendSessionReply(sessionId: string, message: string): Promise<void> {
+  const text = message.trim();
+  if (!text) throw new ExecutionBackendApiError(422, 'text is required');
+  const target = await sessionControlTarget(sessionId);
+  await backendRequest('POST', `${target.path}/send`, target.workflowMember ? { prompt: text } : { text });
 }
 
 export async function injectSessionPrompt(runId: string, sessionId: string, prompt: string): Promise<void> {

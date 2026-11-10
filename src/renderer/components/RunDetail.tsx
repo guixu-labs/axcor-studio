@@ -8,8 +8,10 @@ import { RunSubagentTopology } from './RunSubagentTopology';
 interface RunDetailProps {
   run: Run;
   events: RunEvent[];
-  onCancel: () => void;
+  onStop: () => Promise<void>;
   onOpenInsight: () => void;
+  onSetPaused: (paused: boolean) => Promise<void>;
+  onSendReply: (text: string) => Promise<void>;
   messages: Messages;
 }
 
@@ -79,8 +81,30 @@ function RunElapsed({ run, label }: { run: Run; label: string }): JSX.Element | 
   return <time className="run-elapsed" dateTime={'PT' + seconds + 'S'} title={label} aria-label={label + ' ' + time}>{time}</time>;
 }
 
-export function RunDetail({ run, events, onCancel, onOpenInsight, messages }: RunDetailProps): JSX.Element {
+export function RunDetail({ run, events, onStop, onOpenInsight, onSetPaused, onSendReply, messages }: RunDetailProps): JSX.Element {
   const labels = messages.runDetail;
+  const stopDialog = useRef<HTMLDialogElement>(null);
+  const [reply, setReply] = useState('');
+  const [sessionActionPending, setSessionActionPending] = useState(false);
+  const [sessionActionError, setSessionActionError] = useState<string>();
+  const isSession = run.runtimeId === 'session';
+  const isPaused = run.status === 'paused';
+  const canReply = isSession && run.status !== 'failed' && run.status !== 'cancelled';
+  const canSetPaused = isSession && (run.status === 'running' || isPaused);
+  const stopButton = <button className="secondary-button stop-run-button" type="button" disabled={isTerminalRun(run) || sessionActionPending}
+    onClick={() => stopDialog.current?.showModal()}>{labels.stop}</button>;
+  const performSessionAction = async (action: () => Promise<void>): Promise<void> => {
+    if (sessionActionPending) return;
+    setSessionActionPending(true);
+    setSessionActionError(undefined);
+    try {
+      await action();
+    } catch (error) {
+      setSessionActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSessionActionPending(false);
+    }
+  };
   const context = useMemo(() => run.runtimeId === 'session' ? latestContext(events, run.contextWindow) : undefined,
     [events, run.contextWindow, run.runtimeId]);
   const createdAt = run.createdAt ? new Date(run.createdAt) : null;
@@ -99,11 +123,30 @@ export function RunDetail({ run, events, onCancel, onOpenInsight, messages }: Ru
       </div>
       <div className="run-actions">
         <button className="secondary-button" type="button" onClick={onOpenInsight}>{messages.openInInsight}</button>
-        <button className="secondary-button" type="button" onClick={onCancel} disabled={isTerminalRun(run)}>{messages.cancel}</button>
+        {!isSession && stopButton}
       </div>
     </header>
     <div className="run-detail-body">
-      <RunLog events={events} messages={messages} />
+      <RunLog events={events} messages={messages}>
+        {canReply && <div className="session-reply" aria-busy={sessionActionPending}>
+          <textarea className="run-config-input session-reply-input" rows={1} aria-label={labels.sessionReply}
+            placeholder={labels.sessionReply} value={reply} disabled={sessionActionPending}
+            onChange={event => setReply(event.target.value)} />
+          <div className="session-reply-actions">
+            <button className="primary-button" type="button" disabled={sessionActionPending || !reply.trim()} onClick={() => {
+              void performSessionAction(async () => {
+                await onSendReply(reply.trim());
+                setReply('');
+              });
+            }}>{labels.sendReply}</button>
+            {canSetPaused && <button className="secondary-button" type="button" disabled={sessionActionPending} onClick={() => {
+              void performSessionAction(() => onSetPaused(!isPaused));
+            }}>{isPaused ? labels.resumeSession : labels.pauseSession}</button>}
+            {stopButton}
+          </div>
+        </div>}
+        {sessionActionError && <p className="session-action-error" role="alert">{sessionActionError}</p>}
+      </RunLog>
       <section className="run-overview">
         <header className="run-pane-heading"><h2>{labels.overview}</h2></header>
         <div className="run-overview-content">
@@ -138,5 +181,16 @@ export function RunDetail({ run, events, onCancel, onOpenInsight, messages }: Ru
         </div>
       </section>
     </div>
+    <dialog className="workbench-dialog" ref={stopDialog} aria-labelledby="stop-run-title" aria-describedby="stop-run-message">
+      <h2 id="stop-run-title">{isSession ? labels.stopSessionTitle : labels.stopRunTitle}</h2>
+      <p id="stop-run-message">{isSession ? labels.stopSessionMessage : labels.stopRunMessage}</p>
+      <div className="workbench-dialog-actions">
+        <button className="secondary-button" type="button" onClick={() => stopDialog.current?.close()}>{messages.cancel}</button>
+        <button className="primary-button" type="button" disabled={isTerminalRun(run)} onClick={() => {
+          stopDialog.current?.close();
+          void performSessionAction(onStop);
+        }}>{labels.stop}</button>
+      </div>
+    </dialog>
   </section>;
 }

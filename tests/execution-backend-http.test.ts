@@ -13,7 +13,9 @@ import {
   listRuns,
   listProviders,
   saveProviders,
+  sendSessionReply,
   setBackendBaseUrl,
+  setSessionPaused,
   startWorkflowRun,
   startSessionRun,
   stopRun,
@@ -69,6 +71,15 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
         res.end(JSON.stringify({ run_id: 'run-1', session_id: 'sess-1', accepted: true }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-1') {
+        res.end(JSON.stringify({ id: 'sess-1', run_id: 'run-1', state: 'idle', stop_reason: 'user_pause' }));
+        return;
+      }
+      if (req.method === 'POST' && /^\/api\/v1\/runs\/run-1\/sessions\/sess-1\/(pause|resume|send|stop)$/.test(req.url ?? '')) {
+        res.statusCode = 202;
+        res.end(JSON.stringify({ accepted: true }));
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/stop') {
@@ -258,6 +269,22 @@ test('execution backend HTTP client', async t => {
     const inject = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject');
     assert.ok(inject);
     assert.equal(inject.body.prompt, '请继续推进');
+  });
+
+  await t.test('workflow member actions use the owning run endpoints', async () => {
+    await getRun('sess-1');
+    const before = fixture.requests.length;
+    await setSessionPaused('sess-1', true);
+    await setSessionPaused('sess-1', false);
+    await sendSessionReply('sess-1', ' 请继续检查 ');
+    await stopRun('sess-1');
+    const posts = fixture.requests.slice(before).filter(request => request.method === 'POST');
+    assert.deepEqual(posts.map(request => [request.url, request.body]), [
+      ['/api/v1/runs/run-1/sessions/sess-1/pause', {}],
+      ['/api/v1/runs/run-1/sessions/sess-1/resume', {}],
+      ['/api/v1/runs/run-1/sessions/sess-1/send', { prompt: '请继续检查' }],
+      ['/api/v1/runs/run-1/sessions/sess-1/stop', {}],
+    ]);
   });
 
   await t.test('listProviders maps the provider rows', async () => {

@@ -64,9 +64,11 @@ export interface ExecutionBackendBridge {
   startRun(input: CreateRunInput): Promise<Run>;
   listRuns(): Promise<Run[]>;
   getRun(runId: string): Promise<Run>;
-  cancelRun(runId: string): Promise<void>;
+  stopRun(runId: string): Promise<void>;
   getRunSessions(runId: string): Promise<RunSession[]>;
   injectPrompt(runId: string, sessionId: string, prompt: string): Promise<void>;
+  setSessionPaused(sessionId: string, paused: boolean): Promise<void>;
+  sendSessionReply(sessionId: string, text: string): Promise<void>;
   importToInsight(sessionId: string): Promise<InsightImportResult>;
   insightStatus(): Promise<InsightStatusResult>;
   listProviders(): Promise<ProviderKey[]>;

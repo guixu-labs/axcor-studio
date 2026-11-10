@@ -87,6 +87,7 @@ export interface BackendSessionRecord {
   id: string;
   name?: string | null;
   role?: string | null;
+  run_id?: string | null;
   state?: string;
   created_at?: string | null;
   created_at_iso?: string | null;
@@ -117,8 +118,11 @@ const SESSION_STATUS_MAP: Record<string, RunStatus> = {
 
 export function mapSession(session: BackendSessionRecord): Run {
   const createdAt = session.created_at_iso || session.created_at || '';
-  const status = session.state === 'idle' && session.stop_reason === 'max_iterations'
-    ? 'completed' : SESSION_STATUS_MAP[session.state ?? ''] ?? 'queued';
+  let status = SESSION_STATUS_MAP[session.state ?? ''] ?? 'queued';
+  if (session.state === 'idle') {
+    if (session.stop_reason === 'user_pause') status = 'paused';
+    if (session.stop_reason === 'max_iterations') status = 'completed';
+  }
   return {
     id: session.id,
     workflowId: session.name || session.id,

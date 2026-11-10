@@ -11,7 +11,9 @@ import {
   injectSessionPrompt,
   listRuns,
   listSessionModels,
+  sendSessionReply,
   setBackendBaseUrl,
+  setSessionPaused,
   startWorkflowRun,
   startSessionRun,
   stopRun,
@@ -27,11 +29,13 @@ export function registerExecutionBackendIpc(): void {
   ipcMain.handle('execution:start-run', (_event, input: CreateRunInput) => input.runtime === 'session' ? startSessionRun(input) : startWorkflowRun(input));
   ipcMain.handle('execution:list-runs', () => listRuns());
   ipcMain.handle('execution:get-run', (_event, runId: string) => getRun(runId));
-  ipcMain.handle('execution:cancel-run', (_event, runId: string) => stopRun(runId));
+  ipcMain.handle('execution:stop-run', (_event, runId: string) => stopRun(runId));
   ipcMain.handle('execution:set-base-url', (_event, url: string) => { setBackendBaseUrl(url); });
   ipcMain.handle('execution:get-base-url', () => getBackendBaseUrl());
   ipcMain.handle('execution:get-run-sessions', (_event, runId: string) => getRunSessions(runId));
   ipcMain.handle('execution:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectSessionPrompt(runId, sessionId, prompt));
+  ipcMain.handle('execution:set-session-paused', (_event, sessionId: string, paused: boolean) => setSessionPaused(sessionId, paused));
+  ipcMain.handle('execution:send-session-reply', (_event, sessionId: string, text: string) => sendSessionReply(sessionId, text));
   ipcMain.handle('execution:import-to-insight', (_event, sessionId: string) => importSessionToInsight(sessionId));
   ipcMain.handle('execution:insight-status', () => getInsightStatus());
   ipcMain.handle('execution:list-providers', () => listProviders());

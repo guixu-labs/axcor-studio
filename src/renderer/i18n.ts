@@ -22,6 +22,8 @@ export interface Messages {
     log: string; waiting: string; overview: string; id: string; iteration: string; elapsed: string;
     members: string; running: string; createdAt: string; context: string;
     input: string; output: string; cacheRead: string; cacheWrite: string; free: string; thinking: string;
+    sessionReply: string; sendReply: string; pauseSession: string; resumeSession: string;
+    stop: string; stopSessionTitle: string; stopSessionMessage: string; stopRunTitle: string; stopRunMessage: string;
     status: Record<RunStatus, string>;
     subagents: string; mainAgent: string; subagentDispatched: string; subagentCall: string; subagentEvents: Record<string, string>;
     assistant: string; user: string; toolCall: string; toolInput: string; toolResult: string; toolReturned: string; notification: string;
@@ -41,7 +43,10 @@ export const messages: Record<LocaleId, Messages> = {
       log: '运行日志', waiting: '等待运行事件…', overview: '概览', id: '运行 ID', iteration: '迭代', elapsed: '耗时',
       members: '成员会话', running: '运行中', createdAt: '创建时间', context: '上下文用量',
       input: '输入', output: '输出', cacheRead: '缓存读取', cacheWrite: '缓存写入', free: '剩余用量', thinking: '思考',
-      status: { queued: '排队中', running: '运行中', paused: '已暂停', failed: '失败', completed: '已完成', cancelled: '已取消' },
+      sessionReply: '人工回复', sendReply: '发送', pauseSession: '暂停', resumeSession: '继续',
+      stop: '停止', stopSessionTitle: '停止会话？', stopSessionMessage: '停止后，无法再向此会话发送回复。已有日志仍可查看。',
+      stopRunTitle: '停止工作流？', stopRunMessage: '停止后，本次工作流将结束。已有日志仍可查看。',
+      status: { queued: '排队中', running: '运行中', paused: '已暂停', failed: '失败', completed: '已完成', cancelled: '已停止' },
       subagents: '子代理', mainAgent: '主代理', subagentDispatched: '已调用', subagentCall: '子代理调用',
       assistant: '助手消息', user: '用户消息', toolCall: '工具调用', toolInput: '参数', toolResult: '结果', toolReturned: '已返回', notification: '通知',
       subagentEvents: { subagent_start: '子代理启动', subagent_progress: '子代理进度', subagent_stop: '子代理结束', subagent_context: '子代理上下文' },
@@ -54,7 +59,10 @@ export const messages: Record<LocaleId, Messages> = {
       log: 'Run log', waiting: 'Waiting for run events…', overview: 'Overview', id: 'Run ID', iteration: 'Iteration', elapsed: 'Elapsed',
       members: 'Member sessions', running: 'Running', createdAt: 'Created', context: 'Context usage',
       input: 'Input', output: 'Output', cacheRead: 'Cache read', cacheWrite: 'Cache write', free: 'Remaining tokens', thinking: 'Thinking',
-      status: { queued: 'Queued', running: 'Running', paused: 'Paused', failed: 'Failed', completed: 'Completed', cancelled: 'Cancelled' },
+      sessionReply: 'Manual reply', sendReply: 'Send', pauseSession: 'Pause', resumeSession: 'Resume',
+      stop: 'Stop', stopSessionTitle: 'Stop session?', stopSessionMessage: 'After stopping, you can no longer reply to this session. Its existing logs remain available.',
+      stopRunTitle: 'Stop workflow?', stopRunMessage: 'Stopping ends this workflow run. Its existing logs remain available.',
+      status: { queued: 'Queued', running: 'Running', paused: 'Paused', failed: 'Failed', completed: 'Completed', cancelled: 'Stopped' },
       subagents: 'Subagents', mainAgent: 'Main agent', subagentDispatched: 'Dispatched', subagentCall: 'Subagent call',
       assistant: 'Assistant message', user: 'User message', toolCall: 'Tool call', toolInput: 'Input', toolResult: 'Result', toolReturned: 'Returned', notification: 'Notification',
       subagentEvents: { subagent_start: 'Subagent started', subagent_progress: 'Subagent progress', subagent_stop: 'Subagent stopped', subagent_context: 'Subagent context' },

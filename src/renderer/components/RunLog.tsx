@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { RunEvent } from '../../shared/protocol';
 import { eventPayloadRecord as record, isSubagentTool, runEventKey, toolArgumentRecord } from '../../shared/run';
 import type { Messages } from '../i18n';
@@ -200,7 +200,7 @@ const LogRow = memo(function LogRow({ row, labels }: { row: LogEntry; labels: La
   </div>;
 });
 
-export function RunLog({ events, messages }: { events: RunEvent[]; messages: Messages }): JSX.Element {
+export function RunLog({ events, messages, children }: { events: RunEvent[]; messages: Messages; children?: ReactNode }): JSX.Element {
   const log = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const labels = messages.runDetail;
@@ -217,5 +217,6 @@ export function RunLog({ events, messages }: { events: RunEvent[]; messages: Mes
     }}>
       {rows.length ? rows.map(row => <LogRow key={row.key} row={row} labels={labels} />) : <p className="run-log-empty">{labels.waiting}</p>}
     </div>
+    {children}
   </section>;
 }

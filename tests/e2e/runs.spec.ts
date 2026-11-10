@@ -26,10 +26,53 @@ const assistantEvent = {
 
 function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
   let eventCursorSeen = false;
-  const server = http.createServer((req, res) => {
+  const interactive = { ...sessionRecord, id: 'session-interactive', name: '人工交互会话', state: 'running', stop_reason: null as string | null };
+  const replies: string[] = [];
+  const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'GET' && req.url === '/api/v1/sessions') {
-      res.end(JSON.stringify([sessionRecord]));
+      res.end(JSON.stringify([sessionRecord, interactive]));
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/api/v1/sessions/session-interactive') {
+      res.end(JSON.stringify(interactive));
+      return;
+    }
+    if (req.method === 'GET' && req.url?.startsWith('/api/v1/events?session_id=session-interactive')) {
+      const cursor = Number(new URL(req.url, 'http://localhost').searchParams.get('cursor'));
+      const events = replies.slice(cursor).map(prompt => ({
+        timestamp: new Date().toISOString(), event_type: 'log_manual', data: { prompt },
+      }));
+      res.end(JSON.stringify({ cursor: String(replies.length), events }));
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/v1/sessions/session-interactive/send') {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const { text } = JSON.parse(Buffer.concat(chunks).toString());
+      if (text === '保留未发送的回复') {
+        res.statusCode = 409;
+        res.end(JSON.stringify({ detail: '暂时无法发送' }));
+        return;
+      }
+      replies.push(text);
+      const resumed = interactive.state === 'idle';
+      interactive.state = 'running';
+      interactive.stop_reason = null;
+      res.end(JSON.stringify({ ok: true, resumed }));
+      return;
+    }
+    if (req.method === 'POST' && (req.url === '/api/v1/sessions/session-interactive/pause' || req.url === '/api/v1/sessions/session-interactive/resume')) {
+      const paused = req.url.endsWith('/pause');
+      interactive.state = paused ? 'idle' : 'running';
+      interactive.stop_reason = paused ? 'user_pause' : null;
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/v1/sessions/session-interactive/stop') {
+      interactive.state = 'stopped';
+      interactive.stop_reason = 'user_pause';
+      res.end(JSON.stringify({ ok: true }));
       return;
     }
     if (req.method === 'GET' && req.url === '/api/v1/sessions/session-a') {
@@ -151,6 +194,7 @@ test.describe('execution runs', () => {
     await expect(window.getByRole('log')).not.toContainText('session_state_changed');
     await expect(window.locator('.run-overview')).toContainText('成员会话');
     await expect(window.locator('.run-detail-title .status-badge')).toHaveText('运行中');
+    await expect(window.getByLabel('人工回复')).toHaveCount(0);
     const elapsed = window.locator('.run-detail-title .run-elapsed');
     await expect(elapsed).toHaveAttribute('datetime', /^PT\d+S$/);
     const initial = Number((await elapsed.getAttribute('datetime'))?.slice(2, -1));
@@ -268,6 +312,61 @@ test.describe('execution runs', () => {
     const track = await context.locator('.run-context-bar').evaluate(node => getComputedStyle(node).backgroundColor);
     expect(track).not.toBe('rgb(255, 255, 255)');
     await expect(context.locator('.run-context-free')).toHaveCSS('background-color', track);
+  });
+
+  test('controls a session from the reply bar and confirms before stopping', async () => {
+    await window.getByRole('option', { name: /人工交互会话/ }).click();
+    const detail = window.locator('.run-detail');
+    const pause = detail.getByRole('button', { name: '暂停', exact: true });
+    const resume = detail.getByRole('button', { name: '继续', exact: true });
+    const status = detail.locator('.run-detail-title .status-badge');
+    const reply = detail.getByRole('textbox', { name: '人工回复' });
+    const send = detail.getByRole('button', { name: '发送', exact: true });
+    const stop = detail.locator('.session-reply-actions').getByRole('button', { name: '停止', exact: true });
+    await expect(detail.locator('.session-reply-actions button')).toHaveText(['发送', '暂停', '停止']);
+    await expect(reply).toHaveCSS('height', '34px');
+    await expect(send).toHaveCSS('height', '34px');
+    await expect(reply).toHaveCSS('font-size', '13px');
+    await expect(send).toHaveCSS('font-size', '13px');
+    await expect(send).toBeDisabled();
+    await expect(send).toHaveCSS('cursor', 'not-allowed');
+    await expect(send).toHaveCSS('box-shadow', 'none');
+    const disabledBackground = await send.evaluate(button => getComputedStyle(button).backgroundColor);
+    await expect(pause).toBeEnabled();
+    await expect(stop).toBeEnabled();
+    await expect(stop).not.toHaveCSS('background-color', await pause.evaluate(button => getComputedStyle(button).backgroundColor));
+    await pause.click();
+    await expect(status).toHaveText('已暂停');
+    await resume.click();
+    await expect(status).toHaveText('运行中');
+    await reply.fill('保留未发送的回复');
+    await expect(send).toBeEnabled();
+    await expect(send).not.toHaveCSS('background-color', disabledBackground);
+    await send.click();
+    await expect(detail.getByRole('alert')).toContainText('暂时无法发送');
+    await expect(reply).toHaveValue('保留未发送的回复');
+    await pause.click();
+    await expect(status).toHaveText('已暂停');
+    await reply.fill('请按这个方向继续。');
+    await reply.press('End');
+    await reply.press('Enter');
+    await expect(reply).toHaveValue('请按这个方向继续。\n');
+    await expect(status).toHaveText('已暂停');
+    await expect(detail.getByRole('log')).not.toContainText('请按这个方向继续。');
+    await send.click();
+    await expect(reply).toHaveValue('');
+    await expect(detail.getByRole('log')).toContainText('请按这个方向继续。');
+    await expect(status).toHaveText('运行中');
+    await stop.click();
+    const dialog = detail.getByRole('dialog', { name: '停止会话？' });
+    await expect(dialog).toContainText('停止后，无法再向此会话发送回复。');
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(status).toHaveText('运行中');
+    await stop.click();
+    await dialog.getByRole('button', { name: '停止', exact: true }).click();
+    await expect(status).toHaveText('已停止');
+    await expect(reply).toHaveCount(0);
+    await expect(detail.getByRole('log')).toContainText('请按这个方向继续。');
   });
 
   test('opens a centered workspace prompt when starting a run without a workspace', async () => {

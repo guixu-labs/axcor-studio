@@ -333,16 +333,10 @@ export default function App(): JSX.Element {
     setOpenFiles(nextFiles);
     if (file === closedFile) setFile(nextFiles.at(-1) ?? '');
   };
-  const cancelRun = async (): Promise<void> => {
-    if (!selectedRun) return;
-    try {
-      await client.cancelRun(selectedRun.id);
-    } catch (error) {
-      setExecutionError(error instanceof Error ? error.message : String(error));
-      return;
-    }
-    const latest = await client.getRun(selectedRun.id);
-    setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
+  const refreshRunAfterAction = async (id: string): Promise<void> => {
+    // The event subscription can still refresh the run if this read fails.
+    const latest = await client.getRun(id).catch(() => undefined);
+    if (latest) setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
   };
   const openInsightForRun = async (): Promise<void> => {
     if (!selectedRun) return;
@@ -399,17 +393,26 @@ export default function App(): JSX.Element {
             </div> : <div className="empty-panel" />}
           </section>}
           {activeNavigation === 'runs' && (selectedRun
-            ? <section className="single-panel"><RunDetail key={selectedRun.id} run={selectedRun} events={selectedEvents} onCancel={cancelRun} onOpenInsight={openInsightForRun} messages={t} /></section>
+            ? <section className="single-panel"><RunDetail key={selectedRun.id} run={selectedRun} events={selectedEvents} onOpenInsight={openInsightForRun}
+              onStop={async () => {
+                await client.stopRun(selectedRun.id);
+                await refreshRunAfterAction(selectedRun.id);
+              }}
+              onSetPaused={async paused => {
+                await client.setSessionPaused(selectedRun.id, paused);
+                await refreshRunAfterAction(selectedRun.id);
+              }}
+              onSendReply={text => client.sendSessionReply(selectedRun.id, text)} messages={t} /></section>
             : <section className="single-panel"><div className="empty-panel"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></div></section>)}
           {activeNavigation === 'insight' && <section className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
         </div>
       </div>
     </div>
     <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span>{file && <><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></>}</footer>
-    <dialog className="workspace-required-dialog" ref={workspaceRequiredDialog} aria-labelledby="workspace-required-title" aria-describedby="workspace-required-message">
+    <dialog className="workbench-dialog" ref={workspaceRequiredDialog} aria-labelledby="workspace-required-title" aria-describedby="workspace-required-message">
       <h2 id="workspace-required-title">{t.workspaceRequiredTitle}</h2>
       <p id="workspace-required-message">{t.workspaceRequiredMessage}</p>
-      <div className="workspace-required-actions">
+      <div className="workbench-dialog-actions">
         <button className="secondary-button" type="button" onClick={() => workspaceRequiredDialog.current?.close()}>{t.cancel}</button>
         <button className="primary-button" type="button" onClick={() => {
           workspaceRequiredDialog.current?.close();

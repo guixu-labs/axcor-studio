@@ -3,7 +3,13 @@ import type { Artifact, CreateRunInput, ExecutionClient, Run, RunEvent } from '.
 export class WorkbenchExecutionClient implements ExecutionClient {
   createRun(input: CreateRunInput): Promise<Run> { return window.executionBackend.startRun(input); }
   getRun(runId: string): Promise<Run> { return window.executionBackend.getRun(runId); }
-  cancelRun(runId: string): Promise<void> { return window.executionBackend.cancelRun(runId); }
+  stopRun(runId: string): Promise<void> { return window.executionBackend.stopRun(runId); }
+  setSessionPaused(sessionId: string, paused: boolean): Promise<void> {
+    return window.executionBackend.setSessionPaused(sessionId, paused);
+  }
+  sendSessionReply(sessionId: string, text: string): Promise<void> {
+    return window.executionBackend.sendSessionReply(sessionId, text);
+  }
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void { return window.executionBackend.subscribeRunEvents(runId, listener); }
   async listRuns(): Promise<Run[]> { return window.executionBackend.listRuns(); }
   async listArtifacts(): Promise<Artifact[]> { return []; }
@@ -25,7 +31,7 @@ export class MockExecutionClient implements ExecutionClient {
 
   async getRun(runId: string): Promise<Run> { const run = this.runs.get(runId); if (!run) throw new Error(`Unknown run: ${runId}`); return run; }
   async listRuns(): Promise<Run[]> { return [...this.runs.values()]; }
-  async cancelRun(runId: string): Promise<void> { this.advance(runId, 'cancelled', 'run.cancelled'); }
+  async stopRun(runId: string): Promise<void> { this.advance(runId, 'cancelled', 'run.cancelled'); }
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void { const listeners = this.listeners.get(runId) ?? new Set(); listeners.add(listener); this.listeners.set(runId, listeners); return () => listeners.delete(listener); }
   async listArtifacts(runId: string): Promise<Artifact[]> { return [{ id: `artifact_${runId}`, runId, type: 'log', name: 'mock-run.log' }]; }
 

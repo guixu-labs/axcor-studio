@@ -78,7 +78,7 @@ export interface ExecutionClient {
   createRun(input: CreateRunInput): Promise<Run>;
   listRuns(): Promise<Run[]>;
   getRun(runId: string): Promise<Run>;
-  cancelRun(runId: string): Promise<void>;
+  stopRun(runId: string): Promise<void>;
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void;
   listArtifacts(runId: string): Promise<Artifact[]>;
 }
