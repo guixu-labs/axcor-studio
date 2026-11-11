@@ -6,6 +6,7 @@ import started from 'electron-squirrel-startup';
 import { stopAllExecutionPolls } from './executionBackend/events';
 import { registerExecutionBackendIpc } from './executionBackend/ipc';
 import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './insightView';
+import { stopInsightIfStarted } from './insightService';
 import { walkWorkspace } from './workspaceFiles';
 import { ensureExecutionBackendRunning, stopExecutionBackendIfStarted } from './executionBackend/lifecycle';
 
@@ -65,7 +66,7 @@ app.whenReady().then(() => {
   ipcMain.handle('workspace:read-file', (_event, fileName: string) => fs.readFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), 'utf8'));
   ipcMain.handle('workspace:write-file', (_event, fileName: string, content: string) => fs.writeFile(workspacePath(path.join(selectedWorkspace ?? '', fileName)), content, 'utf8'));
   registerExecutionBackendIpc();
-  ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => { showInsight(path, bounds, isDark); });
+  ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => showInsight(path, bounds, isDark));
   ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => { updateInsightBounds(bounds); });
   ipcMain.handle('insight:hide', () => { hideInsight(); });
   createWindow();
@@ -75,6 +76,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   stopAllExecutionPolls();
   stopExecutionBackendIfStarted();
+  stopInsightIfStarted();
 });
 
 app.on('window-all-closed', () => {

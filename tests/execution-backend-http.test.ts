@@ -5,7 +5,6 @@ import type { AddressInfo } from 'node:net';
 import {
   activateProvider,
   deleteProvider,
-  getInsightStatus,
   getRun,
   getRunSessions,
   importSessionToInsight,
@@ -63,10 +62,6 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
           return;
         }
         res.end(JSON.stringify({ ok: true, sessionId, insightUrl: `/insight/session/${sessionId}`, imported: true }));
-        return;
-      }
-      if (req.method === 'GET' && req.url === '/api/v1/insight/status') {
-        res.end(JSON.stringify({ running: true, port: 21025 }));
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
@@ -274,12 +269,6 @@ test('execution backend HTTP client', async t => {
     const result = await importSessionToInsight('sess-missing');
     assert.equal(result.ok, false);
     assert.match(result.error ?? '', /Cannot connect/);
-  });
-
-  await t.test('getInsightStatus reports the insight port', async () => {
-    const status = await getInsightStatus();
-    assert.equal(status.running, true);
-    assert.equal(status.port, 21025);
   });
 
   await t.test('injectSessionPrompt posts to the inject endpoint', async () => {

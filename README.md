@@ -19,6 +19,10 @@ npm run start
 
 执行后端的显示名称和 CLI 命令集中定义在 `src/shared/executionBackendConfig.ts`。
 
+打开「观测」或导入运行会话时，工作台会连接本机的 Context Insight（默认 `http://127.0.0.1:21025`）。如果服务未运行，工作台会通过 PATH 中的 `context-insight` 命令启动服务，并在退出时停止自己启动的实例。首次启动可能需要构建 Insight 页面。
+
+可在启动工作台时通过 `CONTEXT_INSIGHT_PORT` 指定端口，或设置 `CONTEXT_INSIGHT_NO_AUTOSTART=1` 使用手动启动的实例。会话导入仍由 Workflow Controller 定位转录文件。如果 Workflow Controller 是单独启动的，请在启动它时将 `WORKFLOW_CONTROLLER_INSIGHT_PORT` 设为同一个端口。
+
 `MockExecutionClient` 保留用于隔离测试。产物获取和 Evidence 面板仍为占位实现；运行完成本身不代表代码或业务验收通过。
 
 依赖配置将 `@electron/rebuild` 固定为已发布的 4.2.0 版本，避免旧版本引入托管在 GitHub 上的 `@electron/node-gyp` 源码依赖，降低受限网络环境下的安装失败风险。

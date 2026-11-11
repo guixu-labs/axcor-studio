@@ -1,11 +1,11 @@
 import { ipcMain } from 'electron';
 import type { ProviderKeyInput } from '../shared/executionBackendIpc';
 import type { CreateRunInput } from '../shared/protocol';
+import { ensureInsightRunning, getInsightStatus } from '../insightService';
 import { subscribeExecutionEvents, unsubscribeExecutionEvents } from './events';
 import {
   getRun,
   getRunSessions,
-  getInsightStatus,
   getBackendBaseUrl,
   importSessionToInsight,
   injectSessionPrompt,
@@ -36,7 +36,10 @@ export function registerExecutionBackendIpc(): void {
   ipcMain.handle('execution:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectSessionPrompt(runId, sessionId, prompt));
   ipcMain.handle('execution:set-session-paused', (_event, sessionId: string, paused: boolean) => setSessionPaused(sessionId, paused));
   ipcMain.handle('execution:send-session-reply', (_event, sessionId: string, text: string) => sendSessionReply(sessionId, text));
-  ipcMain.handle('execution:import-to-insight', (_event, sessionId: string) => importSessionToInsight(sessionId));
+  ipcMain.handle('execution:import-to-insight', async (_event, sessionId: string) => {
+    await ensureInsightRunning();
+    return importSessionToInsight(sessionId);
+  });
   ipcMain.handle('execution:insight-status', () => getInsightStatus());
   ipcMain.handle('execution:list-providers', () => listProviders());
   ipcMain.handle('execution:list-session-models', (_event, runtime: string) => listSessionModels(runtime));

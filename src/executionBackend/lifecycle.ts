@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
+import { insightPort } from '../insightService';
 import { getBackendBaseUrl } from './http';
 import { DEFAULT_EXECUTION_BACKEND_PORT, EXECUTION_BACKEND_COMMAND } from '../shared/executionBackendConfig';
 
@@ -49,7 +50,11 @@ function spawnExecutionBackend(port: string): Promise<boolean> {
   // tool locations after the inherited PATH (which may itself be augmented,
   // e.g. by tests injecting a fixture binary first).
   const pathPrefix = [os.homedir() + '/.local/bin', '/usr/local/bin'].join(':');
-  const env = { ...process.env, PATH: (process.env.PATH ?? '') + ':' + pathPrefix };
+  const env = {
+    ...process.env,
+    PATH: (process.env.PATH ?? '') + ':' + pathPrefix,
+    WORKFLOW_CONTROLLER_INSIGHT_PORT: String(insightPort),
+  };
   return new Promise(resolve => {
     const child = spawn(EXECUTION_BACKEND_COMMAND, ['web', '--port', port, '--no-open'], {
       env, cwd: os.homedir(), detached: true, stdio: 'ignore',
