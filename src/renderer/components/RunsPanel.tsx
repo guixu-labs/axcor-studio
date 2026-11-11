@@ -1,23 +1,25 @@
 import { useState } from 'react';
 import type { SessionModelOption } from '../../shared/executionBackendIpc';
-import type { Run, RuntimeId } from '../../shared/protocol';
+import type { GraphRunParams, Run, RuntimeId } from '../../shared/protocol';
 import { RUNTIMES } from '../../shared/protocol';
 
 export interface RunsPanelMessages {
   runs: string; runWorkflow: string;
   noRuns: string; runToSeeEvents: string;
   runConfig: string; runtime: string; runLabel: string; runLabelPlaceholder: string;
-  runProgramPath: string; runFormat: string;
-  runParams: string; addParam: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
-  maxParallel: string; removeParam: string;
+  runProgramPath: string; graphDefault: string; graphReviewer: string; enabled: string; disabled: string;
+  graphAdvanced: string; cliWrapper: string; evaluator: string; reviewerModel: string; reviewerProviderIndex: string;
+  reviewerTaskGoal: string; reviewerThinking: string; reviewerThinkingBudget: string; modelPinned: string;
+  graphVariables: string; addGraphVariable: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
+  maxParallel: string; removeGraphVariable: string;
   agentRuntime: string; sessionPrompt: string; sessionModel: string; sessionSystemPrompt: string;
   sessionMaxIterations: string; sessionReviewerEnabled: string;
   prompt: string; promptPlaceholder: string;
 }
 
-export interface RunParamsRow { key: string; value: string; }
+export interface GraphVariableRow { key: string; value: string; }
 
-const SESSION_RUNTIME_OPTIONS = [
+const AGENT_RUNTIME_OPTIONS = [
   { id: 'claude_sdk', label: 'Claude SDK' },
   { id: 'claude_cli', label: 'Claude CLI' },
   { id: 'opencode', label: 'OpenCode' },
@@ -37,10 +39,10 @@ interface RunsListProps {
   runProgramPath: string;
   defaultProgramPath: string;
   onRunProgramPathChange: (value: string) => void;
-  runFormat: string;
-  onRunFormatChange: (value: string) => void;
-  runParams: RunParamsRow[];
-  onRunParamsChange: (rows: RunParamsRow[]) => void;
+  graphVariables: GraphVariableRow[];
+  onGraphVariablesChange: (rows: GraphVariableRow[]) => void;
+  graphOptions: GraphRunParams;
+  onGraphOptionsChange: (options: GraphRunParams) => void;
   maxParallel: string;
   onMaxParallelChange: (value: string) => void;
   runPrompt: string;
@@ -62,7 +64,7 @@ interface RunsListProps {
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runProgramPath, defaultProgramPath, onRunProgramPathChange, runFormat, onRunFormatChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runProgramPath, defaultProgramPath, onRunProgramPathChange, graphVariables, onGraphVariablesChange, graphOptions, onGraphOptionsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><h2>{messages.runs}</h2></div>
@@ -100,22 +102,18 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
             }} />
           </label>
           <label className="run-config-field">
-            <span className="run-config-title">{messages.runFormat}</span>
-            <input className="run-config-input" type="text" value={runFormat} aria-label={messages.runFormat} onChange={event => onRunFormatChange(event.target.value)} />
-          </label>
-          <label className="run-config-field">
             <span className="run-config-title">{messages.runLabel}</span>
             <input className="run-config-input" type="text" value={runLabel} placeholder={messages.runLabelPlaceholder} aria-label={messages.runLabel} onChange={event => onRunLabelChange(event.target.value)} />
           </label>
           <div className="run-config-field">
             <div className="run-params-heading">
-              <span className="run-config-title">{messages.runParams}</span>
-              <button className="icon-button run-param-add" type="button" aria-label={messages.addParam} title={messages.addParam} onClick={() => onRunParamsChange([...runParams, { key: '', value: '' }])}>+</button>
+              <span className="run-config-title">{messages.graphVariables}</span>
+              <button className="icon-button run-param-add" type="button" aria-label={messages.addGraphVariable} title={messages.addGraphVariable} onClick={() => onGraphVariablesChange([...graphVariables, { key: '', value: '' }])}>+</button>
             </div>
-            {runParams.map((row, index) => <div className="run-param-row" key={index}>
-              <input className="run-config-input" type="text" value={row.key} placeholder={messages.paramKeyPlaceholder} aria-label={messages.paramKeyPlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} />
-              <input className="run-config-input" type="text" value={row.value} placeholder={messages.paramValuePlaceholder} aria-label={messages.paramValuePlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} />
-              <button className="run-param-remove" type="button" aria-label={messages.removeParam} onClick={() => onRunParamsChange(runParams.filter((_item, itemIndex) => itemIndex !== index))}>×</button>
+            {graphVariables.map((row, index) => <div className="run-param-row" key={index}>
+              <input className="run-config-input" type="text" value={row.key} placeholder={messages.paramKeyPlaceholder} aria-label={messages.paramKeyPlaceholder} onChange={event => onGraphVariablesChange(graphVariables.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} />
+              <input className="run-config-input" type="text" value={row.value} placeholder={messages.paramValuePlaceholder} aria-label={messages.paramValuePlaceholder} onChange={event => onGraphVariablesChange(graphVariables.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} />
+              <button className="run-param-remove" type="button" aria-label={messages.removeGraphVariable} onClick={() => onGraphVariablesChange(graphVariables.filter((_item, itemIndex) => itemIndex !== index))}>×</button>
             </div>)}
           </div>
           <label className="run-config-field">
@@ -126,6 +124,77 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
             <span className="run-config-title">{messages.prompt}</span>
             <textarea className="run-config-input run-config-textarea" rows={3} value={runPrompt} placeholder={messages.promptPlaceholder} aria-label={messages.prompt} onChange={event => onRunPromptChange(event.target.value)} />
           </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.agentRuntime}</span>
+            <select className="run-config-select" aria-label={messages.agentRuntime} value={graphOptions.runtime ?? ''} onChange={event => onGraphOptionsChange({ ...graphOptions, runtime: event.target.value || undefined })}>
+              <option value="">{messages.graphDefault}</option>
+              {AGENT_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+          </label>
+          {graphOptions.runtime && <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionModel}</span>
+            <select className="run-config-select" aria-label={messages.sessionModel} value={sessionModel} onChange={event => onSessionModelChange(event.target.value)}>
+              <option value="">{messages.graphDefault}</option>
+              {sessionModels.map(option => <option key={option.model} value={option.model}>{option.model}</option>)}
+            </select>
+          </label>}
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionSystemPrompt}</span>
+            <textarea className="run-config-input run-config-textarea" rows={3} value={graphOptions.system_prompt ?? ''} onChange={event => onGraphOptionsChange({ ...graphOptions, system_prompt: event.target.value || undefined })} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.sessionMaxIterations}</span>
+            <input className="run-config-input" type="number" min={1} value={graphOptions.max_iterations ?? ''} onChange={event => onGraphOptionsChange({ ...graphOptions, max_iterations: event.target.valueAsNumber || undefined })} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.graphReviewer}</span>
+            <select className="run-config-select" aria-label={messages.graphReviewer} value={graphOptions.reviewer_enabled === undefined ? '' : String(graphOptions.reviewer_enabled)} onChange={event => {
+              const value = event.target.value;
+              onGraphOptionsChange({ ...graphOptions, reviewer_enabled: value === '' ? undefined : value === 'true' });
+            }}>
+              <option value="">{messages.graphDefault}</option>
+              <option value="true">{messages.enabled}</option>
+              <option value="false">{messages.disabled}</option>
+            </select>
+          </label>
+          <details>
+            <summary className="run-config-title">{messages.graphAdvanced}</summary>
+            <div className="graph-advanced-fields">
+              {([
+                ['cli_wrapper', messages.cliWrapper],
+                ['evaluator', messages.evaluator],
+                ['reviewer_model', messages.reviewerModel],
+                ['reviewer_task_goal', messages.reviewerTaskGoal],
+              ] as const).map(([key, label]) => <label className="run-config-field" key={key}>
+                <span className="run-config-title">{label}</span>
+                <input className="run-config-input" type="text" value={graphOptions[key] ?? ''} onChange={event => onGraphOptionsChange({ ...graphOptions, [key]: event.target.value || undefined })} />
+              </label>)}
+              {([
+                ['reviewer_provider_index', messages.reviewerProviderIndex],
+                ['reviewer_thinking_budget_tokens', messages.reviewerThinkingBudget],
+              ] as const).map(([key, label]) => <label className="run-config-field" key={key}>
+                <span className="run-config-title">{label}</span>
+                <input className="run-config-input" type="number" min={0} value={graphOptions[key] ?? ''} onChange={event => {
+                  const value = event.target.valueAsNumber;
+                  onGraphOptionsChange({ ...graphOptions, [key]: Number.isNaN(value) ? undefined : value });
+                }} />
+              </label>)}
+              {([
+                ['reviewer_thinking_enabled', messages.reviewerThinking],
+                ['model_pinned', messages.modelPinned],
+              ] as const).map(([key, label]) => <label className="run-config-field" key={key}>
+                <span className="run-config-title">{label}</span>
+                <select className="run-config-select" aria-label={label} value={String(graphOptions[key] ?? '')} onChange={event => {
+                  const value = event.target.value;
+                  onGraphOptionsChange({ ...graphOptions, [key]: value === '' ? undefined : value === 'true' });
+                }}>
+                  <option value="">{messages.graphDefault}</option>
+                  <option value="true">{messages.enabled}</option>
+                  <option value="false">{messages.disabled}</option>
+                </select>
+              </label>)}
+            </div>
+          </details>
         </>}
         {runtime === 'session' && <>
           <label className="run-config-field">
@@ -135,7 +204,7 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
           <label className="run-config-field">
             <span className="run-config-title">{messages.agentRuntime}</span>
             <select className="run-config-select" value={sessionRuntime} aria-label={messages.agentRuntime} onChange={event => onSessionRuntimeChange(event.target.value)}>
-              {SESSION_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              {AGENT_RUNTIME_OPTIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
           </label>
           <label className="run-config-field">
