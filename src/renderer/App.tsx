@@ -98,7 +98,7 @@ export default function App(): JSX.Element {
   const [sessionSystemPrompt, setSessionSystemPrompt] = useState('');
   const [sessionMaxIterations, setSessionMaxIterations] = useState('');
   const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
-  const [insightPath, setInsightPath] = useState('/insight/');
+  const [insightPath, setInsightPath] = useState('/');
   const [insightFailed, setInsightFailed] = useState(false);
   const effectiveExecutionBackendUrl = executionBackendUrl ?? DEFAULT_EXECUTION_BACKEND_URL;
   const appContent = useRef<HTMLDivElement>(null);
@@ -218,12 +218,12 @@ export default function App(): JSX.Element {
     setInsightFailed(false);
     const node = appContent.current;
     if (!node) return;
-    const push = (): void => {
+    const bounds = () => {
       const rect = node.getBoundingClientRect();
-      void window.insight.show(insightPath, { x: rect.left, y: rect.top, width: rect.width, height: rect.height }, selectedTheme.colorScheme === 'dark');
+      return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
     };
-    push();
-    const observer = new ResizeObserver(push);
+    void window.insight.show(insightPath, bounds(), selectedTheme.colorScheme === 'dark');
+    const observer = new ResizeObserver(() => { void window.insight.updateBounds(bounds()); });
     observer.observe(node);
     return () => observer.disconnect();
   }, [activeTab?.kind, insightPath, selectedTheme.colorScheme, settingsOpen]);
@@ -374,19 +374,19 @@ export default function App(): JSX.Element {
   const openInsightForRun = async (run: Run): Promise<void> => {
     setExecutionError(undefined);
     try {
-      if (run.runtimeId === 'session') {
-        const result = await window.executionBackend.importToInsight(run.id);
-        if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
-        setInsightPath('/insight/session/' + encodeURIComponent(run.id));
-        openContentTab(insightTab);
-        return;
+      let sessionId = run.id;
+      if (run.runtimeId !== 'session') {
+        const sessions = await window.executionBackend.getRunSessions(run.id);
+        const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
+        if (!target) { setExecutionError(t.noObservableSessions); return; }
+        sessionId = target.session_id;
       }
-      const sessions = await window.executionBackend.getRunSessions(run.id);
-      const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
-      if (!target) { setExecutionError(t.noObservableSessions); return; }
-      const result = await window.executionBackend.importToInsight(target.session_id);
+      const result = await window.executionBackend.importToInsight(sessionId);
       if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
-      setInsightPath('/insight/session/' + encodeURIComponent(target.session_id));
+      const directPath = result.insightUrl?.replace(/^\/insight(?=\/)/, '');
+      setInsightPath(directPath && /^\/(run|session)\//.test(directPath)
+        ? directPath
+        : '/session/' + encodeURIComponent(result.sessionId ?? sessionId));
       openContentTab(insightTab);
     } catch (error) {
       setExecutionError(error instanceof Error ? error.message : String(error));

@@ -11,7 +11,6 @@ import {
 } from './api';
 import type {
   InsightImportResult,
-  InsightStatusResult,
   ProviderKey,
   ProviderKeyInput,
   ProviderTestResult,
@@ -193,10 +192,6 @@ export async function injectSessionPrompt(runId: string, sessionId: string, prom
 export async function importSessionToInsight(sessionId: string): Promise<InsightImportResult> {
   const result = await backendRequest<InsightImportResult>('POST', `/api/v1/insight/import?session_id=${encodeURIComponent(sessionId)}`);
   return result.ok ? result : { ...result, ok: false };
-}
-
-export async function getInsightStatus(): Promise<InsightStatusResult> {
-  return backendRequest<InsightStatusResult>('GET', '/api/v1/insight/status');
 }
 
 export async function listProviders(): Promise<ProviderKey[]> {
