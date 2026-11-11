@@ -20,7 +20,7 @@ html, body, #root { height: 100%; overflow: hidden; }
 body { margin: 0; min-width: 1024px; background: var(--surface-0); }
 button { border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; padding: 7px 12px; cursor: pointer; font: inherit; transition: border-color .18s, background .18s, color .18s, transform .18s; }
 button:hover { border-color: color-mix(in srgb, var(--muted) 50%, var(--border)); background: var(--surface-3); } button:active { transform: translateY(1px); } button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.app-shell { height: 100%; display: grid; grid-template-columns: 52px minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr) 22px; background: radial-gradient(circle at 70% -20%, var(--accent-soft) 0%, transparent 42%), var(--surface-0); }
+.app-shell { height: 100%; display: grid; grid-template-columns: 52px minmax(0, 1fr); grid-template-rows: 36px minmax(0, 1fr) 22px; background: radial-gradient(circle at 70% -20%, var(--accent-soft) 0%, transparent 42%), var(--surface-0); }
 .app-content {
   grid-column: 2;
   grid-row: 2;
