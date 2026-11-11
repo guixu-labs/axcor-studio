@@ -41,11 +41,25 @@ test.describe('monaco editor', () => {
   test('shows the file background when the last editor tab is closed', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
-    await window.getByRole('button', { name: 'Close workflow.md', exact: true }).click();
+    await window.getByRole('button', { name: '关闭 workflow.md', exact: true }).click();
     await expect(window.locator('.workspace-grid .empty-panel')).toBeVisible();
     await expect(window.getByRole('tab')).toHaveCount(0);
     await window.locator('.file-list').getByRole('button', { name: /workflow\.md/ }).click();
     await expect(window.locator('.view-lines', { hasText: 'New workflow' })).toBeVisible();
+  });
+
+  test('keeps the editor visible when switching sidebars', async () => {
+    const tabs = window.locator('.app-content').getByRole('tablist', { name: '已打开的标签页' });
+    await expect(tabs.getByRole('tab', { name: 'workflow.md' })).toHaveAttribute('aria-selected', 'true');
+    await window.locator('.monaco-editor').click();
+    await window.keyboard.press('ControlOrMeta+a');
+    await window.keyboard.type('# Preserved edit');
+    await window.getByRole('button', { name: '运行', exact: true }).click();
+    await expect(tabs.getByRole('tab')).toHaveCount(1);
+    await expect(window.locator('.view-lines', { hasText: '# Preserved edit' })).toBeVisible();
+    await window.getByRole('button', { name: '工作台', exact: true }).click();
+    await expect(tabs.getByRole('tab', { name: 'workflow.md' })).toHaveAttribute('aria-selected', 'true');
+    await expect(window.locator('.view-lines', { hasText: '# Preserved edit' })).toBeVisible();
   });
 
   test('keeps edits with their file when switching tabs', async () => {

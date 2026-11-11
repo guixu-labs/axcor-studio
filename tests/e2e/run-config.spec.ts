@@ -160,7 +160,7 @@ test.describe('run configuration', () => {
     await expect(programPath).toHaveValue(suggestion!);
     await expect(window.getByLabel('格式', { exact: true })).toBeFocused();
     await window.getByRole('button', { name: '工作台', exact: true }).click();
-    await window.locator('.tab-close').click();
+    await window.getByRole('button', { name: /^关闭 .*\.md$/ }).click();
     await window.getByRole('button', { name: '运行', exact: true }).click();
     await expect(programPath).toHaveAttribute('placeholder', '');
     await programPath.fill('other/workflow.yaml');

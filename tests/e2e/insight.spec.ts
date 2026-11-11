@@ -10,6 +10,7 @@ const runRecord = {
   max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00',
   finished_at: '2026-11-03T10:05:00+00:00', reopened_at: null, error: null, member_count: 1, running_count: 0,
 };
+const otherRunRecord = { ...runRecord, run_id: 'run-b', label: 'Second run' };
 const sessionRecord = { session_id: 'sess-1', role: 'executor', context: null, state: 'completed', stop_reason: null, in_flight: false };
 
 function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
@@ -21,15 +22,15 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
     }
     if (req.method === 'GET' && req.url === '/api/v1/runs') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ runs: [runRecord] }));
+      res.end(JSON.stringify({ runs: [runRecord, otherRunRecord] }));
       return;
     }
-    if (req.method === 'GET' && req.url === '/api/v1/runs/run-a') {
+    if (req.method === 'GET' && (req.url === '/api/v1/runs/run-a' || req.url === '/api/v1/runs/run-b')) {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ run: runRecord, sessions: [sessionRecord] }));
+      res.end(JSON.stringify({ run: req.url.endsWith('run-b') ? otherRunRecord : runRecord, sessions: [sessionRecord] }));
       return;
     }
-    if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-a/events')) {
+    if (req.method === 'GET' && req.url?.match(/^\/api\/v1\/runs\/run-[ab]\/events/)) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ events: [], next_cursor: 'cursor-1', limit: 200 }));
       return;
@@ -101,6 +102,7 @@ test.describe('insight observability view', () => {
 
   test('opens the insight session view for a completed run', async () => {
     await window.getByRole('button', { name: '运行', exact: true }).click();
+    await window.getByRole('option', { name: /Second run/ }).click();
     await window.getByRole('option', { name: /workflow\.md/ }).click();
     await window.getByRole('button', { name: '在 Insight 中查看' }).click();
     await expect.poll(() => insightUrl(app, '/insight/session/sess-1')).toContain('/insight/session/sess-1');
@@ -109,6 +111,17 @@ test.describe('insight observability view', () => {
       await expect(insightPage.locator('h1')).toContainText('INSIGHT FIXTURE SESSION PAGE');
     }
     await expect(window.locator('.insight-pane')).toBeVisible();
+    const tabs = window.getByRole('tablist', { name: '已打开的标签页', exact: true });
+    await expect(tabs.getByRole('tab')).toHaveCount(3);
+    await tabs.getByRole('tab', { name: 'workflow.md', exact: true }).click();
+    await expect(window.getByRole('tabpanel', { name: 'workflow.md' })).toBeVisible();
+    await tabs.getByRole('tab', { name: 'Second run', exact: true }).click();
+    await expect(window.getByRole('tabpanel', { name: 'Second run' })).toBeVisible();
+    await window.locator('.rail-item', { hasText: '观测' }).click();
+    await expect(tabs.getByRole('tab')).toHaveCount(3);
+    await expect.poll(() => insightUrl(app, '/insight/session/sess-1')).toContain('/insight/session/sess-1');
+    await tabs.getByRole('button', { name: '关闭 观测', exact: true }).click();
+    await expect(window.getByRole('tabpanel', { name: 'workflow.md' })).toBeVisible();
   });
 
   test('opens the insight home from the navigation rail', async () => {

@@ -23,21 +23,52 @@ import { defaultFont, defaultTheme, fonts, migrateLegacyThemeId, themes } from '
 import { messages, type LocaleId } from './i18n';
 
 const client = new WorkbenchExecutionClient();
+type ContentTab = { kind: 'file' | 'run' | 'insight'; resource: string };
+
+const insightTab: ContentTab = { kind: 'insight', resource: '' };
+const tabKey = ({ kind, resource }: ContentTab): string => kind + ':' + resource;
+const fileName = (path: string): string => path.split('/').at(-1) ?? path;
+
 const EXECUTION_BACKEND_URL_STORAGE_KEY = 'workbench.executionBackendUrl';
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
   const workspaceRequiredDialog = useRef<HTMLDialogElement>(null);
   const [tree, setTree] = useState<WorkspaceNode[]>([]);
-  const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [file, setFile] = useState('');
   const [contents, setContents] = useState<Record<string, string>>({});
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>();
   const [eventsByRun, setEventsByRun] = useState<Record<string, RunEvent[]>>({});
-  const selectedRun = runs.find(item => item.id === selectedRunId);
-  const selectedEvents = selectedRunId ? eventsByRun[selectedRunId] ?? [] : [];
   const [activeNavigation, setActiveNavigation] = useState('workbench');
+  const [contentTabs, setContentTabs] = useState<ContentTab[]>([]);
+  const [activeTabKey, setActiveTabKey] = useState<string>();
+  const activeTab = contentTabs.find(tab => tabKey(tab) === activeTabKey);
+  const activateTab = (tab: ContentTab): void => {
+    setActiveTabKey(tabKey(tab));
+    if (tab.kind === 'file') setFile(tab.resource);
+    if (tab.kind === 'run') setSelectedRunId(tab.resource);
+  };
+  const openContentTab = (tab: ContentTab): void => {
+    setContentTabs(previous => previous.some(item => tabKey(item) === tabKey(tab)) ? previous : [...previous, tab]);
+    activateTab(tab);
+  };
+  const closeContentTab = (tab: ContentTab): void => {
+    const key = tabKey(tab);
+    const index = contentTabs.findIndex(item => tabKey(item) === key);
+    const remaining = contentTabs.filter(item => tabKey(item) !== key);
+    setContentTabs(remaining);
+    if (tab.kind === 'file' && tab.resource === file) {
+      setFile(remaining.filter(item => item.kind === 'file').at(-1)?.resource ?? '');
+    }
+    if (tab.kind === 'run' && tab.resource === selectedRunId) {
+      setSelectedRunId(remaining.filter(item => item.kind === 'run').at(-1)?.resource);
+    }
+    if (activeTabKey !== key) return;
+    const neighbor = remaining[index] ?? remaining.at(-1);
+    if (neighbor) activateTab(neighbor);
+    else setActiveTabKey(undefined);
+  };
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -183,7 +214,7 @@ export default function App(): JSX.Element {
     };
   }, [selectedRunId]);
   useEffect(() => {
-    if (activeNavigation !== 'insight') { void window.insight.hide(); return; }
+    if (activeTab?.kind !== 'insight' || settingsOpen) { void window.insight.hide(); return; }
     setInsightFailed(false);
     const node = appContent.current;
     if (!node) return;
@@ -195,7 +226,7 @@ export default function App(): JSX.Element {
     const observer = new ResizeObserver(push);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [activeNavigation, insightPath, selectedTheme.colorScheme]);
+  }, [activeTab?.kind, insightPath, selectedTheme.colorScheme, settingsOpen]);
   useEffect(() => window.insight.onLoadFailed(() => setInsightFailed(true)), []);
   useEffect(() => {
     Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
@@ -220,7 +251,7 @@ export default function App(): JSX.Element {
   const navigate = (item: string): void => {
     commands.register('workbench.navigate', () => {
       if (item === 'settings') { setSettingsOpen(true); return; }
-      if (item === 'insight') { setInsightPath('/insight/'); setInsightFailed(false); }
+      if (item === 'insight') openContentTab(insightTab);
       setActiveNavigation(item);
     });
     commands.execute('workbench.navigate');
@@ -233,8 +264,14 @@ export default function App(): JSX.Element {
     setTree(workspaceTree);
     const firstMarkdown = workspaceTree.find(node => node.type === 'file' && node.name.endsWith('.md'));
     const initialFile = firstMarkdown?.path ?? workspaceTree.find(node => node.type === 'file')?.path ?? '';
-    setOpenFiles(initialFile ? [initialFile] : []);
+    const initialTab: ContentTab | undefined = initialFile ? { kind: 'file', resource: initialFile } : undefined;
+    setContentTabs(previous => [
+      ...previous.filter(tab => tab.kind !== 'file'),
+      ...(initialTab ? [initialTab] : []),
+    ]);
     setFile(initialFile);
+    if (initialTab) activateTab(initialTab);
+    else setActiveTabKey(previous => previous?.startsWith('file:') ? undefined : previous);
     if (initialFile) {
       const initialContent = await window.workbench.readFile(initialFile);
       setContents(previous => ({ ...previous, [initialFile]: initialContent }));
@@ -247,8 +284,7 @@ export default function App(): JSX.Element {
     await loadWorkspaceTree();
   };
   const selectFile = async (nextFile: string): Promise<void> => {
-    setFile(nextFile);
-    setOpenFiles(previous => previous.includes(nextFile) ? previous : [...previous, nextFile]);
+    openContentTab({ kind: 'file', resource: nextFile });
     if (workspace && !Object.prototype.hasOwnProperty.call(contents, nextFile)) {
       const nextContent = await window.workbench.readFile(nextFile);
       setContents(previous => ({ ...previous, [nextFile]: nextContent }));
@@ -304,9 +340,9 @@ export default function App(): JSX.Element {
       return;
     }
     setRuns(previous => [created, ...previous]);
-    setSelectedRunId(created.id);
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
+    openContentTab({ kind: 'run', resource: created.id });
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
     if (runtime === 'workflow') {
       const trimmedPrompt = runPrompt.trim();
@@ -330,34 +366,28 @@ export default function App(): JSX.Element {
       }
     }
   };
-  const closeFile = (closedFile: string): void => {
-    const nextFiles = openFiles.filter(openFile => openFile !== closedFile);
-    setOpenFiles(nextFiles);
-    if (file === closedFile) setFile(nextFiles.at(-1) ?? '');
-  };
   const refreshRunAfterAction = async (id: string): Promise<void> => {
     // The event subscription can still refresh the run if this read fails.
     const latest = await client.getRun(id).catch(() => undefined);
     if (latest) setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
   };
-  const openInsightForRun = async (): Promise<void> => {
-    if (!selectedRun) return;
+  const openInsightForRun = async (run: Run): Promise<void> => {
     setExecutionError(undefined);
     try {
-      if (selectedRun.runtimeId === 'session') {
-        const result = await window.executionBackend.importToInsight(selectedRun.id);
+      if (run.runtimeId === 'session') {
+        const result = await window.executionBackend.importToInsight(run.id);
         if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
-        setInsightPath('/insight/session/' + encodeURIComponent(selectedRun.id));
-        setActiveNavigation('insight');
+        setInsightPath('/insight/session/' + encodeURIComponent(run.id));
+        openContentTab(insightTab);
         return;
       }
-      const sessions = await window.executionBackend.getRunSessions(selectedRun.id);
+      const sessions = await window.executionBackend.getRunSessions(run.id);
       const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
       if (!target) { setExecutionError(t.noObservableSessions); return; }
       const result = await window.executionBackend.importToInsight(target.session_id);
       if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
       setInsightPath('/insight/session/' + encodeURIComponent(target.session_id));
-      setActiveNavigation('insight');
+      openContentTab(insightTab);
     } catch (error) {
       setExecutionError(error instanceof Error ? error.message : String(error));
     }
@@ -382,34 +412,55 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} runFormat={runFormat} onRunFormatChange={setRunFormat} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedSessionModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={id => openContentTab({ kind: 'run', resource: id })} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} runFormat={runFormat} onRunFormatChange={setRunFormat} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedSessionModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
-    <div className="app-content" ref={appContent}>
-      <div className="workbench-body">
-        <div className="workbench-main" style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
-          {activeNavigation === 'workbench' && <section className="workspace-grid">
-            {file ? <div className={'editor-groups split-' + splitDirection}>
-              <MonacoEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />
-              {splitDirection !== 'none' && <MonacoEditor files={openFiles} activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} onSelectFile={selectFile} onCloseFile={closeFile} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />}
-            </div> : <div className="empty-panel" />}
-          </section>}
-          {activeNavigation === 'runs' && (selectedRun
-            ? <section className="single-panel"><RunDetail key={selectedRun.id} run={selectedRun} events={selectedEvents} onOpenInsight={openInsightForRun}
+    <section className="app-content" aria-label={t.workbench}>
+      {contentTabs.length > 0 && <div className="content-tabs" role="tablist" aria-label={t.openTabs}>
+        {contentTabs.map(tab => {
+          const key = tabKey(tab);
+          const run = tab.kind === 'run' ? runs.find(item => item.id === tab.resource) : undefined;
+          const label = tab.kind === 'file' ? fileName(tab.resource) : tab.kind === 'run' ? run?.workflowId ?? tab.resource : t.insight;
+          const title = tab.kind === 'file' ? tab.resource : run ? `${label} · ${run.id}` : label;
+          const selected = key === activeTabKey;
+          return <div className={'content-tab' + (selected ? ' active' : '')} key={key}>
+            <button className="content-tab-label" type="button" role="tab" aria-selected={selected} title={title} onClick={() => activateTab(tab)}>
+              <span className={`content-tab-icon icon-${tab.kind}`} aria-hidden="true">{tab.kind === 'file' ? '≡' : tab.kind === 'run' ? '▶' : '◉'}</span>
+              <span className="content-tab-name">{label}</span>
+            </button>
+            <button type="button" className="content-tab-close" aria-label={t.closeTab(label)} onClick={() => closeContentTab(tab)}>×</button>
+          </div>;
+        })}
+      </div>}
+      <div className="content-panels">
+        {file && <section hidden={activeTab?.kind !== 'file'} className="workspace-grid" role="tabpanel" aria-label={fileName(file)}>
+          <div className={'editor-groups split-' + splitDirection}>
+            <MonacoEditor activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} splitDirection={splitDirection} onSplit={splitEditor} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />
+            {splitDirection !== 'none' && <MonacoEditor activeFile={file} content={content} onChange={nextContent => setContents(previous => ({ ...previous, [file]: nextContent }))} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />}
+          </div>
+        </section>}
+        {contentTabs.filter(tab => tab.kind === 'run').map(tab => {
+          const run = runs.find(item => item.id === tab.resource);
+          if (!run) return null;
+          return <section key={tab.resource} hidden={activeTabKey !== tabKey(tab)} className="single-panel" role="tabpanel" aria-label={run.workflowId}>
+            <RunDetail run={run} events={eventsByRun[run.id] ?? []} onOpenInsight={() => openInsightForRun(run)}
               onStop={async () => {
-                await client.stopRun(selectedRun.id);
-                await refreshRunAfterAction(selectedRun.id);
+                await client.stopRun(run.id);
+                await refreshRunAfterAction(run.id);
               }}
               onSetPaused={async paused => {
-                await client.setSessionPaused(selectedRun.id, paused);
-                await refreshRunAfterAction(selectedRun.id);
+                await client.setSessionPaused(run.id, paused);
+                await refreshRunAfterAction(run.id);
               }}
-              onSendReply={text => client.sendSessionReply(selectedRun.id, text)} messages={t} /></section>
-            : <section className="single-panel"><div className="empty-panel"><div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div></div></section>)}
-          {activeNavigation === 'insight' && <section className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
-        </div>
+              onSendReply={text => client.sendSessionReply(run.id, text)} messages={t} />
+          </section>;
+        })}
+        {activeTab?.kind === 'insight' && <section ref={appContent} role="tabpanel" aria-label={t.insight} className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{insightFailed ? t.insightLoadFailed : t.insightHint}</p></section>}
+        {(!activeTab || (activeTab.kind === 'run' && !runs.some(run => run.id === activeTab.resource))) && <section className={activeNavigation === 'runs' ? 'single-panel' : 'workspace-grid'}>
+          <div className="empty-panel">{activeNavigation === 'runs' && <div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div>}</div>
+        </section>}
       </div>
-    </div>
+    </section>
     <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace ? t.workspaceReady : t.noWorkspace}</span>{file && <><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></>}</footer>
     <dialog className="workbench-dialog" ref={workspaceRequiredDialog} aria-labelledby="workspace-required-title" aria-describedby="workspace-required-message">
       <h2 id="workspace-required-title">{t.workspaceRequiredTitle}</h2>
