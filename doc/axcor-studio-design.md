@@ -1,65 +1,81 @@
-# Agent Workbench：方案设计
+# axcor-studio 方案设计
 
-**日期：** 2026-10-22  
-**文档拆分：** 2026-11-06；竞品能力对照、竞争判断与官方来源见[竞品调研](axcor-studio-competitive-research.md)。
-**定位：** 面向“用自然语言编写和运行工作流”的工程师工作台，而不是给传统代码编辑器增加一个聊天侧栏。
+## 1. 产品定位与范围
 
-## 1. 结论先行
+axcor-studio 定位为**工作流一站式解决平台**，目标是贯通工作流的编写、执行、观测、评测、（自）进化，支持团队间协作开发，为用户提供统一的工作环境。
 
-本方案以**工作流本身**作为一等工程资产：可发现、可组合、可执行、可暂停接管、可回放、可评测、可发布。代码是工作流产生的一类产物。依据[竞品调研](axcor-studio-competitive-research.md)，控制面和执行留痕已有相近竞品覆盖，差异化需要通过资产可移植性、证据对账和质量回归验证。
+工作流及其版本是可共同开发的资产。每次运行关联确定的工作流版本、执行环境、过程证据和评测结果。改进从这些记录出发，经验证和审阅后形成下一版本，其他团队可按权限发现、采用和维护已发布的版本。
 
-建议产品定位为：
+| 环节 | 用户在平台上完成的工作 |
+| --- | --- |
+| 编写 | 创建工作流，定义输入、阶段、角色、工具和验收条件，管理工作流及依赖资产版本。 |
+| 执行 | 核对计划和权限，选择运行环境，发起任务并按需接管。 |
+| 观测 | 查看运行、步骤和工具调用，把失败或产物追溯到对应步骤。 |
+| 评测 | 根据验收条件评估结果与过程，比较基线并记录门禁结论。 |
+| （自）进化 | 从运行证据和评测差异提出改进，通过对照验证后发布新版本。 |
+| 团队间协作 | 共享版本、交接运行和证据，审阅改进并按权限发布或采用。 |
 
-> **Workflow-first Agent Workbench：以 Markdown 工作流为源代码，以 Agent 运行时为执行引擎，以证据和评测为质量门，以 VS Code 级工作区为交互载体。**
+当前交付形态是 Electron 桌面工作台，已接通 Markdown 编辑与保存、Opsbot 运行与事件轮询、Insight 会话查看。完整产物证据、评测接入、进化流程和跨团队协作属于规划范围。第一阶段先验证本地工作流能否可靠运行，以及成员能否根据版本和证据接续工作。启动方法见[项目概览](../README.md)。
 
-内部已有组件可以形成五层闭环：
+## 2. 用户任务
 
-- **工作流资产层：** Markdown agent、skill、workflow、spec、policy、eval。
-- **执行控制层：** Opsbot 的 Loop Engine、Reviewer、暂停/修改/继续、运行时 Driver。
-- **兼容接入层：** Claude Code、OpenCode、Codex CLI 及 cpx wrapper，统一 session/trace/artifact 契约。
-- **观测层：** Insight 的链路、运行、Skill 生命周期和 A/B 数据。
-- **质量层：** Sift 的评测、遵循性审计、校准、post-hoc gate 和 CI 输出。
-
-第一阶段不应试图重新实现一个通用 IDE 或训练平台，而应围绕“把一份 Markdown 工作流可靠地跑完并交付可审查结果”建立强产品闭环。
-
-## 2. 用户和任务变化
-
-传统 IDE 的基本单位是文件、符号、编辑、编译、调试。Agent 工程的基本单位变成：
+用户围绕工作流完成以下任务。
 
 1. **意图：** 用自然语言描述目标、边界和验收条件。
 2. **工作流：** 规定阶段、角色、工具、上下文和门禁。
 3. **运行：** Agent 在本地、远程或隔离 worktree 中执行。
 4. **证据：** 产出文件、测试、日志、截图、trace、决策和人工接管记录。
-5. **复用：** 将成功运行沉淀为 skill、agent、模板或评测题。
+5. **评测与改进：** 根据成功和失败的证据，调整工作流、skill、模板或评测题。
+6. **协作交付：** 将变更、证据和待办交给审阅者，经确认后发布供其他团队复用。
 
-当前 VS Code 仍把 Markdown 当作普通文档，把 Agent 对话当作一个侧面板，把终端和 Git 当作人工操作工具，因此用户需要在多个窗口之间拼接上下文。新工作台的核心对象应该是一个 **Workflow Run**，而不是一个 Chat conversation。
+统一工作区围绕工作流版本组织编辑、运行和交付。**Workflow Run** 承载一次执行及其过程证据，连接工作流版本、评测结论和团队交接记录。
 
 ## 3. 产品定义
 
 ### 3.1 核心对象模型
 
+以下对象用于说明目标关系，具体目录布局和字段在实现时按契约确认。
+
 ```text
 Workspace
   ├── Workflow Package
-  │     ├── workflow.md       # 阶段和执行逻辑
+  │     ├── Definition        # 权威源定义、表达格式与版本、执行入口
   │     ├── agents/*.md       # 角色和工具权限
   │     ├── skills/*/SKILL.md # 可复用能力
   │     ├── spec/             # requirements/design/tasks
   │     ├── policies/         # 安全、审批、交付规则
   │     └── evals/            # 验收题、断言、基准
-  ├── Run
+  ├── Run                     # 固定工作流版本、输入和执行环境
   │     ├── plan / steps / handoffs
   │     ├── sessions / tool calls / approvals
   │     ├── artifacts / diffs / test reports
-  │     └── scorecard / audit / cost
+  │     └── Evaluation        # 基准版本、指标、门禁和证据引用
+  ├── Evolution Proposal      # 来源运行、变更、对照结果、审阅决定
   └── Delivery
-        ├── commit / PR / release note
-        └── reusable learning
+        └── commit / PR / 发布版本 / 交接记录
 ```
 
-### 3.2 工作流文件建议
+团队协作贯穿对象的创建、审阅和发布。工作流包标记所属团队及可用范围，运行交接记录负责人、执行证据和下一步。其他团队采用发布版本时保留来源与版本引用，后续修改通过独立提案回馈原团队。
 
-保持 Markdown 可读，同时用轻量 front matter 描述可执行元数据：
+### 3.2 工作流类型与表达方式
+
+工作区支持多种类型的工作流，并统一管理版本、运行证据、评测和交接。设计上分别描述**编写入口、存储格式和执行模型**。例如，画布可以编辑以 JSON 保存的状态机，YAML 声明的步骤也可以调用 Agent 解释自然语言指令。类型划分和适用场景见[工作流表达方式调研](workflow-representation-research.md)。
+
+| 表达方式 | 适用场景与接入方式 |
+| --- | --- |
+| 自然语言 / Markdown | 用于需要上下文判断的任务。正文描述目标、步骤和验收，结构化元数据声明权限、预算、完成条件和人工确认点。Agent 在这些边界内解释正文。 |
+| 声明式 DSL（YAML / JSON 等） | 用于步骤、依赖、条件和失败处理可明确声明的自动化。按所选 DSL 的版本校验定义，由对应适配器接入执行。 |
+| 代码（Workflow as Code） | 用于复杂逻辑、动态编排和集成。保存代码入口及版本，按语言、SDK 和执行引擎的约束运行。 |
+| 可视化节点与连线 | 用于理解和编排流程。先提供预览与运行定位，画布编辑在有明确双向映射的结构上启用，变更保存到该工作流的权威源定义。 |
+| BPMN 业务流程模型 | 用于审批、跨部门协作和长周期业务流程。保留 BPMN 模型及版本，通过适配器验证所用元素和目标引擎的执行能力。 |
+
+每个版本固定一份权威源定义，声明格式及版本、入口、输入输出、权限和评测引用。编写入口可包括源文件、表单、画布和自然语言辅助。自然语言既可用于生成待审查的定义，也可作为运行中交给 Agent 的任务说明。
+
+执行前按格式和运行环境校验定义。适配器识别顺序、DAG、状态机、事件驱动或 Agent 动态规划等执行模型，并保留源定义的语义。启动时固定源版本、执行适配器和权限边界。能静态确定的依赖和步骤进入运行计划，动态部分记录允许的动作、停止条件和实际轨迹。平台通过统一的 Run、事件、产物和评测引用关联各类运行，格式转换仅在语义与来源映射可验证的范围内提供。
+
+#### Markdown 工作流示例
+
+首期可用 Markdown 正文表达任务，以轻量 front matter 承载可执行元数据。以下示例用于讨论该类型的目标契约。
 
 ```markdown
 ---
@@ -92,7 +108,7 @@ gates: [tests-pass, sift-compliance, human-approval]
 - 产出清单、测试证据和未解决风险。
 ```
 
-文件是源代码，但运行时必须编译出结构化计划：步骤依赖图、可用工具、权限策略、输入输出 schema、重试策略、超时和门禁。这样既保持自然语言的表达力，又避免把执行完全交给不可见的 prompt。
+运行计划明确可用工具、权限、输入输出、重试、超时和门禁。正文中需要理解和判断的步骤由 Agent 在运行时处理，实际动作及证据随运行保存。
 
 ### 3.3 三种运行形态
 
@@ -107,11 +123,11 @@ gates: [tests-pass, sift-compliance, human-approval]
 ### 4.1 工作区布局
 
 1. **Workflow Explorer（左侧）**：按 `agents / workflows / skills / specs / policies / evals` 分组，显示来源、版本、触发方式、最近运行和质量分。
-2. **Canvas / Markdown Editor（中间）**：编辑 Markdown；结构化标题自动生成步骤图、依赖图和输入输出提示；支持从运行结果回写工作流草稿。
+2. **工作流编辑区（中间）**：根据源定义提供文本、代码或画布入口。可解析的步骤、依赖和输入输出以流程预览展示，动态部分显示执行边界与实际轨迹。改进提案按原格式生成可审阅的草稿。
 3. **Run Control（右侧）**：阶段时间线、当前 Agent、工具调用、权限请求、token/成本、产物和失败原因；按钮是暂停、接管、修改、重试、分叉、回滚。
 4. **Evidence Drawer（底部）**：diff、测试、日志、截图、trace、评测报告和审计结论，所有结论可跳回原始调用。
 
-### 4.2 从“聊天”转向“运行”
+### 4.2 运行计划与接管
 
 输入框仍存在，但每次提交先生成可编辑的 Run Plan：
 
@@ -121,36 +137,34 @@ gates: [tests-pass, sift-compliance, human-approval]
 - 权限和高风险动作
 - 验收条件
 
-用户可以直接开始，也可以修改计划。运行中每个阶段都是可暂停的状态机，用户的自然语言修订成为事件，而不是追加到一个无限聊天上下文中。
+用户可以直接开始，也可以修改计划。运行中每个阶段都可暂停，用户的自然语言修订记录为运行事件。
 
 ### 4.3 关键交互
 
 - 点击文件只负责选择和查看；“跳到运行步骤”由时间线按钮完成，保留普通编辑器的导航和滚动行为。
-- 对话消息、工具调用和产物使用稳定 locator，可从报告定位到 transcript、Markdown 行和文件 diff。
+- 对话消息、工具调用和产物使用稳定引用，可从报告定位到 transcript、源文件行、图节点或模型元素，以及相关 diff。
 - 同一工作流支持“试运行/基准运行/生产运行”三种模式，避免把探索期的低质量结果混进生产统计。
 
-## 5. 体系架构
+### 4.4 交接、评测与改进
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│ Agent Workbench UI                                        │
-│ Workflow Explorer | Markdown/Plan | Run Control | Evidence │
-└───────────────────────┬────────────────────────────────────┘
-                        │ Run API / Event Stream
-┌───────────────────────▼────────────────────────────────────┐
-│ Workflow Control Plane                                     │
-│ parser/compiler · DAG/state machine · approvals · artifacts│
-│ retry/resume/fork · policy · delivery adapters             │
-└──────────────┬────────────────────┬────────────────────────┘
-               │                    │
-      ┌────────▼────────┐  ┌────────▼───────────┐
-      │ Runtime Adapter  │  │ Quality & Evidence  │
-      │ Opsbot Drivers   │  │ Insight + Sift      │
-      │ Claude/OpenCode  │  │ trace / eval / gate  │
-      │ Codex / cpx      │  │ score / audit / CI   │
-      └──────────────────┘  └─────────────────────┘
-               │
-      Local / worktree / container / cloud execution
+- 运行详情显示所用工作流版本、负责人、证据和下一步，便于接手者从同一上下文继续。
+- 评测视图并列展示当前运行与基线，支持从指标差异定位到相关步骤和证据。
+- 改进视图展示建议来源、版本 diff、对照结果和审阅状态。首期由人批准发布，验证失败时继续使用原版本。
+
+## 5. 目标体系架构
+
+桌面工作台与规划中的 Web 控制面通过版本化接口访问执行和协作服务。Opsbot 管理运行，Insight 提供过程证据，Sift 承担拟接入的评测门禁。运行、评测、改进和发布通过工作流版本与运行标识关联。
+
+```mermaid
+flowchart LR
+  UI[axcor-studio 统一工作环境] --> W[编写与工作流版本]
+  W --> F[定义校验与格式适配]
+  F --> R[执行控制与运行时适配]
+  R --> O[观测与过程证据]
+  O --> E[评测与质量门禁]
+  E --> P[改进提案与对照验证]
+  P --> A[团队审阅与发布]
+  A --> W
 ```
 
 ### 5.1 复用现有组件
@@ -160,36 +174,44 @@ gates: [tests-pass, sift-compliance, human-approval]
 - **Sift：** 作为工作流质量门：结果评分、过程遵循性、校准、盲比较、post-hoc gate 和 CI JSON。
 - **cpx：** 继续作为 CLI wrapper/argv 前缀，不把它提升为独立 runtime；在 Adapter 层记录 wrapper、真实 runtime 和可定位的 session 文件。
 - **CANNBay / 领域插件：** 作为领域应用和产物查看器，通过 `InsightDataPort` 等能力接口接入，不把领域数据库耦合进工作台核心。
+- **协作与版本管理：** 先用 Git 承载工作流版本和审阅，用运行与评测引用交接证据，再逐步接入团队权限和发布目录。
 
 ### 5.2 事件和数据契约
 
-最小事件集合：`run.created`、`plan.approved`、`step.started`、`tool.called`、`approval.requested`、`artifact.created`、`step.failed`、`step.completed`、`gate.evaluated`、`run.paused`、`run.resumed`、`run.delivered`。
+执行链路拟覆盖 `run.created`、`plan.approved`、`step.started`、`tool.called`、`approval.requested`、`artifact.created`、`step.failed`、`step.completed`、`gate.evaluated`、`run.paused`、`run.resumed`、`run.delivered` 等事件。
 
-每个事件至少包含：`run_id`、`workflow_id/version`、`step_id`、`agent_id`、`runtime`、`wrapper`、`workspace`、`parent_event_id`、时间戳、权限上下文、输入/输出引用和敏感信息脱敏后的摘要。
+事件统一携带 `run_id`、`workflow_id/version`、时间戳和权限上下文，按事件类型补充 `step_id`、`agent_id`、`runtime`、`wrapper`、`workspace`、`parent_event_id` 和输入输出引用。评测结论引用运行、评测集版本和对应证据。交接和发布记录保留版本、负责人和审阅决定，跨团队共享受权限控制的引用和脱敏摘要。
+
+### 5.3 （自）进化流程
+
+人或 Agent 基于运行证据提出改进，记录来源运行、基线版本、拟修改资产和预期指标。系统用固定评测集在可比条件下运行基线与候选，对照质量、成本和失败场景。审阅者根据差异与证据决定发布、继续修改或驳回。发布时记录新旧版本关联，后续运行可显式选回上一版本。首期自动化集中在提案和验证，发布由人工确认。
 
 ## 6. MVP 边界（12 周）
 
-### P0：一个可靠的本地闭环（第 1–4 周）
+### P0：本地编写、执行与观测（第 1–4 周）
 
 - Electron 桌面壳（编辑器能力用 Monaco 组件组装）；打开 workspace 后发现工作流包。
-- Markdown workflow parser + front matter 校验。
+- 以 Markdown 和轻量结构化元数据验证本地闭环，按声明的格式选择校验和执行入口。
 - Opsbot 作为执行后端，支持 Claude Code/OpenCode/Codex CLI 三种 adapter。
 - Run Plan、阶段时间线、暂停/继续/人工修改、diff 和测试结果。
 - 统一 session/trace/artifact schema；Insight 展示单次运行。
+- 用 Git 版本和运行引用形成最小交接记录，让另一位成员可定位工作流、执行证据和待办。
 
-### P1：质量和复用（第 5–8 周）
+### P1：评测与受控进化（第 5–8 周）
 
 - Sift 作为 workflow gate：结果、遵循性、校准和 JSON 报告。
 - 工作流版本、基准题集、A/B 运行和回归对比。
-- 从成功运行生成 workflow/skill 草稿，但必须经过 review 才能写回仓库。
+- 提供可解析定义的流程预览和运行定位，选择一个有明确执行语义的声明式 DSL 场景验证多格式接入。
+- 从成功和失败运行中生成 workflow/skill 改进草稿，附基线对照结果，由团队审阅后发布版本。
 - 运行结果可生成 PR 描述、变更摘要和证据包。
 
-### P2：并行和远程（第 9–12 周）
+### P2：跨团队协作与远程运行（第 9–12 周）
 
 - worktree 隔离、并行 runs、依赖图和合并前冲突检查。
 - 云端/远程 worker 适配；关闭本地窗口后继续运行。
 - 团队 policy、allowlist、审批角色和成本预算。
-- 组织级 workflow registry 与私有模板分发。
+- 组织级 workflow registry 支持跨团队查找、授权采用、版本升级和向来源团队回馈改进。
+- 根据实际编排与审批需求扩展代码、画布编辑和 BPMN 接入，逐项验证引擎能力、版本追溯及证据定位。
 
 ## 7. 不做什么
 
@@ -219,14 +241,15 @@ gates: [tests-pass, sift-compliance, human-approval]
 - 每次成功交付的 token / 模型 / worker 成本
 - 工作流遵循性、门禁误放行率、证据完整率
 - workflow/skill 复用率和版本回归率
+- 跨团队采用率、交接到可继续执行的时间、改进提案发布后的回归率
 
 不要从“具备自动化能力”直接推导 ROI；先证明固定任务族在质量不下降时的周期、人工介入和成本变化。
 
 ## 9. 建议的第一条用户路径
 
-用户打开一个已有仓库，选择 `feature-delivery.md`，系统生成计划：需求澄清 → 代码探索 → 实现 → 测试 → Sift 审计 → 人工 review → PR。用户在计划上改一行验收条件，点击运行。Opsbot 在隔离 worktree 中执行，Insight 显示每个阶段和工具调用，遇到高风险命令暂停。完成后，Sift 给出结果分、过程遵循性和 gate 判定；用户在 Evidence Drawer 中查看 diff、测试日志和关键 transcript，批准后生成 PR。下一次运行复用同一 workflow，并自动比较上次基线。
+产品目标路径以功能交付为例。用户打开仓库，选定 `feature-delivery.md` 的版本，在工作台编辑验收条件和运行计划。Opsbot 在隔离 worktree 中执行，Insight 显示各阶段及工具调用，遇到高风险命令暂停。另一位成员从运行页接手，依据 diff、测试日志和评测结论审阅交付结果。
 
-这条路径足以让用户感受到它不是“VS Code 里多了一个聊天框”，而是一个可以编写、运行、审查和改进工程流程的工作台。
+如果评测发现某类验收反复遗漏，系统基于相关证据生成工作流改进提案。团队对照基线复跑评测，审阅通过后发布新版。另一团队可在自己的工作区采用该版本，并沿来源引用查看改进依据。P0 先交付这条路径中的本地编辑、执行、观测与基本交接。
 
 ## 10. 关键风险和决策
 
@@ -235,6 +258,8 @@ gates: [tests-pass, sift-compliance, human-approval]
 - **自动化失控：** local/isolated/cloud 三种执行边界和权限模式必须在 Run Plan 中可见；高风险动作不可被工作流正文绕过。
 - **评测与生产混淆：** 每个运行标记 purpose 和 dataset，报告分离探索、基准、生产结果。
 - **UI 过重：** 首版只做一个高质量 Run Control 和 Evidence Drawer；Canvas、可视化编排器放到验证后。
+- **改进回归：** 每次发布保留基线、评测差异和审阅记录，以版本回退恢复上一条可用工作流。
+- **跨团队共享：** 为工作流、运行证据和交付物分别定义访问范围，按权限提供引用和摘要。
 
 ## 11. 近期行动清单
 
@@ -242,55 +267,27 @@ gates: [tests-pass, sift-compliance, human-approval]
 2. 在 Insight 中增加 workflow、step、artifact、gate、policy 字段和统一事件导入。
 3. 在 Sift 中增加 workflow 级 gate schema，支持工作流声明与实际执行的逐条对账。
 4. 选一个真实任务族（例如算子生成或发布准备）做 20–30 个 baseline/shadow/control 样本。
-5. 做一个桌面 App vertical slice：发现 Markdown → 生成计划 → 运行 → 暂停/继续 → 查看证据 → Sift gate。
-6. 用四类竞品做可用性对照：VS Code custom agent、Cursor Cloud Agent、Kiro Spec、Axon Gateway/Node；比较“从意图到可审查交付”的步骤数、等待时间和证据完整度，并对 Axon 增加节点恢复、审批和工作流可移植性验证。
+5. 验证桌面工作台的最小闭环，从工作流编写、运行和观测延伸到证据交接，再接入评测门禁和改进提案。
 
-## 12. 技术形态决策：独立 IDE + 本地服务 + Web 控制面（2026-11-03 修订）
+## 12. 技术方案
 
-> **决策记录（2026-11-03）**：本工具定位为**独立 IDE**——用户在做工作流时全程留在本工具内（写 workflow → 运行 → 审证据 → 改代码），不跳回 VS Code。编辑器能力路线选定 **B：自研壳 + 组件组装**（Electron + Monaco / xterm.js / LSP），**不 fork VS Code**（fork 的转向判据见文末）。本节其余内容为修订后的形态描述。
+平台由桌面工作台、执行服务和规划中的 Web 控制面组成。三者通过版本化的 Run API 交换运行状态、过程证据和控制指令。
 
-采用三层形态：
+### 12.1 桌面工作台
 
-1. **主工作台：独立 Desktop App（当前路线）**
-   - 自研壳复用 VS Code 工作台边界（NavigationRail / Explorer / Editor Part / Panel）；编辑器能力用同源组件组装：**Monaco**（编辑、语法高亮、diff）、**xterm.js**（终端）、**monaco-languageclient**（LSP）。
-   - 不重造编辑器长尾：SCM 用 git CLI 封装、搜索用 ripgrep、调试器与扩展市场不在 MVP 范围，按需演进。
-   - 用户不跳回 VS Code；如需在外部编辑器打开文件，由本工具发深链，反向不成立。
+独立应用采用 Electron 和 React，以 Monaco 提供 Markdown 和代码编辑、语法高亮与 diff 审查。界面提供导航、工作流浏览、编辑、运行控制和证据查看。Git 操作通过 Git CLI 接入，搜索使用 ripgrep。终端和 LSP 按需接入 xterm.js 和 monaco-languageclient，调试器及扩展市场列入后续评估。用户可通过深链在外部编辑器打开文件。
 
-2. **执行后端：本地 companion service**
-   - Opsbot、runtime adapters、Insight collector、Sift runner 运行在本地进程或 workspace-sidecar 中。
-   - 桌面壳只负责 UI 和命令编排，不把长任务状态放在渲染层内。
-   - 通过 localhost HTTP/SSE 或 WebSocket 通信，未来可把同一协议切到远程 worker。
+### 12.2 执行服务
 
-3. **远程控制面：Web**
-   - 用于查看 Cloud Run、手机/浏览器发起任务、团队运行列表、质量报表和审批。
-   - Web 不承担本地文件编辑、终端执行和本机凭据管理。
+Opsbot 负责运行状态、执行控制、权限和产物引用。运行时适配器、Insight collector 与 Sift runner 可部署在本地进程或工作区 sidecar。桌面端负责交互和命令编排。
 
-### 形态比较
+- **接口**通过 OpenAPI 和 JSON Schema 定义 Run、Step、Approval、Artifact、Event 与 Gate。UI 通过统一接口读取运行信息。
+- **通信**当前采用 HTTP 请求和事件轮询。规划接入 SSE，按需加入 WebSocket，服务端通过 `run_id` 支持事件重放。
+- **存储**采用 SQLite 保存本地运行元数据和事件索引，产物目录保存文件、日志和截图。远程部署可采用 PostgreSQL 与对象存储。
+- **分发**将 Opsbot 作为 CLI 或服务包分发，桌面应用作为独立 Electron 应用分发，通过版本化协议保持兼容。
 
-| 形态 | 适合 | 优点 | 主要问题 | 建议 |
-|---|---|---|---|---|
-| VS Code Extension | 本地工作流编写和运行 | 文件、Git、终端、Remote、Worktree 都在同一上下文；用户迁移成本低 | 受 Extension API、发布和宿主生命周期约束；用户在 VS Code 内而非本工具内 | 暂不采用（产品定位要求全程留在本工具） |
-| 独立 Desktop App | IDE 定位的工作流控制台、长期运行、强隔离 | 可控制 Electron、后台进程和升级；产品体验自由；无上游同步负担 | 编辑器能力需组件组装（Monaco/xterm.js/LSP） | **当前路线（2026-11-03 定）** |
-| Web App | 云端运行、团队协作、手机审批、运行报表 | 部署和协作方便；天然适合远程 Worker | 本地文件、终端、凭据、Worktree 和网络权限受限 | 作为远程控制面 |
+### 12.3 Web 控制面（规划）
 
-### 推荐的技术栈
+浏览器和桌面端共享 Run API。Web 控制面支持发起与查看远程运行、浏览团队运行列表和质量报表、处理审批。本地文件编辑、终端执行和本机凭据管理由桌面工作台及本地服务承载。
 
-- **Desktop shell：** Electron + React；编辑器能力组装 Monaco（编辑/语法高亮/diff）、xterm.js（终端）、monaco-languageclient（LSP），不 fork VS Code。
-- **Local service：** 复用 Opsbot 的 Python 核心；提供 Run API、事件流、状态恢复、权限和 artifact 引用。
-- **Event transport：** MVP 使用 HTTP + SSE；需要双向控制时增加 WebSocket。事件持久化由服务端负责，UI 断线后通过 `run_id` 重放。
-- **契约：** OpenAPI/JSON Schema 固化 Run、Step、Approval、Artifact、Event、Gate；不要让 UI 直接读取各 runtime 的私有日志。
-- **Persistence：** 本地 SQLite 保存运行元数据和事件索引，文件/日志/截图存 artifact directory；未来可替换为 Postgres + object storage。
-- **Remote：** 保持同一 Run API，把 local service 替换为 remote worker gateway；Web 和 Desktop App 都是客户端。
-- **Packaging：** `opsbot` 作为 CLI/服务包，Desktop App 作为独立 Electron 发行（自有更新渠道）；两者通过版本化协议兼容，不把 Python runtime 打进前端 bundle。
-
-### 独立 App 的边界原则与 fork 转向判据（2026-11-03）
-
-独立 App 已定为当前路线，但边界是“Agent Control Center”型，不复制完整 VS Code：保留 Markdown/Workflow 编辑、Run Control、Evidence、Git 交付；编辑器能力以 Monaco 提供扎实的代码阅读 / diff 审查 / 就地修改，编辑器长尾功能（调试器、扩展市场）不在 MVP 范围。
-
-**不 fork VS Code**（Cursor 路线被评估后否决）：本产品的差异化是工作流编排与证据链，不是 AI 原生编辑，fork 的最大收益（深入 text model / diff 引擎）用不上，而其上游同步成本（VS Code 每月发版，需专职 merge 团队）、扩展市场替换（Open VSX）、遥测/品牌/更新通道剥离均是负资产。以下条件**同时成立**时才重新评估 fork：
-
-- 产品验证后发现核心场景变成“AI 原生改代码”（补全、inline diff、多文件编辑成为主交互）；
-- 需要官方扩展市场或 VS Code 级调试/Remote 能力，且 Monaco 组装路径已被证明覆盖不了；
-- 团队规模足以承担上游同步。
-
-架构纪律保证该决策无沉没成本：**服务层与 UI 经协议解耦**（`shared/protocol.ts`、ExecutionClient、insight 服务调用均壳无关）。若未来转向 fork，运行控制面可整体迁入 VS Code 的 webview/panel，损失仅限于 React UI 层。
+竞品能力和选型依据见[竞品调研](axcor-studio-competitive-research.md)。
