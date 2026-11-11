@@ -20,6 +20,8 @@ function applyTheme(view: WebContentsView): void {
 function ensureView(): WebContentsView {
   if (insightView) return insightView;
   const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true } });
+  // Match the content card's inner radius (8px outer radius minus its 1px border).
+  view.setBorderRadius(7);
   view.setVisible(false);
   view.webContents.on('did-finish-load', () => applyTheme(view));
   for (const window of BrowserWindow.getAllWindows()) {
