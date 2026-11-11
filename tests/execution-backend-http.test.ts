@@ -168,11 +168,11 @@ test('execution backend HTTP client', async t => {
   });
 
   await t.test('startWorkflowRun passes label, params and max_parallel when provided', async () => {
-    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow', label: 'release-check', params: { dataset: 'core', mode: 'fast' }, maxParallel: 4 });
+    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow', label: 'release-check', params: { variables: '{"dataset":"core","mode":"fast"}', max_iterations: 3, reviewer_enabled: false }, maxParallel: 4 });
     const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
     assert.ok(post);
     assert.equal(post.body.label, 'release-check');
-    assert.deepEqual(post.body.params, { dataset: 'core', mode: 'fast' });
+    assert.deepEqual(post.body.params, { variables: '{"dataset":"core","mode":"fast"}', max_iterations: 3, reviewer_enabled: false });
     assert.equal(post.body.max_parallel, 4);
     assert.equal(run.id, 'run-1');
   });

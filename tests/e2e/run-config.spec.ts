@@ -76,11 +76,6 @@ test.describe('run configuration', () => {
           res.end(JSON.stringify({ id: 'sess-new', name: postedSessionPrompt.slice(0, 20), role: 'worker', state: 'running', created_at: '2026-11-03T12:10:00+00:00', stop_reason: null, loop_status: 'yes' }));
           return;
         }
-        if (req.method === 'POST' && req.url === '/api/v1/runs/run-params-1/sessions/sess-exec/inject') {
-          capturedBodies.push(body);
-          res.end(JSON.stringify({ run_id: 'run-params-1', session_id: 'sess-exec', accepted: true }));
-          return;
-        }
         if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-params-1')) {
           const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.yaml', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 };
           if (req.url.includes('/events')) {
@@ -122,35 +117,50 @@ test.describe('run configuration', () => {
     if (app) await app.close();
   });
 
-  test('starts a run with the configured runtime, label, params and max parallel', async () => {
+  test('starts Graph with fixed parameters, variables and max parallel', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await window.locator('.file-list').getByRole('button', { name: /workflow\.yaml/ }).click();
     await expect(window.getByRole('heading', { name: 'workflow.yaml', exact: true })).toBeVisible();
     await window.locator('.rail-item', { hasText: '运行' }).click();
-    await expect(window.getByLabel('运行时')).toHaveValue('workflow');
+    await expect(window.getByLabel('运行时', { exact: true })).toHaveValue('workflow');
     await expect(window.getByLabel('运行文件', { exact: true })).toHaveValue('');
     await expect(window.getByLabel('运行文件', { exact: true })).toHaveAttribute('placeholder', path.join(workspaceDir, 'workflow.yaml'));
-    await expect(window.getByLabel('格式', { exact: true })).toHaveValue('graph-yaml@1');
+    await expect(window.getByLabel('运行时', { exact: true }).locator('option:checked')).toHaveText('Graph');
     await window.getByLabel('运行名称').fill('release-check');
-    await window.getByRole('button', { name: '添加参数' }).click();
+    await window.getByRole('button', { name: '添加变量' }).click();
     const rows = window.locator('.run-param-row');
     await rows.first().getByPlaceholder('键').fill('dataset');
     await rows.first().getByPlaceholder('值').fill('core');
     await window.getByLabel('最大并行数').fill('4');
     await window.getByLabel('提示词', { exact: true }).fill('按计划推进发布准备');
+    await window.getByLabel('Agent 运行时', { exact: true }).selectOption('opencode');
+    await window.getByLabel('模型', { exact: true }).selectOption('glm-4.7');
+    await window.getByLabel('系统提示词').fill('保持输出简洁');
+    await window.getByLabel('最大迭代').fill('3');
+    await window.getByLabel('Reviewer', { exact: true }).selectOption('false');
+    await window.getByText('高级参数', { exact: true }).click();
+    await window.getByLabel('评估器', { exact: true }).fill('max_iteration');
     await window.getByRole('button', { name: '运行工作流' }).click();
     await expect(window.getByRole('option', { name: /release-check/ })).toBeVisible();
-    await expect.poll(() => capturedBodies.filter(body => body['prompt'] !== undefined).length).toBe(1);
-    const injectBody = capturedBodies.find(body => body['prompt'] !== undefined);
-    expect(injectBody?.['prompt']).toBe('按计划推进发布准备');
+    expect(capturedBodies).toHaveLength(1);
     expect(capturedBodies[0]['program_path']).toBe(path.join(workspaceDir, 'workflow.yaml'));
     expect(capturedBodies[0]['format']).toBe('graph-yaml@1');
     expect(capturedBodies[0]['label']).toBe('release-check');
-    expect(capturedBodies[0]['params']).toEqual({ dataset: 'core' });
+    expect(capturedBodies[0]['params']).toEqual({
+      variables: '{"dataset":"core"}',
+      starting_prompt: '按计划推进发布准备',
+      runtime: 'opencode',
+      model: 'glm-4.7',
+      provider_index: 0,
+      system_prompt: '保持输出简洁',
+      max_iterations: 3,
+      reviewer_enabled: false,
+      evaluator: 'max_iteration',
+    });
     expect(capturedBodies[0]['max_parallel']).toBe(4);
   });
 
-  test('completes the selected file with Tab and sends edited path and format', async () => {
+  test('completes the selected file with Tab and sends the edited path with the Graph format', async () => {
     await window.getByRole('button', { name: '运行', exact: true }).click();
     const programPath = window.getByLabel('运行文件', { exact: true });
     const suggestion = await programPath.getAttribute('placeholder');
@@ -158,17 +168,16 @@ test.describe('run configuration', () => {
     await programPath.focus();
     await window.keyboard.press('Tab');
     await expect(programPath).toHaveValue(suggestion!);
-    await expect(window.getByLabel('格式', { exact: true })).toBeFocused();
+    await expect(window.getByLabel('运行名称', { exact: true })).toBeFocused();
     await window.getByRole('button', { name: '工作台', exact: true }).click();
     await window.getByRole('button', { name: /^关闭 .*\.md$/ }).click();
     await window.getByRole('button', { name: '运行', exact: true }).click();
     await expect(programPath).toHaveAttribute('placeholder', '');
     await programPath.fill('other/workflow.yaml');
-    await window.getByLabel('格式', { exact: true }).fill('custom@2');
     await window.getByRole('button', { name: '运行工作流' }).click();
     await expect.poll(() => capturedBodies.length).toBe(1);
     expect(capturedBodies[0]['program_path']).toBe('other/workflow.yaml');
-    expect(capturedBodies[0]['format']).toBe('custom@2');
+    expect(capturedBodies[0]['format']).toBe('graph-yaml@1');
     expect(capturedBodies[0]['label']).toBe('workflow.yaml');
     expect(await fs.readFile(path.join(workspaceDir, 'notes.md'), 'utf8')).toBe('# Not a workflow\n');
   });
@@ -183,7 +192,7 @@ test.describe('run configuration', () => {
 
   test('starts a session with prompt and agent options', async () => {
     await window.locator('.rail-item', { hasText: '运行' }).click();
-    await window.getByLabel('运行时').selectOption('session');
+    await window.getByLabel('运行时', { exact: true }).selectOption('session');
     await window.getByLabel('提示词', { exact: true }).fill('整理当前项目结构');
     const agentRuntime = window.getByLabel('Agent 运行时');
     const model = window.getByLabel('模型', { exact: true });

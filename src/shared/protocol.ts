@@ -29,15 +29,36 @@ export interface Run {
 
 export type RuntimeId = 'workflow' | 'session';
 
+export const GRAPH_WORKFLOW_FORMAT = 'graph-yaml@1';
+
 export interface RuntimeDescriptor {
   id: RuntimeId;
   label: string;
 }
 
 export const RUNTIMES: RuntimeDescriptor[] = [
-  { id: 'workflow', label: `${EXECUTION_BACKEND_NAME} Run` },
+  { id: 'workflow', label: 'Graph' },
   { id: 'session', label: `${EXECUTION_BACKEND_NAME} Session` },
 ];
+
+export interface GraphRunParams {
+  variables?: string;
+  starting_prompt?: string;
+  runtime?: string;
+  model?: string;
+  provider_index?: number;
+  system_prompt?: string;
+  max_iterations?: number;
+  reviewer_enabled?: boolean;
+  cli_wrapper?: string;
+  evaluator?: string;
+  reviewer_model?: string;
+  reviewer_provider_index?: number;
+  reviewer_task_goal?: string;
+  reviewer_thinking_enabled?: boolean;
+  reviewer_thinking_budget_tokens?: number;
+  model_pinned?: boolean;
+}
 
 export interface CreateRunInput {
   workflowId: string;
@@ -47,7 +68,7 @@ export interface CreateRunInput {
   programPath?: string;
   format?: string;
   label?: string;
-  params?: Record<string, string>;
+  params?: GraphRunParams;
   maxParallel?: number;
   prompt?: string;
   sessionRuntime?: string;

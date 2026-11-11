@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { WorkbenchExecutionClient } from './services/executionClient';
 import type { SessionModelOption } from '../shared/executionBackendIpc';
 import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackendConfig';
-import type { Run, RunEvent, RuntimeId } from '../shared/protocol';
+import { GRAPH_WORKFLOW_FORMAT, type GraphRunParams, type Run, type RunEvent, type RuntimeId } from '../shared/protocol';
 import { isTerminalRun, runEventKey } from '../shared/run';
-import type { RunParamsRow } from './components/RunsPanel';
+import type { GraphVariableRow } from './components/RunsPanel';
 import type { WorkspaceNode } from '../workspaceFiles';
 import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
@@ -87,14 +87,16 @@ export default function App(): JSX.Element {
   });
   const [runLabel, setRunLabel] = useState('');
   const [runProgramPath, setRunProgramPath] = useState('');
-  const [runFormat, setRunFormat] = useState('graph-yaml@1');
-  const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
+  const [graphVariables, setGraphVariables] = useState<GraphVariableRow[]>([]);
+  const [graphOptions, setGraphOptions] = useState<GraphRunParams>({});
+  const [graphModel, setGraphModel] = useState('');
   const [maxParallel, setMaxParallel] = useState('');
   const [runPrompt, setRunPrompt] = useState('');
   const [sessionPrompt, setSessionPrompt] = useState('');
   const [sessionRuntime, setSessionRuntime] = useState('claude_sdk');
   const [sessionModel, setSessionModel] = useState('');
   const [sessionModels, setSessionModels] = useState<SessionModelOption[] | 'loading' | 'unavailable'>('loading');
+  const [loadedModelRuntime, setLoadedModelRuntime] = useState<string>();
   const [sessionSystemPrompt, setSessionSystemPrompt] = useState('');
   const [sessionMaxIterations, setSessionMaxIterations] = useState('');
   const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
@@ -104,8 +106,9 @@ export default function App(): JSX.Element {
   const appContent = useRef<HTMLDivElement>(null);
   const importedToInsight = useRef(new Set<string>());
   const t = messages[locale];
-  const sessionModelOptions = Array.isArray(sessionModels) ? sessionModels : [];
-  const selectedSessionModel = sessionModelOptions.find(option => option.model === sessionModel);
+  const modelRuntime = runtime === 'workflow' ? graphOptions.runtime : sessionRuntime;
+  const sessionModelOptions = modelRuntime === loadedModelRuntime && Array.isArray(sessionModels) ? sessionModels : [];
+  const selectedModel = sessionModelOptions.find(option => option.model === (runtime === 'workflow' ? graphModel : sessionModel));
   const sessionModelPlaceholder = sessionModels === 'loading' ? t.sessionModelsLoading
     : sessionModels === 'unavailable' ? t.sessionModelsUnavailable
     : sessionModelOptions.length ? t.sessionSelectModel : t.sessionModelsEmpty;
@@ -143,23 +146,25 @@ export default function App(): JSX.Element {
     void bootListRuns();
   }, []);
   useEffect(() => {
-    if (runtime !== 'session' || activeNavigation !== 'runs' || settingsOpen) return;
+    if (!modelRuntime || activeNavigation !== 'runs' || settingsOpen) return;
+    const setModel = runtime === 'workflow' ? setGraphModel : setSessionModel;
     let cancelled = false;
     setSessionModels('loading');
     void (async () => {
       try {
-        const options = await window.executionBackend.listSessionModels(sessionRuntime);
+        const options = await window.executionBackend.listSessionModels(modelRuntime);
         if (cancelled) return;
+        setLoadedModelRuntime(modelRuntime);
         setSessionModels(options);
-        setSessionModel(current => options.some(option => option.model === current) ? current : '');
+        setModel(current => options.some(option => option.model === current) ? current : '');
       } catch {
         if (cancelled) return;
         setSessionModels('unavailable');
-        setSessionModel('');
+        setModel('');
       }
     })();
     return () => { cancelled = true; };
-  }, [runtime, sessionRuntime, activeNavigation, settingsOpen, executionBackendUrl]);
+  }, [runtime, modelRuntime, activeNavigation, settingsOpen, executionBackendUrl]);
   useEffect(() => {
     if (!selectedRunId) return;
     let pending: RunEvent[] = [];
@@ -296,6 +301,13 @@ export default function App(): JSX.Element {
     setSessionModel('');
     setSessionModels('loading');
   };
+  const changeGraphOptions = (options: GraphRunParams): void => {
+    if (options.runtime !== graphOptions.runtime) {
+      setGraphModel('');
+      setSessionModels('loading');
+    }
+    setGraphOptions(options);
+  };
   const startRun = async (): Promise<void> => {
     if (!workspace) { workspaceRequiredDialog.current?.showModal(); return; }
     setExecutionError(undefined);
@@ -303,7 +315,7 @@ export default function App(): JSX.Element {
     try {
       if (runtime === 'session') {
         if (!sessionPrompt.trim()) { setExecutionError('会话模式需要填写提示词'); return; }
-        if (!selectedSessionModel) { setExecutionError(sessionModelPlaceholder); return; }
+        if (!selectedModel) { setExecutionError(sessionModelPlaceholder); return; }
         const parsedMaxIterations = Number.parseInt(sessionMaxIterations, 10);
         created = await client.createRun({
           workflowId: '',
@@ -311,8 +323,8 @@ export default function App(): JSX.Element {
           runtime,
           prompt: sessionPrompt,
           sessionRuntime,
-          model: selectedSessionModel.model,
-          providerIndex: selectedSessionModel.providerIndex,
+          model: selectedModel.model,
+          providerIndex: selectedModel.providerIndex,
           ...(sessionSystemPrompt.trim() ? { systemPrompt: sessionSystemPrompt.trim() } : {}),
           ...(Number.isInteger(parsedMaxIterations) && parsedMaxIterations >= 1 ? { maxIterations: parsedMaxIterations } : {}),
           reviewerEnabled: sessionReviewerEnabled,
@@ -320,13 +332,21 @@ export default function App(): JSX.Element {
       } else {
         const programPath = runProgramPath.trim() || defaultProgramPath;
         if (programPath && (programPath === file || programPath === defaultProgramPath)) await save();
-        const params: Record<string, string> = {};
-        for (const row of runParams) if (row.key.trim()) params[row.key.trim()] = row.value;
+        const variables = Object.fromEntries(graphVariables
+          .filter(row => row.key.trim())
+          .map(row => [row.key.trim(), row.value]));
+        const params: GraphRunParams = { ...graphOptions };
+        if (Object.keys(variables).length) params.variables = JSON.stringify(variables);
+        if (runPrompt.trim()) params.starting_prompt = runPrompt.trim();
+        if (graphOptions.runtime && selectedModel) {
+          params.model = selectedModel.model;
+          params.provider_index = selectedModel.providerIndex;
+        }
         const parsedMaxParallel = Number.parseInt(maxParallel, 10);
         created = await client.createRun({
           workflowId: file,
           programPath,
-          format: runFormat.trim(),
+          format: GRAPH_WORKFLOW_FORMAT,
           workspacePath: workspace,
           content,
           runtime,
@@ -344,27 +364,6 @@ export default function App(): JSX.Element {
     setActiveNavigation('runs');
     openContentTab({ kind: 'run', resource: created.id });
     setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
-    if (runtime === 'workflow') {
-      const trimmedPrompt = runPrompt.trim();
-      if (trimmedPrompt) {
-        let injected = false;
-        for (let attempt = 0; attempt < 6 && !injected; attempt += 1) {
-          try {
-            const sessions = await window.executionBackend.getRunSessions(created.id);
-            const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
-            if (target) {
-              await window.executionBackend.injectPrompt(created.id, target.session_id, trimmedPrompt);
-              injected = true;
-            }
-          } catch {
-            // The executor session may not exist yet right after the run
-            // starts; retry for a few seconds before giving up softly.
-          }
-          if (!injected) await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        if (!injected) setExecutionError('提示词注入失败：执行会话尚未就绪，run 已照常启动');
-      }
-    }
   };
   const refreshRunAfterAction = async (id: string): Promise<void> => {
     // The event subscription can still refresh the run if this read fails.
@@ -412,7 +411,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={id => openContentTab({ kind: 'run', resource: id })} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} runFormat={runFormat} onRunFormatChange={setRunFormat} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedSessionModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={id => openContentTab({ kind: 'run', resource: id })} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} graphVariables={graphVariables} onGraphVariablesChange={setGraphVariables} graphOptions={graphOptions} onGraphOptionsChange={changeGraphOptions} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={runtime === 'workflow' ? setGraphModel : setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <section className="app-content" aria-label={t.workbench}>
