@@ -1,7 +1,7 @@
 import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
 import { type ElectronApplication, type Page } from 'playwright';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -393,7 +393,25 @@ test.describe('execution runs', () => {
     await runButton.click();
     await prompt.getByRole('button', { name: '打开工作区' }).click();
     await expect(prompt).toBeHidden();
-    await expect(window.locator('.workspace-pill')).toHaveText(directory);
+    await expect(window.locator('.status-live')).toHaveText('工作区已就绪');
+  });
+
+  test('opens a workspace from the empty file sidebar', async () => {
+    const directory = test.info().outputPath('workspace');
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, 'workflow.md'), '# Sidebar workspace\n');
+    await app.evaluate(({ dialog }, selected) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
+    }, directory);
+
+    await window.getByRole('button', { name: '工作台', exact: true }).click();
+    const explorer = window.locator('.workspace-explorer');
+    const empty = explorer.locator('.workspace-empty');
+    await expect(empty).toContainText('未选择工作区');
+    await empty.getByRole('button', { name: '打开工作区', exact: true }).click();
+    await expect(empty).toBeHidden();
+    await expect(explorer.getByRole('button', { name: 'workflow.md' })).toBeVisible();
+    await expect(window.getByRole('tab', { name: 'workflow.md', exact: true })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('restores the backend URL and session mode from legacy settings', async () => {

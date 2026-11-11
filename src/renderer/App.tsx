@@ -280,6 +280,7 @@ export default function App(): JSX.Element {
   const chooseWorkspace = async (): Promise<void> => {
     const selected = await window.workbench.chooseWorkspace();
     if (!selected) return;
+    if (selected !== workspace) setContents({});
     setWorkspace(selected);
     await loadWorkspaceTree();
   };
@@ -391,21 +392,18 @@ export default function App(): JSX.Element {
   const leftWorkbenchWidth = (showSidebar ? 52 + explorerWidth + 4 : 52) + 6;
   return <main className="app-shell" style={{ gridTemplateColumns: leftWorkbenchWidth + 'px minmax(0, 1fr)' }}>
       <header className="topbar">
-      <div className="topbar-brand" aria-label={t.brand}><span className="brand-mark">A</span><span className="brand-name">{t.brand}</span></div>
         <div className="topbar-navigation">
           <button className="icon-button" type="button" aria-label={t.back} title={t.back}>‹</button>
           <button className="icon-button" type="button" aria-label={t.forward} title={t.forward}>›</button>
           <button className="quick-search" type="button">{t.search}</button>
         </div>
         <div className="topbar-actions">
-          <button className="icon-button" type="button" onClick={chooseWorkspace} aria-label={t.openWorkspace} title={t.openWorkspace}>＋</button>
           <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label={t.toggleSidebar} title={t.toggleSidebar}><span className="sidebar-toggle-icon" aria-hidden="true" /></button>
-          <span className="workspace-pill"><i aria-hidden="true" />{workspace ?? t.noWorkspace}</span>
         </div>
       </header>
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
-      {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
+      {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer hasWorkspace={Boolean(workspace)} onOpenWorkspace={chooseWorkspace} tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
       {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={id => openContentTab({ kind: 'run', resource: id })} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} graphVariables={graphVariables} onGraphVariablesChange={setGraphVariables} graphOptions={graphOptions} onGraphOptionsChange={changeGraphOptions} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={runtime === 'workflow' ? setGraphModel : setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
