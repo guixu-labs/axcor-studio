@@ -40,7 +40,6 @@ test.describe('monaco editor', () => {
   });
 
   test('shows the file background when the last editor tab is closed', async () => {
-    await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     await window.getByRole('button', { name: '关闭 workflow.md', exact: true }).click();
     await expect(window.locator('.workspace-grid .empty-panel')).toBeVisible();
@@ -49,13 +48,32 @@ test.describe('monaco editor', () => {
     await expect(window.locator('.view-lines', { hasText: 'New workflow' })).toBeVisible();
   });
 
-  test('keeps the editor visible when switching sidebars', async () => {
+  test('keeps the editor visible while toggling sidebars', async () => {
     const tabs = window.locator('.app-content').getByRole('tablist', { name: '已打开的标签页' });
     await expect(tabs.getByRole('tab', { name: 'workflow.md' })).toHaveAttribute('aria-selected', 'true');
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');
     await window.keyboard.type('# Preserved edit');
-    await window.getByRole('button', { name: '运行', exact: true }).click();
+    const workspace = window.getByRole('button', { name: '工作台', exact: true });
+    const explorer = window.locator('.workspace-explorer');
+    const dividerX = await explorer.evaluate(node => node.getBoundingClientRect().left);
+    const iconX = await workspace.evaluate(node => node.getBoundingClientRect().left);
+    await workspace.click();
+    await expect(explorer).toBeHidden();
+    const collapsedEdge = await window.locator('.left-workbench').evaluate(node => node.getBoundingClientRect().right);
+    expect(collapsedEdge).toBe(dividerX);
+    expect(await workspace.evaluate(node => node.getBoundingClientRect().left)).toBe(iconX);
+    await expect(workspace).not.toHaveAttribute('aria-current', 'page');
+    await workspace.click();
+    await expect(explorer).toBeVisible();
+    const runs = window.getByRole('button', { name: '运行', exact: true });
+    const runsPanel = window.locator('.runs-panel');
+    await runs.click();
+    await expect(runsPanel).toBeVisible();
+    await runs.click();
+    await expect(runsPanel).toBeHidden();
+    await runs.click();
+    await expect(runsPanel).toBeVisible();
     await expect(tabs.getByRole('tab')).toHaveCount(1);
     await expect(window.locator('.view-lines', { hasText: '# Preserved edit' })).toBeVisible();
     await window.getByRole('button', { name: '工作台', exact: true }).click();
@@ -64,7 +82,6 @@ test.describe('monaco editor', () => {
   });
 
   test('keeps edits with their file when switching tabs', async () => {
-    await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');

@@ -119,7 +119,6 @@ test.describe('run configuration', () => {
   });
 
   test('starts Graph with fixed parameters, variables and max parallel', async () => {
-    await window.locator('.rail-item', { hasText: '工作台' }).click();
     await window.locator('.file-list').getByRole('button', { name: /workflow\.yaml/ }).click();
     await expect(window.getByRole('heading', { name: 'workflow.yaml', exact: true })).toBeVisible();
     await window.locator('.rail-item', { hasText: '运行' }).click();

@@ -145,7 +145,14 @@ http.createServer((req, res) => {
     await expect(page.getByRole('tabpanel', { name: 'workflow.md' })).toBeVisible();
     await tabs.getByRole('tab', { name: 'Second run', exact: true }).click();
     await expect(page.getByRole('tabpanel', { name: 'Second run' })).toBeVisible();
-    await page.locator('.rail-item', { hasText: '观测' }).click();
+    const insight = page.getByRole('button', { name: '观测', exact: true });
+    await insight.click();
+    await expect(page.locator('.insight-pane')).toBeVisible();
+    await insight.click();
+    await expect(page.locator('.insight-pane')).toBeHidden();
+    await expect(page.getByRole('tabpanel', { name: 'Second run' })).toBeVisible();
+    await expect(tabs.getByRole('tab', { name: '观测', exact: true })).toBeVisible();
+    await insight.click();
     await expect(tabs.getByRole('tab')).toHaveCount(3);
     await expect.poll(() => insightLoaded(app, insightOrigin + '/run/solo:sdk-session')).toBe(true);
     await tabs.getByRole('button', { name: '关闭 观测', exact: true }).click();

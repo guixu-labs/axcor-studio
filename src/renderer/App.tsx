@@ -39,11 +39,18 @@ export default function App(): JSX.Element {
   const [selectedRunId, setSelectedRunId] = useState<string>();
   const [eventsByRun, setEventsByRun] = useState<Record<string, RunEvent[]>>({});
   const [activeNavigation, setActiveNavigation] = useState('workbench');
+  const [insightFromRail, setInsightFromRail] = useState(false);
   const [contentTabs, setContentTabs] = useState<ContentTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string>();
+  const lastRegularTabKey = useRef<string>();
   const activeTab = contentTabs.find(tab => tabKey(tab) === activeTabKey);
   const activateTab = (tab: ContentTab): void => {
-    setActiveTabKey(tabKey(tab));
+    const key = tabKey(tab);
+    setActiveTabKey(key);
+    if (tab.kind !== 'insight') {
+      lastRegularTabKey.current = key;
+      setInsightFromRail(false);
+    }
     if (tab.kind === 'file') setFile(tab.resource);
     if (tab.kind === 'run') setSelectedRunId(tab.resource);
   };
@@ -63,6 +70,7 @@ export default function App(): JSX.Element {
       setSelectedRunId(remaining.filter(item => item.kind === 'run').at(-1)?.resource);
     }
     if (activeTabKey !== key) return;
+    if (tab.kind === 'insight') setInsightFromRail(false);
     const neighbor = remaining[index] ?? remaining.at(-1);
     if (neighbor) activateTab(neighbor);
     else setActiveTabKey(undefined);
@@ -251,7 +259,24 @@ export default function App(): JSX.Element {
   const navigate = (item: string): void => {
     commands.register('workbench.navigate', () => {
       if (item === 'settings') { setSettingsOpen(true); return; }
-      if (item === 'insight') openContentTab(insightTab);
+      if (item === 'insight') {
+        if (activeTab?.kind === 'insight') {
+          setInsightFromRail(false);
+          const previousTab = contentTabs.find(tab => tabKey(tab) === lastRegularTabKey.current)
+            ?? contentTabs.filter(tab => tab.kind !== 'insight').at(-1);
+          if (previousTab) activateTab(previousTab);
+          else setActiveTabKey(undefined);
+        } else {
+          setInsightFromRail(true);
+          openContentTab(insightTab);
+        }
+        return;
+      }
+      setLayout(previous => ({
+        ...previous,
+        sidebarVisible: item !== activeNavigation || insightFromRail || !previous.sidebarVisible,
+      }));
+      setInsightFromRail(false);
       setActiveNavigation(item);
     });
     commands.execute('workbench.navigate');
@@ -388,9 +413,9 @@ export default function App(): JSX.Element {
     }
   };
 
-  const showSidebar = layout.sidebarVisible && (activeNavigation === 'workbench' || activeNavigation === 'runs');
-  const leftWorkbenchWidth = (showSidebar ? 52 + explorerWidth + 4 : 52) + 6;
-  return <main className="app-shell" style={{ gridTemplateColumns: leftWorkbenchWidth + 'px minmax(0, 1fr)' }}>
+  const showSidebar = layout.sidebarVisible && !insightFromRail;
+  const activeRail = settingsOpen ? 'settings' : insightFromRail ? 'insight' : showSidebar ? activeNavigation : '';
+  return <main className="app-shell">
       <header className="topbar">
         <div className="topbar-navigation">
           <button className="icon-button" type="button" aria-label={t.back} title={t.back}>‹</button>
@@ -401,8 +426,9 @@ export default function App(): JSX.Element {
           <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label={t.toggleSidebar} title={t.toggleSidebar}><span className="sidebar-toggle-icon" aria-hidden="true" /></button>
         </div>
       </header>
-    <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
-      <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
+    <div className="left-workbench" data-sidebar-open={showSidebar}
+      style={showSidebar ? { gridTemplateColumns: `var(--rail-width) ${explorerWidth}px 4px` } : undefined}>
+      <NavigationRail active={activeRail} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer hasWorkspace={Boolean(workspace)} onOpenWorkspace={chooseWorkspace} tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
       {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={id => openContentTab({ kind: 'run', resource: id })} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} graphVariables={graphVariables} onGraphVariablesChange={setGraphVariables} graphOptions={graphOptions} onGraphOptionsChange={changeGraphOptions} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={runtime === 'workflow' ? setGraphModel : setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
