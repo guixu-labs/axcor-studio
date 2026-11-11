@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_NAME } from '../shared/executionBackendConfig';
 import type { CreateRunInput, Run } from '../shared/protocol';
 import {
@@ -77,9 +76,9 @@ export async function startWorkflowRun(input: CreateRunInput): Promise<Run> {
   if (!input.workspacePath) {
     throw new ExecutionBackendApiError(422, '运行工作流需要先选择工作区');
   }
-  const programPath = path.join(input.workspacePath, input.workflowId);
   const body: Record<string, unknown> = {
-    program_path: programPath,
+    format: input.format,
+    program_path: input.programPath,
     work_dir: input.workspacePath,
   };
   if (input.label) body.label = input.label;

@@ -21,7 +21,6 @@ import { SettingsModal } from './components/SettingsModal';
 import type { FontId, ThemeId } from './components/SettingsModal';
 import { defaultFont, defaultTheme, fonts, migrateLegacyThemeId, themes } from './settings';
 import { messages, type LocaleId } from './i18n';
-import { workflowProgramIssues } from './workflowProgram';
 
 const client = new WorkbenchExecutionClient();
 const EXECUTION_BACKEND_URL_STORAGE_KEY = 'workbench.executionBackendUrl';
@@ -56,6 +55,8 @@ export default function App(): JSX.Element {
     return stored === 'session' || stored === 'opsbot-session' ? 'session' : 'workflow';
   });
   const [runLabel, setRunLabel] = useState('');
+  const [runProgramPath, setRunProgramPath] = useState('');
+  const [runFormat, setRunFormat] = useState('graph-yaml@1');
   const [runParams, setRunParams] = useState<RunParamsRow[]>([]);
   const [maxParallel, setMaxParallel] = useState('');
   const [runPrompt, setRunPrompt] = useState('');
@@ -226,6 +227,7 @@ export default function App(): JSX.Element {
   };
 
   const content = contents[file] ?? '';
+  const defaultProgramPath = workspace && file ? `${workspace}/${file}` : '';
   const loadWorkspaceTree = async (): Promise<void> => {
     const workspaceTree = await window.workbench.listTree();
     setTree(workspaceTree);
@@ -252,7 +254,7 @@ export default function App(): JSX.Element {
       setContents(previous => ({ ...previous, [nextFile]: nextContent }));
     }
   };
-  const save = async (): Promise<void> => { if (workspace && file) await window.workbench.writeFile(file, content); };
+  const save = async (): Promise<void> => { if (workspace && file && contents[file] !== undefined) await window.workbench.writeFile(file, contents[file]); };
   const changeSessionRuntime = (value: string): void => {
     setSessionRuntime(value);
     setSessionModel('');
@@ -280,19 +282,19 @@ export default function App(): JSX.Element {
           reviewerEnabled: sessionReviewerEnabled,
         });
       } else {
-        if (!file) { setExecutionError('没有打开的工作流文件'); return; }
-        const issues = workflowProgramIssues(content);
-        if (issues.error) { setExecutionError(issues.error); return; }
-        await save();
+        const programPath = runProgramPath.trim() || defaultProgramPath;
+        if (programPath && (programPath === file || programPath === defaultProgramPath)) await save();
         const params: Record<string, string> = {};
         for (const row of runParams) if (row.key.trim()) params[row.key.trim()] = row.value;
         const parsedMaxParallel = Number.parseInt(maxParallel, 10);
         created = await client.createRun({
           workflowId: file,
+          programPath,
+          format: runFormat.trim(),
           workspacePath: workspace,
           content,
           runtime,
-          label: runLabel.trim() || file,
+          label: runLabel.trim() || programPath.split('/').pop(),
           ...(Object.keys(params).length > 0 ? { params } : {}),
           ...(Number.isInteger(parsedMaxParallel) && parsedMaxParallel >= 1 ? { maxParallel: parsedMaxParallel } : {}),
         });
@@ -380,7 +382,7 @@ export default function App(): JSX.Element {
     <div className="left-workbench" style={{ gridTemplateColumns: showSidebar ? '52px minmax(0, 1fr) 4px' : '52px' }}>
       <NavigationRail active={settingsOpen ? 'settings' : activeNavigation} onSelect={navigate} messages={t} />
       {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer tree={tree} activeFile={file} onSelect={selectFile} onSave={save} messages={t} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedSessionModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
+      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={setSelectedRunId} onRun={startRun} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} runFormat={runFormat} onRunFormatChange={setRunFormat} runParams={runParams} onRunParamsChange={setRunParams} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedSessionModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
       {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
     </div>
     <div className="app-content" ref={appContent}>

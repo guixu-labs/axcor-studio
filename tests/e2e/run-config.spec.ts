@@ -13,12 +13,21 @@ test.describe('run configuration', () => {
   let executionBackendUrl: string;
   let backendServer: http.Server;
   let capturedBodies: Record<string, unknown>[] = [];
-  let postedLabel = 'workflow.md';
+  let postedLabel = 'workflow.yaml';
   let postedSessionPrompt = 'session-prompt';
 
   test.beforeAll(async () => {
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-run-params-'));
-    await fs.writeFile(path.join(workspaceDir, 'workflow.md'), '---\nformat: graph-yaml@1\n---\n\n# Program\n');
+    await fs.writeFile(path.join(workspaceDir, 'workflow.yaml'), [
+      'workflow: run-smoke',
+      'nodes:',
+      '  - id: smoke',
+      '    task_type: bash',
+      '    command: echo run-ok',
+      '    depends_on: []',
+      '',
+    ].join('\n'));
+    await fs.writeFile(path.join(workspaceDir, 'notes.md'), '# Not a workflow\n');
     backendServer = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
       let raw = '';
@@ -28,6 +37,11 @@ test.describe('run configuration', () => {
         try { body = raw ? JSON.parse(raw) as Record<string, unknown> : {}; } catch { /* keep empty */ }
         if (req.method === 'POST' && req.url === '/api/v1/runs') {
           capturedBodies.push(body);
+          if (body['program_path'] === path.join(workspaceDir, 'notes.md')) {
+            res.statusCode = 422;
+            res.end(JSON.stringify({ detail: '工作流文件缺少节点定义' }));
+            return;
+          }
           if (typeof body['label'] === 'string') postedLabel = body['label'];
           res.statusCode = 201;
           res.end(JSON.stringify({ run_id: 'run-params-1', status: 'running', format: 'graph-yaml@1', kind: 'workflow' }));
@@ -68,7 +82,7 @@ test.describe('run configuration', () => {
           return;
         }
         if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-params-1')) {
-          const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.md', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 };
+          const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.yaml', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 };
           if (req.url.includes('/events')) {
             res.end(JSON.stringify({ events: [], next_cursor: 'c', limit: 200 }));
           } else {
@@ -110,9 +124,13 @@ test.describe('run configuration', () => {
 
   test('starts a run with the configured runtime, label, params and max parallel', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
-    await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
+    await window.locator('.file-list').getByRole('button', { name: /workflow\.yaml/ }).click();
+    await expect(window.getByRole('heading', { name: 'workflow.yaml', exact: true })).toBeVisible();
     await window.locator('.rail-item', { hasText: '运行' }).click();
     await expect(window.getByLabel('运行时')).toHaveValue('workflow');
+    await expect(window.getByLabel('运行文件', { exact: true })).toHaveValue('');
+    await expect(window.getByLabel('运行文件', { exact: true })).toHaveAttribute('placeholder', path.join(workspaceDir, 'workflow.yaml'));
+    await expect(window.getByLabel('格式', { exact: true })).toHaveValue('graph-yaml@1');
     await window.getByLabel('运行名称').fill('release-check');
     await window.getByRole('button', { name: '添加参数' }).click();
     const rows = window.locator('.run-param-row');
@@ -125,10 +143,42 @@ test.describe('run configuration', () => {
     await expect.poll(() => capturedBodies.filter(body => body['prompt'] !== undefined).length).toBe(1);
     const injectBody = capturedBodies.find(body => body['prompt'] !== undefined);
     expect(injectBody?.['prompt']).toBe('按计划推进发布准备');
-    expect(capturedBodies[0]['program_path']).toBe(path.join(workspaceDir, 'workflow.md'));
+    expect(capturedBodies[0]['program_path']).toBe(path.join(workspaceDir, 'workflow.yaml'));
+    expect(capturedBodies[0]['format']).toBe('graph-yaml@1');
     expect(capturedBodies[0]['label']).toBe('release-check');
     expect(capturedBodies[0]['params']).toEqual({ dataset: 'core' });
     expect(capturedBodies[0]['max_parallel']).toBe(4);
+  });
+
+  test('completes the selected file with Tab and sends edited path and format', async () => {
+    await window.getByRole('button', { name: '运行', exact: true }).click();
+    const programPath = window.getByLabel('运行文件', { exact: true });
+    const suggestion = await programPath.getAttribute('placeholder');
+    expect(suggestion).toBeTruthy();
+    await programPath.focus();
+    await window.keyboard.press('Tab');
+    await expect(programPath).toHaveValue(suggestion!);
+    await expect(window.getByLabel('格式', { exact: true })).toBeFocused();
+    await window.getByRole('button', { name: '工作台', exact: true }).click();
+    await window.locator('.tab-close').click();
+    await window.getByRole('button', { name: '运行', exact: true }).click();
+    await expect(programPath).toHaveAttribute('placeholder', '');
+    await programPath.fill('other/workflow.yaml');
+    await window.getByLabel('格式', { exact: true }).fill('custom@2');
+    await window.getByRole('button', { name: '运行工作流' }).click();
+    await expect.poll(() => capturedBodies.length).toBe(1);
+    expect(capturedBodies[0]['program_path']).toBe('other/workflow.yaml');
+    expect(capturedBodies[0]['format']).toBe('custom@2');
+    expect(capturedBodies[0]['label']).toBe('workflow.yaml');
+    expect(await fs.readFile(path.join(workspaceDir, 'notes.md'), 'utf8')).toBe('# Not a workflow\n');
+  });
+
+  test('displays the backend error for a file that is not a workflow', async () => {
+    await window.locator('.file-list').getByRole('button', { name: /notes\.md/ }).click();
+    await window.getByRole('button', { name: '运行', exact: true }).click();
+    await window.getByRole('button', { name: '运行工作流' }).click();
+    await expect(window.locator('.run-list-error')).toContainText('工作流文件缺少节点定义');
+    expect(capturedBodies[0]['program_path']).toBe(path.join(workspaceDir, 'notes.md'));
   });
 
   test('starts a session with prompt and agent options', async () => {

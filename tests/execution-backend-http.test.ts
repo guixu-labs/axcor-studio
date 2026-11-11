@@ -160,9 +160,10 @@ test('execution backend HTTP client', async t => {
   t.after(() => fixture.server.close());
 
   await t.test('startWorkflowRun posts the workflow payload and maps the run', async () => {
-    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow' });
+    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow', programPath: '/tmp/ws/workflow.md', format: 'graph-yaml@1' });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs');
     assert.ok(post);
+    assert.equal(post.body.format, 'graph-yaml@1');
     assert.equal(post.body.program_path, '/tmp/ws/workflow.md');
     assert.equal(post.body.work_dir, '/tmp/ws');
     assert.equal(post.body.label, undefined);
@@ -179,6 +180,23 @@ test('execution backend HTTP client', async t => {
     assert.deepEqual(post.body.params, { dataset: 'core', mode: 'fast' });
     assert.equal(post.body.max_parallel, 4);
     assert.equal(run.id, 'run-1');
+  });
+
+  await t.test('startWorkflowRun forwards the specified program path and format', async () => {
+    await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', runtime: 'workflow', programPath: '../other/program.yaml', format: 'custom@2' });
+    const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
+    assert.ok(post);
+    assert.equal(post.body.program_path, '../other/program.yaml');
+    assert.equal(post.body.format, 'custom@2');
+    assert.equal(post.body.work_dir, '/tmp/ws');
+  });
+
+  await t.test('startWorkflowRun does not supply missing program path or format', async () => {
+    await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', runtime: 'workflow' });
+    const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
+    assert.ok(post);
+    assert.equal(Object.hasOwn(post.body, 'program_path'), false);
+    assert.equal(Object.hasOwn(post.body, 'format'), false);
   });
 
   await t.test('startWorkflowRun refuses without a workspace', async () => {

@@ -141,7 +141,6 @@ footer { margin: 0 6px 6px; }
 .settings-input { width: 100%; min-height: 30px; padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--border) 90%, var(--text)); border-radius: 4px; background: var(--surface-3); color: var(--text); font: inherit; font-size: 12.5px; line-height: 1.25; }
 .settings-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .monaco-host { flex: 1; min-height: 0; border-top: 1px solid var(--border); border-radius: 0 0 11px 11px; overflow: hidden; }
-.frontmatter-warn { padding: 2px 8px; border: 1px solid color-mix(in srgb, #f3c76b 55%, var(--border)); border-radius: 99px; background: color-mix(in srgb, #f3c76b 12%, transparent); color: var(--text); font-size: 10px; }
 .insight-pane { display: grid; place-items: center; align-content: center; gap: 8px; width: 100%; height: 100%; padding: 24px; background: var(--surface-0); color: var(--muted); }
 .insight-pane strong { color: var(--text); font-size: 13px; }
 .insight-pane p { margin: 0; max-width: 420px; font-size: 12px; text-align: center; }
@@ -190,6 +189,7 @@ footer { margin: 0 6px 6px; }
 .run-config-title { color: var(--muted); font-size: 11px; }
 .run-config-input, .run-config-select { min-height: 28px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-3); color: var(--text); font: inherit; font-size: 12px; }
 .run-config-input:focus-visible, .run-config-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.run-config-input::placeholder { color: var(--muted); opacity: 1; }
 .session-reply { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); }
 .session-reply-actions { display: flex; gap: 6px; }
 .session-reply-input, .session-reply-actions button { height: 34px; font-size: 13px; line-height: 20px; }
@@ -213,7 +213,8 @@ footer { margin: 0 6px 6px; }
 .run-param-row .run-config-input { flex: 1; min-width: 0; }
 .run-param-remove { width: 26px; border: 0; background: transparent; color: var(--muted); font-size: 14px; }
 .run-param-remove:hover { color: var(--text); }
-.run-param-add { justify-self: start; }
+.run-params-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.run-param-add { width: 24px; height: 24px; border-radius: 4px; font-size: 18px; }
 .run-config-textarea { resize: vertical; min-height: 64px; }
 .run-config-check { display: flex; align-items: center; gap: 8px; }
 .run-config-check input { accent-color: var(--accent); }

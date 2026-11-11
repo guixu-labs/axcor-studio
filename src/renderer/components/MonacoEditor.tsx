@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
 import editorWorker from 'monaco-editor/editor/editor.worker?worker';
-import { workflowProgramIssues } from '../workflowProgram';
 
 (self as { MonacoEnvironment?: monaco.Environment }).MonacoEnvironment = {
   getWorker: () => new editorWorker(),
@@ -11,7 +10,6 @@ export interface MonacoEditorMessages {
   markdown: string;
   splitVertical: string;
   splitHorizontal: string;
-  workflowWarning: string;
 }
 
 interface MonacoEditorProps {
@@ -73,6 +71,9 @@ function defineWorkbenchTheme(tokens: Record<string, string>, colorScheme: 'ligh
 export function MonacoEditor({ files, activeFile, content, onChange, onSelectFile, onCloseFile, splitDirection, onSplit, showSplitActions = true, colorScheme, tokens, fontFamily, messages }: MonacoEditorProps): JSX.Element {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor>();
+  const changeContent = useRef(onChange);
+
+  useEffect(() => { changeContent.current = onChange; }, [onChange]);
 
   useEffect(() => {
     if (!host.current) return;
@@ -88,8 +89,8 @@ export function MonacoEditor({ files, activeFile, content, onChange, onSelectFil
       scrollBeyondLastLine: false,
       renderLineHighlight: 'line',
     });
-    editor.current.onDidChangeModelContent(() => {
-      onChange(editor.current?.getValue() ?? '');
+    editor.current.onDidChangeModelContent(event => {
+      if (!event.isFlush) changeContent.current(editor.current?.getValue() ?? '');
     });
     return () => { editor.current?.dispose(); editor.current = undefined; };
   }, []);
@@ -114,8 +115,6 @@ export function MonacoEditor({ files, activeFile, content, onChange, onSelectFil
     editor.current?.updateOptions({ fontFamily });
   }, [fontFamily]);
 
-  const issues = activeFile.endsWith('.md') ? workflowProgramIssues(content) : { error: undefined };
-
   return <section className="editor-pane">
     <div className="editor-tabs" role="tablist" aria-label="Open files">
       {files.map(file => <div className={'editor-tab' + (file === activeFile ? ' active' : '')} key={file}>
@@ -123,7 +122,7 @@ export function MonacoEditor({ files, activeFile, content, onChange, onSelectFil
         <button className="tab-close" type="button" aria-label={'Close ' + file} onClick={() => onCloseFile(file)}>×</button>
       </div>)}
     </div>
-    <div className="editor-toolbar"><h2>{activeFile}</h2><span>{messages.markdown}</span>{issues.error && <span className="frontmatter-warn" role="status" title={issues.error}>{messages.workflowWarning}</span>}{showSplitActions && <div className="editor-actions"><button className="icon-button" type="button" title={messages.splitVertical} aria-label={messages.splitVertical} onClick={() => onSplit(splitDirection === 'vertical' ? 'none' : 'vertical')}><span className="split-vertical-icon" aria-hidden="true" /></button><button className="icon-button" type="button" title={messages.splitHorizontal} aria-label={messages.splitHorizontal} onClick={() => onSplit(splitDirection === 'horizontal' ? 'none' : 'horizontal')}><span className="split-horizontal-icon" aria-hidden="true" /></button></div>}</div>
+    <div className="editor-toolbar"><h2>{activeFile}</h2><span>{messages.markdown}</span>{showSplitActions && <div className="editor-actions"><button className="icon-button" type="button" title={messages.splitVertical} aria-label={messages.splitVertical} onClick={() => onSplit(splitDirection === 'vertical' ? 'none' : 'vertical')}><span className="split-vertical-icon" aria-hidden="true" /></button><button className="icon-button" type="button" title={messages.splitHorizontal} aria-label={messages.splitHorizontal} onClick={() => onSplit(splitDirection === 'horizontal' ? 'none' : 'horizontal')}><span className="split-horizontal-icon" aria-hidden="true" /></button></div>}</div>
     <div className="monaco-host" ref={host} />
   </section>;
 }

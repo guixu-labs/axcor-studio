@@ -44,6 +44,8 @@ export interface CreateRunInput {
   workspacePath?: string;
   content?: string;
   runtime: RuntimeId;
+  programPath?: string;
+  format?: string;
   label?: string;
   params?: Record<string, string>;
   maxParallel?: number;

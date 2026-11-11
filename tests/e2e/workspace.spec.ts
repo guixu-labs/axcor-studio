@@ -50,19 +50,7 @@ test.describe('workspace tree', () => {
     await window.getByRole('button', { name: 'src', exact: true }).click();
     await window.locator('.file-entry', { hasText: 'main.ts' }).click();
     await expect(window.locator('.view-lines', { hasText: 'export const value = 42' })).toBeVisible();
-    await expect(window.locator('.frontmatter-warn')).toBeHidden();
-    // Switching back to markdown brings the declaration warning back.
     await window.locator('.file-entry', { hasText: 'workflow.md' }).click();
-    await expect(window.locator('.frontmatter-warn')).toBeVisible();
-  });
-
-  test('rejects running a file that is not a workflow program before calling the backend', async () => {
-    await window.locator('.rail-item', { hasText: '工作台' }).click();
-    await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
-    // workflow.md has no front matter declaration, so starting a run must
-    // fail locally with the front matter message (the backend is unavailable).
-    await window.locator('.rail-item', { hasText: '运行' }).click();
-    await window.getByRole('button', { name: '运行工作流' }).click();
-    await expect(window.locator('.run-list-error')).toContainText('front matter');
+    await expect(window.getByRole('heading', { name: 'workflow.md' })).toBeVisible();
   });
 });

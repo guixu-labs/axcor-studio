@@ -12,6 +12,7 @@ test.describe('monaco editor', () => {
   test.beforeAll(async () => {
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-editor-'));
     await fs.writeFile(path.join(workspaceDir, 'workflow.md'), '# New workflow\n');
+    await fs.writeFile(path.join(workspaceDir, 'z-notes.md'), '# Notes\n');
   });
 
   test.afterAll(async () => {
@@ -40,8 +41,6 @@ test.describe('monaco editor', () => {
   test('shows the file background when the last editor tab is closed', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
-    await expect(window.locator('.frontmatter-warn')).toBeVisible();
-    await expect(window.locator('.frontmatter-warn')).toHaveAttribute('title', /front matter/);
     await window.getByRole('button', { name: 'Close workflow.md', exact: true }).click();
     await expect(window.locator('.workspace-grid .empty-panel')).toBeVisible();
     await expect(window.getByRole('tab')).toHaveCount(0);
@@ -49,20 +48,21 @@ test.describe('monaco editor', () => {
     await expect(window.locator('.view-lines', { hasText: 'New workflow' })).toBeVisible();
   });
 
-  test('edits propagate to the editor and a format declaration clears the warning', async () => {
+  test('keeps edits with their file when switching tabs', async () => {
     await window.locator('.rail-item', { hasText: '工作台' }).click();
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');
-    await window.keyboard.type('---');
-    await window.keyboard.press('Enter');
-    await window.keyboard.type('format: graph-yaml@1');
-    await window.keyboard.press('Enter');
-    await window.keyboard.type('---');
-    await window.keyboard.press('Enter');
     await window.keyboard.type('# Hello workflow');
-    await expect(window.locator('.view-lines', { hasText: 'format: graph-yaml@1' })).toBeVisible();
     await expect(window.locator('.view-lines', { hasText: '# Hello workflow' })).toBeVisible();
-    await expect(window.locator('.frontmatter-warn')).toBeHidden();
+    await window.locator('.file-list').getByRole('button', { name: /z-notes\.md/ }).click();
+    await expect(window.locator('.view-lines', { hasText: '# Notes' })).toBeVisible();
+    await window.locator('.monaco-editor').click();
+    await window.keyboard.press('ControlOrMeta+a');
+    await window.keyboard.type('# Edited notes');
+    await window.getByRole('button', { name: '保存', exact: true }).click();
+    await expect.poll(() => fs.readFile(path.join(workspaceDir, 'z-notes.md'), 'utf8')).toBe('# Edited notes');
+    await window.getByRole('tab', { name: 'workflow.md', exact: true }).click();
+    await expect(window.locator('.view-lines', { hasText: '# Hello workflow' })).toBeVisible();
   });
 });

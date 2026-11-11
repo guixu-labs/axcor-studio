@@ -7,6 +7,7 @@ export interface RunsPanelMessages {
   runs: string; runWorkflow: string;
   noRuns: string; runToSeeEvents: string;
   runConfig: string; runtime: string; runLabel: string; runLabelPlaceholder: string;
+  runProgramPath: string; runFormat: string;
   runParams: string; addParam: string; paramKeyPlaceholder: string; paramValuePlaceholder: string;
   maxParallel: string; removeParam: string;
   agentRuntime: string; sessionPrompt: string; sessionModel: string; sessionSystemPrompt: string;
@@ -33,6 +34,11 @@ interface RunsListProps {
   onRuntimeChange: (runtime: RuntimeId) => void;
   runLabel: string;
   onRunLabelChange: (value: string) => void;
+  runProgramPath: string;
+  defaultProgramPath: string;
+  onRunProgramPathChange: (value: string) => void;
+  runFormat: string;
+  onRunFormatChange: (value: string) => void;
   runParams: RunParamsRow[];
   onRunParamsChange: (rows: RunParamsRow[]) => void;
   maxParallel: string;
@@ -56,7 +62,7 @@ interface RunsListProps {
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runProgramPath, defaultProgramPath, onRunProgramPathChange, runFormat, onRunFormatChange, runParams, onRunParamsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><h2>{messages.runs}</h2></div>
@@ -88,17 +94,29 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
         </label>
         {runtime === 'workflow' && <>
           <label className="run-config-field">
+            <span className="run-config-title">{messages.runProgramPath}</span>
+            <input className="run-config-input" type="text" value={runProgramPath} placeholder={defaultProgramPath} aria-label={messages.runProgramPath} onChange={event => onRunProgramPathChange(event.target.value)} onKeyDown={event => {
+              if (event.key === 'Tab' && !event.shiftKey && !event.currentTarget.value && defaultProgramPath) onRunProgramPathChange(defaultProgramPath);
+            }} />
+          </label>
+          <label className="run-config-field">
+            <span className="run-config-title">{messages.runFormat}</span>
+            <input className="run-config-input" type="text" value={runFormat} aria-label={messages.runFormat} onChange={event => onRunFormatChange(event.target.value)} />
+          </label>
+          <label className="run-config-field">
             <span className="run-config-title">{messages.runLabel}</span>
             <input className="run-config-input" type="text" value={runLabel} placeholder={messages.runLabelPlaceholder} aria-label={messages.runLabel} onChange={event => onRunLabelChange(event.target.value)} />
           </label>
           <div className="run-config-field">
-            <span className="run-config-title">{messages.runParams}</span>
+            <div className="run-params-heading">
+              <span className="run-config-title">{messages.runParams}</span>
+              <button className="icon-button run-param-add" type="button" aria-label={messages.addParam} title={messages.addParam} onClick={() => onRunParamsChange([...runParams, { key: '', value: '' }])}>+</button>
+            </div>
             {runParams.map((row, index) => <div className="run-param-row" key={index}>
               <input className="run-config-input" type="text" value={row.key} placeholder={messages.paramKeyPlaceholder} aria-label={messages.paramKeyPlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} />
               <input className="run-config-input" type="text" value={row.value} placeholder={messages.paramValuePlaceholder} aria-label={messages.paramValuePlaceholder} onChange={event => onRunParamsChange(runParams.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} />
               <button className="run-param-remove" type="button" aria-label={messages.removeParam} onClick={() => onRunParamsChange(runParams.filter((_item, itemIndex) => itemIndex !== index))}>×</button>
             </div>)}
-            <button className="text-button run-param-add" type="button" onClick={() => onRunParamsChange([...runParams, { key: '', value: '' }])}>{messages.addParam}</button>
           </div>
           <label className="run-config-field">
             <span className="run-config-title">{messages.maxParallel}</span>
