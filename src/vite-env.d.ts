@@ -4,6 +4,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 interface Window {
+  startup: import('./shared/startup').StartupBridge;
   workbench: {
     chooseWorkspace(): Promise<string | undefined>;
     getWorkspace(): Promise<string | undefined>;

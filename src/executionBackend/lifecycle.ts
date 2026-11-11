@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
-import { insightPort } from '../insightService';
+import { insightPort } from '../observability/insightService';
 import { getBackendBaseUrl } from './http';
 import { DEFAULT_EXECUTION_BACKEND_PORT, EXECUTION_BACKEND_COMMAND } from '../shared/executionBackendConfig';
 
@@ -9,15 +9,15 @@ const STARTUP_WAIT_MS = 20_000;
 const POLL_INTERVAL_MS = 500;
 
 let starting = false;
-let spawnedChild: ChildProcess | undefined;
+let spawnedBackend: { child: ChildProcess; port: string } | undefined;
 
 /**
  * Stop the execution backend this workbench started, if any. Instances
  * that were already running (reused) are never touched.
  */
 export function stopExecutionBackendIfStarted(): void {
-  const child = spawnedChild;
-  spawnedChild = undefined;
+  const child = spawnedBackend?.child;
+  spawnedBackend = undefined;
   if (child && !child.killed) {
     console.log(`[${EXECUTION_BACKEND_COMMAND}] stopping instance started by the workbench (pid ${child.pid})`);
     child.kill();
@@ -59,12 +59,13 @@ function spawnExecutionBackend(port: string): Promise<boolean> {
     const child = spawn(EXECUTION_BACKEND_COMMAND, ['web', '--port', port, '--no-open'], {
       env, cwd: os.homedir(), detached: true, stdio: 'ignore',
     });
+    spawnedBackend = { child, port };
+    child.once('close', () => { if (spawnedBackend?.child === child) spawnedBackend = undefined; });
     child.once('error', error => {
       console.error(`[${EXECUTION_BACKEND_COMMAND}] startup failed: ${error.message}`);
       resolve(false);
     });
     child.once('spawn', () => {
-      spawnedChild = child;
       console.log(`[${EXECUTION_BACKEND_COMMAND}] started (pid ${child.pid})`);
       child.unref();
       resolve(true);
@@ -77,21 +78,24 @@ function spawnExecutionBackend(port: string): Promise<boolean> {
  * local instance. Only local URLs are auto-started; remote endpoints
  * are left to the user. Returns true when the API is reachable.
  */
-export async function ensureExecutionBackendRunning(): Promise<boolean> {
-  if (process.env.EXECUTION_BACKEND_NO_AUTOSTART === '1') return false;
+export async function ensureExecutionBackendRunning(onStarting?: () => void): Promise<boolean> {
   const baseUrl = getBackendBaseUrl();
   if (await isExecutionBackendReachable(baseUrl)) return true;
+  if (process.env.EXECUTION_BACKEND_NO_AUTOSTART === '1') return false;
   const port = localPortOf(baseUrl);
   if (!port) return false;
   if (starting) return false;
   starting = true;
   try {
-    const spawned = await spawnExecutionBackend(port);
+    onStarting?.();
+    if (spawnedBackend && spawnedBackend.port !== port) stopExecutionBackendIfStarted();
+    const spawned = spawnedBackend || await spawnExecutionBackend(port);
     if (!spawned) return false;
     const deadline = Date.now() + STARTUP_WAIT_MS;
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
       if (await isExecutionBackendReachable(baseUrl)) return true;
+      if (!spawnedBackend) return false;
     }
     return false;
   } finally {

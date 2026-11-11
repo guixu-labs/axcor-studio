@@ -1,0 +1,77 @@
+body.startup-window { min-width: 0; }
+
+.startup-screen {
+  position: relative;
+  display: grid;
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr) 4px;
+  background: #141726;
+  color: #f1f3fa;
+  color-scheme: dark;
+}
+
+.startup-brand {
+  display: flex;
+  aspect-ratio: 3.44;
+  align-items: center;
+  padding: 32px;
+  background:
+    linear-gradient(110deg, #0d1023 18%, #101128dd 43%, transparent 80%),
+    linear-gradient(141deg, transparent 50%, #c761ff 50%, #7c5bff 76%, transparent 76%),
+    linear-gradient(30deg, #142665 28%, #235bc7 65%, #48d9ff 100%);
+  -webkit-app-region: drag;
+}
+
+.startup-brand h1 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 720;
+  letter-spacing: -.045em;
+  white-space: nowrap;
+}
+
+.startup-body { align-self: center; max-height: 100%; overflow: auto; padding: 16px 32px; }
+
+.startup-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  -webkit-app-region: no-drag;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #adb6d0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.startup-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.startup-heading h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.startup-heading > span { color: #adb6d0; font: 12px ui-monospace, monospace; }
+.startup-services { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.startup-services li { display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 7px 11px; font-size: 13px; }
+.startup-services small { grid-column: 2 / -1; color: #ffb1b9; overflow-wrap: anywhere; }
+.startup-phase { color: #adb6d0; }
+.startup-indicator { width: 7px; height: 7px; border-radius: 50%; background: #7985a4; }
+[data-phase="starting"] .startup-indicator { background: #aa9bff; box-shadow: 0 0 0 3px #9b84ff26; }
+[data-phase="ready"] .startup-indicator { background: #63d9ad; }
+[data-phase="failed"] .startup-indicator { background: #ff8999; }
+.startup-error { margin: 12px 0 0; color: #ffb1b9; overflow-wrap: anywhere; }
+.startup-retry { display: flex; align-items: end; justify-content: end; gap: 12px; margin-top: 20px; }
+.startup-retry label { display: grid; flex: 1; gap: 5px; color: #adb6d0; font-size: 12px; }
+.startup-retry input { width: 100%; padding: 8px 10px; border: 1px solid #4b5270; border-radius: 6px; background: #0b0e19; color: #f1f3fa; font: inherit; }
+.startup-retry button { border-color: #8e84fa; background: #4b408c; }
+.startup-body:has(.startup-retry) { padding-block: 8px; }
+.startup-body:has(.startup-retry) .startup-services { margin-top: 12px; }
+.startup-body:has(.startup-retry) .startup-retry { margin-top: 12px; }
+.startup-progress { display: block; grid-column: 1 / -1; width: 100%; height: 4px; appearance: none; border: 0; background: #30354b; }
+.startup-progress::-webkit-progress-bar { background: #30354b; }
+.startup-progress::-webkit-progress-value { background: linear-gradient(90deg, #56a9ff, #a78bff); transition: width .2s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .startup-progress::-webkit-progress-value { transition: none; }
+}

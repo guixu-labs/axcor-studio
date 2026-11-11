@@ -27,7 +27,7 @@ export async function getInsightStatus(): Promise<{ running: boolean; port: numb
   return { running, port: insightPort };
 }
 
-async function startInsight(): Promise<void> {
+async function startInsight(onStarting?: () => void): Promise<void> {
   if (!Number.isInteger(insightPort) || insightPort < 1 || insightPort > 65535) {
     throw new Error('CONTEXT_INSIGHT_PORT must be a valid TCP port');
   }
@@ -37,6 +37,7 @@ async function startInsight(): Promise<void> {
     throw new Error(`Context Insight is unavailable at ${insightBaseUrl}`);
   }
 
+  onStarting?.();
   let startupError: Error | undefined;
   if (!child) {
     const instance = spawn('context-insight', [], {
@@ -71,8 +72,8 @@ async function startInsight(): Promise<void> {
   throw new Error(`Context Insight did not become ready at ${insightBaseUrl}`);
 }
 
-export function ensureInsightRunning(): Promise<void> {
-  starting ??= startInsight().finally(() => { starting = undefined; });
+export function ensureInsightRunning(onStarting?: () => void): Promise<void> {
+  starting ??= startInsight(onStarting).finally(() => { starting = undefined; });
   return starting;
 }
 

@@ -1,5 +1,6 @@
+import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import { type ElectronApplication, type Page } from 'playwright';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,11 +21,11 @@ test.describe('monaco editor', () => {
   });
 
   test.beforeEach(async () => {
-    app = await electron.launch({
+    app = await launchWorkbench({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
       env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir },
     });
-    window = await app.firstWindow();
+    window = await workbenchPage(app);
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
     await window.waitForLoadState('domcontentloaded');

@@ -2,6 +2,23 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { RunEvent } from './shared/protocol';
 import type { ExecutionBackendBridge } from './shared/executionBackendIpc';
 import type { WorkspaceNode } from './workspaceFiles';
+import type { StartupBridge, StartupState } from './shared/startup';
+
+const startup: StartupBridge = {
+  run: url => ipcRenderer.invoke('startup:run', url),
+  onProgress: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, state: StartupState): void => listener(state);
+    ipcRenderer.on('startup:progress', handler);
+    return () => { ipcRenderer.removeListener('startup:progress', handler); };
+  },
+  workbenchLoaded: error => { ipcRenderer.send('startup:workbench-loaded', error); },
+  onWorkbenchFailed: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, message: string): void => listener(message);
+    ipcRenderer.on('startup:workbench-failed', handler);
+    return () => { ipcRenderer.removeListener('startup:workbench-failed', handler); };
+  },
+};
+contextBridge.exposeInMainWorld('startup', startup);
 
 contextBridge.exposeInMainWorld('workbench', {
   chooseWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke('workspace:choose'),
