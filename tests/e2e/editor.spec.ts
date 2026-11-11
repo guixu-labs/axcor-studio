@@ -81,6 +81,41 @@ test.describe('monaco editor', () => {
     await expect(window.locator('.view-lines', { hasText: '# Preserved edit' })).toBeVisible();
   });
 
+  test('prompts before closing an edited file and applies the selected action', async () => {
+    const filePath = path.join(workspaceDir, 'workflow.md');
+    const original = await fs.readFile(filePath, 'utf8');
+    const tab = window.getByRole('tab', { name: 'workflow.md', exact: true });
+    const close = window.getByRole('button', { name: '关闭 workflow.md', exact: true });
+    const dialog = window.getByRole('dialog', { name: '是否保存对 workflow.md 的修改？' });
+    const edit = async (text: string): Promise<void> => {
+      await window.locator('.monaco-editor').click();
+      await window.keyboard.press('ControlOrMeta+a');
+      await window.keyboard.type(text);
+      await expect(tab).toHaveAttribute('aria-description', '有未保存的修改');
+    };
+
+    await edit('# Discard this draft');
+    await close.click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(tab).toBeVisible();
+    await expect(window.locator('.view-lines')).toContainText('Discard this draft');
+    await expect.poll(() => fs.readFile(filePath, 'utf8')).toBe(original);
+
+    await close.click();
+    await dialog.getByRole('button', { name: '不保存', exact: true }).click();
+    await expect(tab).toHaveCount(0);
+    await window.locator('.file-list').getByRole('button', { name: /workflow\.md/ }).click();
+    await expect(window.locator('.view-lines')).toContainText(original.trim());
+
+    await edit('# Save this draft');
+    await close.click();
+    await dialog.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(tab).toHaveCount(0);
+    await expect.poll(() => fs.readFile(filePath, 'utf8')).toBe('# Save this draft');
+    await fs.writeFile(filePath, original);
+  });
+
   test('keeps edits with their file when switching tabs', async () => {
     await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
     await window.locator('.monaco-editor').click();

@@ -32,9 +32,16 @@ const fileName = (path: string): string => path.split('/').at(-1) ?? path;
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
   const workspaceRequiredDialog = useRef<HTMLDialogElement>(null);
+  const saveChangesDialog = useRef<HTMLDialogElement>(null);
   const [tree, setTree] = useState<WorkspaceNode[]>([]);
   const [file, setFile] = useState('');
   const [contents, setContents] = useState<Record<string, string>>({});
+  const [savedContents, setSavedContents] = useState<Record<string, string>>({});
+  const [pendingClosePath, setPendingClosePath] = useState<string>();
+  const [savingBeforeClose, setSavingBeforeClose] = useState(false);
+  const [closeSaveError, setCloseSaveError] = useState(false);
+  const isFileDirty = (path: string): boolean =>
+    savedContents[path] !== undefined && contents[path] !== savedContents[path];
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>();
   const [eventsByRun, setEventsByRun] = useState<Record<string, RunEvent[]>>({});
@@ -74,6 +81,15 @@ export default function App(): JSX.Element {
     const neighbor = remaining[index] ?? remaining.at(-1);
     if (neighbor) activateTab(neighbor);
     else setActiveTabKey(undefined);
+  };
+  const requestCloseTab = (tab: ContentTab): void => {
+    if (tab.kind === 'file' && isFileDirty(tab.resource)) {
+      setPendingClosePath(tab.resource);
+      setCloseSaveError(false);
+      saveChangesDialog.current?.showModal();
+      return;
+    }
+    closeContentTab(tab);
   };
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
@@ -222,7 +238,7 @@ export default function App(): JSX.Element {
     };
   }, [selectedRunId]);
   useEffect(() => {
-    if (activeTab?.kind !== 'insight' || settingsOpen) { void window.insight.hide(); return; }
+    if (activeTab?.kind !== 'insight' || settingsOpen || pendingClosePath) { void window.insight.hide(); return; }
     setInsightFailed(false);
     const node = appContent.current;
     if (!node) return;
@@ -234,7 +250,7 @@ export default function App(): JSX.Element {
     const observer = new ResizeObserver(() => { void window.insight.updateBounds(bounds()); });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [activeTab?.kind, insightPath, selectedTheme.colorScheme, settingsOpen]);
+  }, [activeTab?.kind, insightPath, selectedTheme.colorScheme, settingsOpen, pendingClosePath]);
   useEffect(() => window.insight.onLoadFailed(() => setInsightFailed(true)), []);
   useEffect(() => {
     Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
@@ -300,12 +316,16 @@ export default function App(): JSX.Element {
     if (initialFile) {
       const initialContent = await window.workbench.readFile(initialFile);
       setContents(previous => ({ ...previous, [initialFile]: initialContent }));
+      setSavedContents(previous => ({ ...previous, [initialFile]: initialContent }));
     }
   };
   const chooseWorkspace = async (): Promise<void> => {
     const selected = await window.workbench.chooseWorkspace();
     if (!selected) return;
-    if (selected !== workspace) setContents({});
+    if (selected !== workspace) {
+      setContents({});
+      setSavedContents({});
+    }
     setWorkspace(selected);
     await loadWorkspaceTree();
   };
@@ -314,9 +334,36 @@ export default function App(): JSX.Element {
     if (workspace && !Object.prototype.hasOwnProperty.call(contents, nextFile)) {
       const nextContent = await window.workbench.readFile(nextFile);
       setContents(previous => ({ ...previous, [nextFile]: nextContent }));
+      setSavedContents(previous => ({ ...previous, [nextFile]: nextContent }));
     }
   };
-  const save = async (): Promise<void> => { if (workspace && file && contents[file] !== undefined) await window.workbench.writeFile(file, contents[file]); };
+  const saveFile = async (path: string): Promise<void> => {
+    const draft = contents[path];
+    if (!workspace || draft === undefined) return;
+    await window.workbench.writeFile(path, draft);
+    setSavedContents(previous => ({ ...previous, [path]: draft }));
+  };
+  const save = (): Promise<void> => saveFile(file);
+  const finishFileClose = async (saveChanges: boolean): Promise<void> => {
+    const path = pendingClosePath;
+    if (!path || savingBeforeClose) return;
+    if (saveChanges) {
+      setSavingBeforeClose(true);
+      setCloseSaveError(false);
+      try {
+        await saveFile(path);
+      } catch {
+        setCloseSaveError(true);
+        return;
+      } finally {
+        setSavingBeforeClose(false);
+      }
+    } else {
+      setContents(previous => ({ ...previous, [path]: savedContents[path] }));
+    }
+    closeContentTab({ kind: 'file', resource: path });
+    saveChangesDialog.current?.close();
+  };
   const changeSessionRuntime = (value: string): void => {
     setSessionRuntime(value);
     setSessionModel('');
@@ -441,12 +488,13 @@ export default function App(): JSX.Element {
           const label = tab.kind === 'file' ? fileName(tab.resource) : tab.kind === 'run' ? run?.workflowId ?? tab.resource : t.insight;
           const title = tab.kind === 'file' ? tab.resource : run ? `${label} · ${run.id}` : label;
           const selected = key === activeTabKey;
+          const dirty = tab.kind === 'file' && isFileDirty(tab.resource);
           return <div className={'content-tab' + (selected ? ' active' : '')} key={key}>
-            <button className="content-tab-label" type="button" role="tab" aria-selected={selected} title={title} onClick={() => activateTab(tab)}>
+            <button className="content-tab-label" type="button" role="tab" aria-selected={selected} aria-description={dirty ? t.unsavedChanges : undefined} title={title} onClick={() => activateTab(tab)}>
               <span className={`content-tab-icon icon-${tab.kind}`} aria-hidden="true">{tab.kind === 'file' ? '≡' : tab.kind === 'run' ? '▶' : '◉'}</span>
               <span className="content-tab-name">{label}</span>
             </button>
-            <button type="button" className="content-tab-close" aria-label={t.closeTab(label)} onClick={() => closeContentTab(tab)}>×</button>
+            <button type="button" className="content-tab-close" data-dirty={dirty || undefined} aria-label={t.closeTab(label)} onClick={() => requestCloseTab(tab)}><span aria-hidden="true">×</span></button>
           </div>;
         })}
       </div>}
@@ -489,6 +537,17 @@ export default function App(): JSX.Element {
           workspaceRequiredDialog.current?.close();
           void chooseWorkspace();
         }}>{t.openWorkspace}</button>
+      </div>
+    </dialog>
+    <dialog className="workbench-dialog" ref={saveChangesDialog} aria-labelledby="save-changes-title" aria-describedby="save-changes-message"
+      onClose={() => setPendingClosePath(undefined)} onCancel={event => { if (savingBeforeClose) event.preventDefault(); }}>
+      <h2 id="save-changes-title">{t.saveChangesTitle(fileName(pendingClosePath ?? ''))}</h2>
+      <p id="save-changes-message">{t.saveChangesMessage}</p>
+      {closeSaveError && <p role="alert">{t.saveFileFailed}</p>}
+      <div className="workbench-dialog-actions">
+        <button className="secondary-button" type="button" disabled={savingBeforeClose} onClick={() => saveChangesDialog.current?.close()}>{t.cancel}</button>
+        <button className="secondary-button" type="button" disabled={savingBeforeClose} onClick={() => void finishFileClose(false)}>{t.dontSave}</button>
+        <button className="primary-button" type="button" disabled={savingBeforeClose} onClick={() => void finishFileClose(true)}>{t.save}</button>
       </div>
     </dialog>
     {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} executionBackendUrl={effectiveExecutionBackendUrl} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onExecutionBackendUrlChange={url => { setExecutionBackendUrl(url); saveWorkbenchState(EXECUTION_BACKEND_URL_STORAGE_KEY, url); void window.executionBackend.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setExecutionError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}

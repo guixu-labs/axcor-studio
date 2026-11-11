@@ -315,6 +315,8 @@ h3.settings-field-title { margin: 0; }
 .content-tab-icon.icon-run { font-size: 9px; }
 .content-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .content-tab-close {
+  display: grid;
+  place-items: center;
   flex: none;
   width: 22px;
   height: 22px;
@@ -328,6 +330,14 @@ h3.settings-field-title { margin: 0; }
   line-height: 1;
 }
 .content-tab-close:hover { color: var(--text); }
+.content-tab-close[data-dirty]:not(:hover, :focus-visible) span { display: none; }
+.content-tab-close[data-dirty]:not(:hover, :focus-visible)::after {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text);
+  content: '';
+}
 .content-panels {
   display: grid;
   flex: 1;
