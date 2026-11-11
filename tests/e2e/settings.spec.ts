@@ -1,5 +1,6 @@
+import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import { type ElectronApplication, type Page } from 'playwright';
 import path from 'node:path';
 
 test.describe('settings', () => {
@@ -7,9 +8,9 @@ test.describe('settings', () => {
   let window: Page;
 
   test.beforeEach(async () => {
-    app = await electron.launch({ args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')], env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1' } });
+    app = await launchWorkbench({ args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')], env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1' } });
     app.process().stderr?.on('data', chunk => console.error(`[electron] ${chunk.toString().trim()}`));
-    window = await app.firstWindow();
+    window = await workbenchPage(app);
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
     await window.waitForLoadState('domcontentloaded');

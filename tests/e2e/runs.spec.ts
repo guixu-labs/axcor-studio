@@ -1,5 +1,6 @@
+import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import { type ElectronApplication, type Page } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
@@ -165,11 +166,11 @@ test.describe('execution runs', () => {
   });
 
   test.beforeEach(async () => {
-    app = await electron.launch({
+    app = await launchWorkbench({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
       env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: fixture.url },
     });
-    window = await app.firstWindow();
+    window = await workbenchPage(app);
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
     await window.waitForLoadState('domcontentloaded');
@@ -411,24 +412,18 @@ test.describe('execution runs', () => {
   });
 
   test('reconnects when the execution backend URL is changed in settings', async () => {
-    const defaultApp = await electron.launch({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('reconnect-profile')}`, path.resolve('.vite/build/main.js')],
-      // Point the app at an unreachable port so the boot-time list fails
-      // deterministically, independent of any backend running on the host.
-      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: 'http://127.0.0.1:1' },
-    });
-    const defaultWindow = await defaultApp.firstWindow();
-    await defaultWindow.waitForLoadState('domcontentloaded');
-    await expect(defaultWindow.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
-    await defaultWindow.getByRole('button', { name: '运行', exact: true }).click();
-    await expect(defaultWindow.locator('.run-list-error')).toContainText('无法连接 Workflow Controller', { timeout: 20_000 });
-    await defaultWindow.locator('.rail-settings').click();
-    await defaultWindow.getByRole('button', { name: '常规' }).click();
-    await defaultWindow.getByLabel('Workflow Controller 地址').fill(fixture.url);
-    await expect.poll(() => defaultWindow.evaluate(() => localStorage.getItem('workbench.executionBackendUrl')))
+    await window.getByRole('button', { name: '运行', exact: true }).click();
+    await window.locator('.rail-settings').click();
+    await window.getByRole('button', { name: '常规' }).click();
+    await window.getByLabel('Workflow Controller 地址').fill('http://127.0.0.1:1');
+    await window.locator('.modal-close').click();
+    await expect(window.locator('.run-list-error')).toContainText('无法连接 Workflow Controller');
+    await window.locator('.rail-settings').click();
+    await window.getByRole('button', { name: '常规' }).click();
+    await window.getByLabel('Workflow Controller 地址').fill(fixture.url);
+    await expect.poll(() => window.evaluate(() => localStorage.getItem('workbench.executionBackendUrl')))
       .toBe(JSON.stringify(fixture.url));
-    await defaultWindow.locator('.modal-close').click();
-    await expect(defaultWindow.getByRole('option', { name: /workflow\.md/ })).toBeVisible();
-    await defaultApp.close();
+    await window.locator('.modal-close').click();
+    await expect(window.getByRole('option', { name: /workflow\.md/ })).toBeVisible();
   });
 });

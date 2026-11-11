@@ -1,5 +1,6 @@
+import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import { type ElectronApplication, type Page } from 'playwright';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
@@ -46,11 +47,11 @@ test.describe('execution backend auto-start', () => {
   });
 
   test.beforeEach(async () => {
-    app = await electron.launch({
+    app = await launchWorkbench({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
       env: { ...process.env, PATH: binDir + ':' + (process.env.PATH ?? ''), EXECUTION_BACKEND_BASE_URL: `http://127.0.0.1:${backendPort}` },
     });
-    window = await app.firstWindow();
+    window = await workbenchPage(app);
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
     await window.waitForLoadState('domcontentloaded');
     await expect(window.locator('.app-shell')).toBeVisible({ timeout: 10_000 });

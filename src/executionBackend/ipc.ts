@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import type { ProviderKeyInput } from '../shared/executionBackendIpc';
 import type { CreateRunInput } from '../shared/protocol';
-import { ensureInsightRunning, getInsightStatus } from '../insightService';
+import { ensureInsightRunning, getInsightStatus } from '../observability/insightService';
 import { subscribeExecutionEvents, unsubscribeExecutionEvents } from './events';
 import {
   getRun,

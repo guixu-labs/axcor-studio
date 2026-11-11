@@ -15,7 +15,7 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
 import type { EditorGroupOrientation } from './workbench/layout';
 import { createWorkbenchLayout, toggleWorkbenchPart } from './workbench/layoutService';
-import { loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
+import { EXECUTION_BACKEND_URL_STORAGE_KEY, loadExecutionBackendUrl, loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
 import { createWorkbenchServices, WorkbenchCommandService } from './workbench/services';
 import { SettingsModal } from './components/SettingsModal';
 import type { FontId, ThemeId } from './components/SettingsModal';
@@ -28,8 +28,6 @@ type ContentTab = { kind: 'file' | 'run' | 'insight'; resource: string };
 const insightTab: ContentTab = { kind: 'insight', resource: '' };
 const tabKey = ({ kind, resource }: ContentTab): string => kind + ':' + resource;
 const fileName = (path: string): string => path.split('/').at(-1) ?? path;
-
-const EXECUTION_BACKEND_URL_STORAGE_KEY = 'workbench.executionBackendUrl';
 
 export default function App(): JSX.Element {
   const [workspace, setWorkspace] = useState<string>();
@@ -77,9 +75,7 @@ export default function App(): JSX.Element {
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
   const [backgroundImage, setBackgroundImage] = useState(() => loadWorkbenchState('workbench.backgroundImage', ''));
   const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
-  const [executionBackendUrl, setExecutionBackendUrl] = useState<string | undefined>(() =>
-    loadWorkbenchState<string | undefined>(EXECUTION_BACKEND_URL_STORAGE_KEY, undefined)
-    ?? loadWorkbenchState<string | undefined>('workbench.opsbotUrl', undefined));
+  const [executionBackendUrl, setExecutionBackendUrl] = useState(loadExecutionBackendUrl);
   const [executionError, setExecutionError] = useState<string>();
   const [runtime, setRuntime] = useState<RuntimeId>(() => {
     const stored = loadWorkbenchState<string>('workbench.runtime', 'workflow');
@@ -123,8 +119,7 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
   const bootListRuns = async (): Promise<void> => {
-    // The backend may still be starting up; retry for a while before
-    // surfacing a connection error.
+    // Retry transient run-list errors after the startup readiness check.
     for (let attempt = 0; attempt < 6; attempt += 1) {
       try {
         setRuns(await client.listRuns());

@@ -19,7 +19,9 @@ npm run start
 
 执行后端的显示名称和 CLI 命令集中定义在 `src/shared/executionBackendConfig.ts`。
 
-打开「观测」或导入运行会话时，工作台会连接本机的 Context Insight（默认 `http://127.0.0.1:21025`）。如果服务未运行，工作台会通过 PATH 中的 `context-insight` 命令启动服务，并在退出时停止自己启动的实例。首次启动可能需要构建 Insight 页面。
+App 启动时会并行检查 Workflow Controller 和本机 Context Insight（默认 `http://127.0.0.1:21025`），并显示各自的启动状态。两个服务都就绪后才进入工作台。启动失败时可在启动页重试，Workflow Controller 连接失败时也可在该页修改地址。
+
+如果 Insight 未运行，工作台会通过 PATH 中的 `context-insight` 命令启动服务，并在退出时停止自己启动的实例。首次启动可能需要构建 Insight 页面。进入工作台后，打开「观测」时才加载页面。
 
 可在启动工作台时通过 `CONTEXT_INSIGHT_PORT` 指定端口，或设置 `CONTEXT_INSIGHT_NO_AUTOSTART=1` 使用手动启动的实例。会话导入仍由 Workflow Controller 定位转录文件。如果 Workflow Controller 是单独启动的，请在启动它时将 `WORKFLOW_CONTROLLER_INSIGHT_PORT` 设为同一个端口。
 
