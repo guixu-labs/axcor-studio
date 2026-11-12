@@ -32,6 +32,7 @@ interface RunsListProps {
   error?: string;
   onSelectRun: (runId: string) => void;
   onRun: () => void;
+  runDisabled?: boolean;
   runtime: RuntimeId;
   onRuntimeChange: (runtime: RuntimeId) => void;
   runLabel: string;
@@ -64,7 +65,7 @@ interface RunsListProps {
   messages: RunsPanelMessages;
 }
 
-export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runtime, onRuntimeChange, runLabel, onRunLabelChange, runProgramPath, defaultProgramPath, onRunProgramPathChange, graphVariables, onGraphVariablesChange, graphOptions, onGraphOptionsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
+export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runDisabled, runtime, onRuntimeChange, runLabel, onRunLabelChange, runProgramPath, defaultProgramPath, onRunProgramPathChange, graphVariables, onGraphVariablesChange, graphOptions, onGraphOptionsChange, maxParallel, onMaxParallelChange, runPrompt, onRunPromptChange, sessionPrompt, onSessionPromptChange, sessionRuntime, onSessionRuntimeChange, sessionModel, sessionModels, sessionModelPlaceholder, onSessionModelChange, sessionSystemPrompt, onSessionSystemPromptChange, sessionMaxIterations, onSessionMaxIterationsChange, sessionReviewerEnabled, onSessionReviewerEnabledChange, messages }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
   return <aside className="runs-panel">
     <div className="explorer-heading"><h2>{messages.runs}</h2></div>
@@ -229,6 +230,6 @@ export function RunsList({ runs, selectedRunId, error, onSelectRun, onRun, runti
         </>}
       </>}
     </div>
-    <button className="run-action" type="button" disabled={runtime === 'session' && !sessionModel} onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
+    <button className="run-action" type="button" disabled={runDisabled || (runtime === 'session' && !sessionModel)} onClick={onRun}><span>{messages.runWorkflow}</span><b>⌘ ↵</b></button>
   </aside>;
 }

@@ -1,7 +1,6 @@
 import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
 import { type ElectronApplication, type Page } from 'playwright';
-import { mkdir, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -370,48 +369,12 @@ test.describe('execution runs', () => {
     await expect(detail.getByRole('log')).toContainText('请按这个方向继续。');
   });
 
-  test('opens a centered workspace prompt when starting a run without a workspace', async () => {
-    const runButton = window.getByRole('button', { name: '运行工作流' });
-    await runButton.click();
-    const prompt = window.getByRole('dialog', { name: '选择工作区' });
-    await expect(prompt).toBeVisible();
-    await expect(prompt).toContainText('运行工作流需要先选择工作区。');
-    const offset = await prompt.evaluate(dialog => {
-      const bounds = dialog.getBoundingClientRect();
-      return [bounds.x + bounds.width / 2 - innerWidth / 2, bounds.y + bounds.height / 2 - innerHeight / 2];
-    });
-    expect(offset.every(value => Math.abs(value) <= 1)).toBe(true);
-    await window.keyboard.press('Escape');
-    await expect(prompt).toBeHidden();
-    await expect(runButton).toBeFocused();
-
-    const directory = test.info().outputPath('workspace');
-    await mkdir(directory, { recursive: true });
-    await app.evaluate(({ dialog }, selected) => {
-      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
-    }, directory);
-    await runButton.click();
-    await prompt.getByRole('button', { name: '打开工作区' }).click();
-    await expect(prompt).toBeHidden();
-    await expect(window.locator('.status-live')).toHaveText('工作区已就绪');
-  });
-
-  test('opens a workspace from the empty file sidebar', async () => {
-    const directory = test.info().outputPath('workspace');
-    await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, 'workflow.md'), '# Sidebar workspace\n');
-    await app.evaluate(({ dialog }, selected) => {
-      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
-    }, directory);
-
+  test('keeps the workspace chosen at startup fixed inside the workbench', async () => {
     await window.getByRole('button', { name: '工作台', exact: true }).click();
     const explorer = window.locator('.workspace-explorer');
-    const empty = explorer.locator('.workspace-empty');
-    await expect(empty).toContainText('未选择工作区');
-    await empty.getByRole('button', { name: '打开工作区', exact: true }).click();
-    await expect(empty).toBeHidden();
-    await expect(explorer.getByRole('button', { name: 'workflow.md' })).toBeVisible();
-    await expect(window.getByRole('tab', { name: 'workflow.md', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(explorer.locator('.explorer-workspace-path')).toContainText('axcor-e2e-workspace-');
+    await expect(explorer.getByRole('button', { name: /打开.*工作区/ })).toHaveCount(0);
+    await expect(window.locator('.status-live')).toHaveText('工作区已就绪');
   });
 
   test('restores the backend URL and session mode from legacy settings', async () => {
@@ -430,7 +393,7 @@ test.describe('execution runs', () => {
   });
 
   test('reconnects when the execution backend URL is changed in settings', async () => {
-    await window.getByRole('button', { name: '运行', exact: true }).click();
+    await expect(window.locator('.runs-panel')).toBeVisible();
     await window.locator('.rail-settings').click();
     await window.getByRole('button', { name: '常规' }).click();
     await window.getByLabel('Workflow Controller 地址').fill('http://127.0.0.1:1');

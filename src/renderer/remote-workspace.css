@@ -1,0 +1,19 @@
+.remote-workspace-form { display: grid; gap: 10px; }
+.remote-workspace-form h2 { margin: 0; }
+.remote-workspace-form label { display: grid; gap: 4px; font-size: 12px; }
+.remote-workspace-form input, .remote-workspace-form select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #4b5270);
+  border-radius: 6px;
+  background: var(--surface-0, #0b0e19);
+  color: inherit;
+  font: inherit;
+}
+.remote-workspace-form [role="alert"], .workspace-error { overflow-wrap: anywhere; }
+.workspace-remote-actions { display: flex; align-items: center; gap: 6px; }
+.workspace-remote-actions button { padding: 3px 7px; font-size: 11px; }
+.workspace-error { margin: 4px 8px; font-size: 12px; }
+.remote-workspace-form p { margin: 0; font-size: 12px; }
+.ssh-save-host summary { font-size: 12px; cursor: pointer; }
+.ssh-save-host > label, .ssh-save-host > button { margin-top: 8px; }

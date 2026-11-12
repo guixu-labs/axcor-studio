@@ -4,11 +4,11 @@ import type { WorkspaceNode } from '../../workspaceFiles';
 interface WorkspaceExplorerProps {
   tree: WorkspaceNode[];
   hasWorkspace: boolean;
-  onOpenWorkspace: () => void;
+  workspacePath?: string;
   activeFile: string;
   onSelect: (filePath: string) => void;
   onSave: () => void;
-  messages: { workspace: string; save: string; emptyWorkspace: string; noWorkspace: string; openWorkspace: string };
+  messages: { workspace: string; save: string; emptyWorkspace: string; noWorkspace: string };
 }
 
 interface TreeNode {
@@ -58,7 +58,7 @@ function extensionBadge(name: string): { label: string; className: string } {
 
 const INDENT_GUIDE = 'linear-gradient(to right, transparent 7px, var(--border) 7px, var(--border) 8px, transparent 8px)';
 
-export function WorkspaceExplorer({ tree, hasWorkspace, activeFile, onSelect, onSave, onOpenWorkspace, messages }: WorkspaceExplorerProps): JSX.Element {
+export function WorkspaceExplorer({ tree, hasWorkspace, activeFile, onSelect, onSave, workspacePath, messages }: WorkspaceExplorerProps): JSX.Element {
   const roots = buildTree(tree);
   const topLevelDirs = new Set(roots.filter(node => node.type === 'dir').map(node => node.path));
   const [expanded, setExpanded] = useState<Set<string>>(topLevelDirs);
@@ -94,18 +94,12 @@ export function WorkspaceExplorer({ tree, hasWorkspace, activeFile, onSelect, on
   return <aside className="workspace-explorer">
     <div className="explorer-heading">
       <h2>{messages.workspace}</h2>
-      {roots.length > 0 && <div className="explorer-actions">
-        {activeFile && <button className="text-button" type="button" onClick={onSave}>{messages.save}</button>}
-        <button className="text-button" type="button" aria-label={messages.openWorkspace} title={messages.openWorkspace} onClick={onOpenWorkspace}>
-          <span className="tree-folder" aria-hidden="true" />
-        </button>
-      </div>}
+      {activeFile && <button className="text-button" type="button" onClick={onSave}>{messages.save}</button>}
     </div>
-    <div className="file-list">
-      {roots.length ? roots.map(node => renderNode(node, 0)) : <div className="workspace-empty">
-        <p>{hasWorkspace ? messages.emptyWorkspace : messages.noWorkspace}</p>
-        <button className="workspace-open-button" type="button" onClick={onOpenWorkspace}>{messages.openWorkspace}</button>
-      </div>}
-    </div>
+    {roots.length === 0 && <div className="workspace-empty">
+      <p>{hasWorkspace ? messages.emptyWorkspace : messages.noWorkspace}</p>
+    </div>}
+    {workspacePath && <p className="explorer-workspace-path" title={workspacePath}>{workspacePath}</p>}
+    {roots.length > 0 && <div className="file-list">{roots.map(node => renderNode(node, 0))}</div>}
   </aside>;
 }

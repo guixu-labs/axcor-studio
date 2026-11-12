@@ -5,13 +5,7 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 interface Window {
   startup: import('./shared/startup').StartupBridge;
-  workbench: {
-    chooseWorkspace(): Promise<string | undefined>;
-    getWorkspace(): Promise<string | undefined>;
-    listTree(): Promise<import('./workspaceFiles').WorkspaceNode[]>;
-    readFile(filePath: string): Promise<string>;
-    writeFile(filePath: string, content: string): Promise<void>;
-  };
+  workbench: import('./shared/workspace').WorkspaceBridge;
   executionBackend: import('./shared/executionBackendIpc').ExecutionBackendBridge;
   insight: {
     show(path: string, bounds: { x: number; y: number; width: number; height: number }, isDark: boolean): Promise<void>;

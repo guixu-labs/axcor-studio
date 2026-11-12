@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import { insightPort } from '../observability/insightService';
 import { getBackendBaseUrl } from './http';
+import { ServiceStartupError, serviceExitError, serviceSpawnError } from '../serviceStartupError';
 import { DEFAULT_EXECUTION_BACKEND_PORT, EXECUTION_BACKEND_COMMAND } from '../shared/executionBackendConfig';
 
 const PROBE_TIMEOUT_MS = 1_500;
@@ -9,7 +10,8 @@ const STARTUP_WAIT_MS = 20_000;
 const POLL_INTERVAL_MS = 500;
 
 let starting = false;
-let spawnedBackend: { child: ChildProcess; port: string } | undefined;
+type BackendProcess = { child: ChildProcess; port: string; failure?: ServiceStartupError };
+let spawnedBackend: BackendProcess | undefined;
 
 /**
  * Stop the execution backend this workbench started, if any. Instances
@@ -45,7 +47,7 @@ function localPortOf(baseUrl: string): string | undefined {
   }
 }
 
-function spawnExecutionBackend(port: string): Promise<boolean> {
+function spawnExecutionBackend(port: string): Promise<BackendProcess> {
   // GUI-launched Electron has a minimal PATH, so append the well-known user
   // tool locations after the inherited PATH (which may itself be augmented,
   // e.g. by tests injecting a fixture binary first).
@@ -55,20 +57,27 @@ function spawnExecutionBackend(port: string): Promise<boolean> {
     PATH: (process.env.PATH ?? '') + ':' + pathPrefix,
     WORKFLOW_CONTROLLER_INSIGHT_PORT: String(insightPort),
   };
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const child = spawn(EXECUTION_BACKEND_COMMAND, ['web', '--port', port, '--no-open'], {
-      env, cwd: os.homedir(), detached: true, stdio: 'ignore',
+      env, cwd: os.homedir(), detached: true, stdio: ['ignore', 'ignore', 'pipe'],
     });
-    spawnedBackend = { child, port };
-    child.once('close', () => { if (spawnedBackend?.child === child) spawnedBackend = undefined; });
+    const instance: BackendProcess = { child, port };
+    spawnedBackend = instance;
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-2000); });
+    child.once('close', (code, signal) => {
+      instance.failure ??= serviceExitError(code, signal, stderr);
+      if (spawnedBackend === instance) spawnedBackend = undefined;
+    });
     child.once('error', error => {
-      console.error(`[${EXECUTION_BACKEND_COMMAND}] startup failed: ${error.message}`);
-      resolve(false);
+      instance.failure = serviceSpawnError(EXECUTION_BACKEND_COMMAND, error);
+      if (spawnedBackend === instance) spawnedBackend = undefined;
+      reject(instance.failure);
     });
     child.once('spawn', () => {
       console.log(`[${EXECUTION_BACKEND_COMMAND}] started (pid ${child.pid})`);
       child.unref();
-      resolve(true);
+      resolve(instance);
     });
   });
 }
@@ -89,15 +98,14 @@ export async function ensureExecutionBackendRunning(onStarting?: () => void): Pr
   try {
     onStarting?.();
     if (spawnedBackend && spawnedBackend.port !== port) stopExecutionBackendIfStarted();
-    const spawned = spawnedBackend || await spawnExecutionBackend(port);
-    if (!spawned) return false;
+    const instance = spawnedBackend ?? await spawnExecutionBackend(port);
     const deadline = Date.now() + STARTUP_WAIT_MS;
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
       if (await isExecutionBackendReachable(baseUrl)) return true;
-      if (!spawnedBackend) return false;
+      if (instance.failure) throw instance.failure;
     }
-    return false;
+    throw new ServiceStartupError('timeout', baseUrl);
   } finally {
     starting = false;
   }

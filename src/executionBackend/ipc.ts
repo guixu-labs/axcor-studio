@@ -1,10 +1,13 @@
 import { ipcMain } from 'electron';
 import type { ProviderKeyInput } from '../shared/executionBackendIpc';
+import { ExecutionBackendApiError } from './api';
 import type { CreateRunInput } from '../shared/protocol';
-import { ensureInsightRunning, getInsightStatus } from '../observability/insightService';
+import { probeInsight } from '../observability/insightService';
+import type { InsightTarget } from '../observability/insightView';
 import { subscribeExecutionEvents, unsubscribeExecutionEvents } from './events';
 import {
   getRun,
+  isRemoteBackend,
   getRunSessions,
   getBackendBaseUrl,
   importSessionToInsight,
@@ -25,8 +28,22 @@ import {
   testProviderKey,
 } from './http';
 
-export function registerExecutionBackendIpc(): void {
-  ipcMain.handle('execution:start-run', (_event, input: CreateRunInput) => input.runtime === 'session' ? startSessionRun(input) : startWorkflowRun(input));
+export function registerExecutionBackendIpc(
+  prepareRun: (input: CreateRunInput) => Promise<CreateRunInput>,
+  insightTarget: () => InsightTarget,
+): void {
+  ipcMain.handle('execution:start-run', async (_event, input: CreateRunInput) => {
+    const prepared = await prepareRun(input);
+    const remote = isRemoteBackend();
+    try {
+      return await (prepared.runtime === 'session' ? startSessionRun(prepared) : startWorkflowRun(prepared));
+    } catch (error) {
+      if (remote && (!(error instanceof ExecutionBackendApiError) || error.status === 0 || error.status >= 500)) {
+        throw new Error('AXCOR_RUN_UNCERTAIN: Check the remote run list before submitting again.');
+      }
+      throw error;
+    }
+  });
   ipcMain.handle('execution:list-runs', () => listRuns());
   ipcMain.handle('execution:get-run', (_event, runId: string) => getRun(runId));
   ipcMain.handle('execution:stop-run', (_event, runId: string) => stopRun(runId));
@@ -37,10 +54,13 @@ export function registerExecutionBackendIpc(): void {
   ipcMain.handle('execution:set-session-paused', (_event, sessionId: string, paused: boolean) => setSessionPaused(sessionId, paused));
   ipcMain.handle('execution:send-session-reply', (_event, sessionId: string, text: string) => sendSessionReply(sessionId, text));
   ipcMain.handle('execution:import-to-insight', async (_event, sessionId: string) => {
-    await ensureInsightRunning();
+    await insightTarget().ensureReady();
     return importSessionToInsight(sessionId);
   });
-  ipcMain.handle('execution:insight-status', () => getInsightStatus());
+  ipcMain.handle('execution:insight-status', async () => {
+    const { url } = insightTarget();
+    return { running: await probeInsight(url), port: Number(new URL(url).port) };
+  });
   ipcMain.handle('execution:list-providers', () => listProviders());
   ipcMain.handle('execution:list-session-models', (_event, runtime: string) => listSessionModels(runtime));
   ipcMain.handle('execution:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));

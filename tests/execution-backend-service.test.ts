@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackend/lifecycle';
+import { serviceSpawnError } from '../src/serviceStartupError';
 import { setBackendBaseUrl } from '../src/executionBackend/http';
 
 const FAKE_SERVER = `
@@ -99,5 +100,31 @@ test('execution backend lifecycle', async t => {
     stopExecutionBackendIfStarted();
     assert.equal(await isExecutionBackendReachable(url), true);
     await new Promise<void>(resolve => { server.close(() => resolve()); });
+  });
+
+  await t.test('distinguishes a missing interpreter from a process that exits during startup', async () => {
+    const executable = path.join(binDir, 'workflow-controller');
+    const url = `http://127.0.0.1:${await freePort()}`;
+    setBackendBaseUrl(url);
+    const missing = serviceSpawnError('workflow-controller', Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }));
+    assert.equal(missing.reason, 'missing-command');
+    assert.equal(missing.detail, 'workflow-controller');
+    await fs.writeFile(executable, '#!/bin/sh\necho "Invalid server configuration" >&2\nexit 7\n');
+    await assert.rejects(ensureExecutionBackendRunning(), { reason: 'exited', detail: 'exit 7 · Invalid server configuration' });
+  });
+
+  await t.test('reports a readiness timeout while the service process stays alive', async t => {
+    const url = `http://127.0.0.1:${await freePort()}`;
+    setBackendBaseUrl(url);
+    await fs.writeFile(path.join(binDir, 'workflow-controller'),
+      `#!/bin/sh\nexec "${process.execPath}" -e 'setInterval(() => {}, 1000)'\n`);
+    const start = Date.now();
+    let reads = 0;
+    t.mock.method(Date, 'now', () => start + reads++ * 11_000);
+    try {
+      await assert.rejects(ensureExecutionBackendRunning(), { reason: 'timeout', detail: url });
+    } finally {
+      stopExecutionBackendIfStarted();
+    }
   });
 });

@@ -15,7 +15,8 @@ const runRecord = {
 const otherRunRecord = { ...runRecord, run_id: 'run-b', label: 'Second run' };
 const sessionRecord = { session_id: 'sess-1', role: 'executor', context: null, state: 'completed', stop_reason: null, in_flight: false };
 
-function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
+function startFixtureBackend(): Promise<{ url: string; close: () => void; setAvailable: (available: boolean) => void }> {
+  let available = true;
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/api/v1/sessions') {
       res.setHeader('Content-Type', 'application/json');
@@ -23,6 +24,7 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
       return;
     }
     if (req.method === 'GET' && req.url === '/api/v1/runs') {
+      if (!available) { res.writeHead(503).end(); return; }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ runs: [runRecord, otherRunRecord] }));
       return;
@@ -50,7 +52,11 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
   return new Promise(resolve => {
     server.once('listening', () => {
       const address = server.address() as AddressInfo;
-      resolve({ url: `http://127.0.0.1:${address.port}`, close: () => server.close() });
+      resolve({
+        url: `http://127.0.0.1:${address.port}`,
+        close: () => server.close(),
+        setAvailable: value => { available = value; },
+      });
     });
   });
 }
@@ -63,7 +69,7 @@ async function insightLoaded(app: ElectronApplication, url: string): Promise<boo
 test.describe('insight observability view', () => {
   let app: ElectronApplication;
   let page: Page;
-  let fixture: { url: string; close: () => void };
+  let fixture: Awaited<ReturnType<typeof startFixtureBackend>>;
   let insightOrigin: string;
 
   test.beforeAll(async () => {
@@ -162,6 +168,11 @@ http.createServer((req, res) => {
   test('starts Insight on launch and waits for it before opening the workbench', async () => {
     const readyFile = await launch(fixture.url, true);
     page = await app.firstWindow();
+    await expect(page.getByRole('button', { name: '打开远程工作区' })).toBeVisible();
+    await expect(page.locator('.startup-services')).toHaveCount(0);
+    const chooserHeight = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].getContentBounds().height);
+    await page.getByRole('button', { name: '打开本地工作区' }).click();
     await expect(page.getByRole('heading', { name: 'Axcor Studio', exact: true })).toBeVisible();
     await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'ready');
     await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'starting');
@@ -171,7 +182,7 @@ http.createServer((req, res) => {
       visible: window.isVisible(),
       width: window.getContentBounds().width,
       height: window.getContentBounds().height,
-    })))).toEqual([{ visible: true, width: 640, height: 332 }]);
+    })))).toEqual([{ visible: true, width: 640, height: chooserHeight }]);
     await writeFile(readyFile, '');
     const splash = page;
     page = await workbenchPage(app);
@@ -184,16 +195,22 @@ http.createServer((req, res) => {
     expect(status).toEqual({ running: true, port: Number(new URL(insightOrigin).port) });
   });
 
-  test('keeps the startup screen on failure and accepts a corrected backend address', async () => {
-    await launch('http://127.0.0.1:1');
+  test('offers only retry and reuses the configured backend address after failure', async () => {
+    fixture.setAvailable(false);
+    await launch(fixture.url);
     page = await app.firstWindow();
+    await page.getByRole('button', { name: '打开本地工作区' }).click();
     await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'failed');
     await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'ready');
     await expect(page.locator('.app-shell')).toHaveCount(0);
     await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0].getContentBounds().height)).toBe(396);
-    await page.getByLabel('Workflow Controller 地址').fill(fixture.url);
-    await page.getByRole('button', { name: '重试' }).click();
+      BrowserWindow.getAllWindows()[0].getContentBounds().height)).toBe(390);
+    await expect(page.locator('.startup-body').getByRole('button')).toHaveText(['重试']);
+    await expect(page.locator('.startup-body').getByRole('textbox')).toHaveCount(0);
+    fixture.setAvailable(true);
+    const failedService = page.locator('.startup-services li', { hasText: 'Workflow Controller' });
+    await expect(failedService).toContainText('无法连接已配置的服务');
+    await failedService.getByRole('button', { name: '重试 Workflow Controller' }).click();
     page = await workbenchPage(app);
     await expect(page.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
     expect(await page.evaluate(() => window.executionBackend.getBaseUrl())).toBe(fixture.url);

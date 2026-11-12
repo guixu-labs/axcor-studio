@@ -1,9 +1,21 @@
 import http from 'node:http';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { expect } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
-export async function workbenchPage(app: ElectronApplication): Promise<Page> {
+export async function workbenchPage(app: ElectronApplication, chooseLocal = true): Promise<Page> {
+  if (chooseLocal) {
+    const startup = await app.firstWindow();
+    const local = startup.getByRole('button', { name: '打开本地工作区', exact: true });
+    await startup.waitForLoadState('domcontentloaded').catch(() => {});
+    if (!startup.isClosed() && new URL(startup.url()).searchParams.has('startup')) {
+      await startup.locator('.startup-heading').waitFor({ state: 'visible' }).catch(() => {});
+      if (!startup.isClosed() && await startup.getByRole('heading', { name: '选择工作区' }).isVisible()) await local.click();
+    }
+  }
   let page: Page | undefined;
   await expect.poll(async () => {
     const url = await app.evaluate(({ BrowserWindow }) => {
@@ -35,12 +47,18 @@ export async function launchWorkbench(options: Parameters<typeof electron.launch
   const { port } = server.address() as AddressInfo;
   env.EXECUTION_BACKEND_BASE_URL ??= `http://127.0.0.1:${port}`;
   env.CONTEXT_INSIGHT_PORT ??= String(port);
+  const workspace = env.WORKBENCH_WORKSPACE === undefined ? await mkdtemp(path.join(tmpdir(), 'axcor-e2e-workspace-')) : undefined;
+  if (workspace) env.WORKBENCH_WORKSPACE = workspace;
+  const close = (): void => {
+    server.close();
+    if (workspace) void rm(workspace, { recursive: true, force: true });
+  };
   try {
     const app = await electron.launch({ ...options, env });
-    app.process().once('exit', () => server.close());
+    app.process().once('exit', close);
     return app;
   } catch (error) {
-    server.close();
+    close();
     throw error;
   }
 }
