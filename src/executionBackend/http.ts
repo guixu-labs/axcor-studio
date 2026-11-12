@@ -21,20 +21,51 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
+let remote: { url?: string } | undefined;
+let requests = new AbortController();
+
+function invalidateRequests(): void {
+  requests.abort();
+  requests = new AbortController();
+}
+
+export function setRemoteBackend(active: boolean, url?: string, switched = false): void {
+  if (switched) sessionRunIds.clear();
+  invalidateRequests();
+  remote = active ? { url } : undefined;
+}
+
+export function isRemoteBackend(): boolean {
+  return remote !== undefined;
+}
+
+export function isBackendDisconnected(): boolean {
+  return remote !== undefined && remote.url === undefined;
+}
+
 export async function backendRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPath: string, body?: Record<string, unknown>): Promise<T> {
-  const requestBaseUrl = DEFAULT_EXECUTION_BACKEND_URL;
+  const requestBaseUrl = remote ? remote.url : DEFAULT_EXECUTION_BACKEND_URL;
+  if (!requestBaseUrl) throw new ExecutionBackendApiError(0, 'SSH workspace is disconnected. Reconnect and retry.');
+  const context = requests.signal;
+  const signal = AbortSignal.any([context, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
   let response: Response;
   try {
     response = await fetch(requestBaseUrl + apiPath, {
       method,
       headers: { 'Content-Type': 'application/json' },
       ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal,
     });
   } catch (error) {
     throw new ExecutionBackendApiError(0, `无法连接 ${EXECUTION_BACKEND_NAME}（${requestBaseUrl}）：${error instanceof Error ? error.message : String(error)}`);
   }
-  const text = await response.text();
+  let text: string;
+  try {
+    text = await response.text();
+    signal.throwIfAborted();
+  } catch {
+    throw new ExecutionBackendApiError(0, 'Controller response interrupted.');
+  }
   if (!response.ok) {
     if (response.status === 404 && method === 'GET' && apiPath === '/api/v1/runs') {
       throw new ExecutionBackendApiError(404, `地址 ${requestBaseUrl} 未提供 GET /api/v1/runs，请确认该端口运行的是 ${EXECUTION_BACKEND_NAME}。`);
@@ -71,8 +102,12 @@ export async function startWorkflowRun(input: CreateRunInput): Promise<Run> {
   if (input.label) body.label = input.label;
   if (input.params && Object.keys(input.params).length > 0) body.params = input.params;
   if (input.maxParallel !== undefined) body.max_parallel = input.maxParallel;
+  const context = requests.signal;
   const started = await backendRequest<BackendStartRunResponse>('POST', '/api/v1/runs', body);
-  return getRun(started.run_id);
+  context.throwIfAborted();
+  return getRun(started.run_id).catch(() => {
+    throw new ExecutionBackendApiError(0, 'Run was submitted, but its details could not be loaded.');
+  });
 }
 
 export async function startSessionRun(input: CreateRunInput): Promise<Run> {
@@ -93,16 +128,22 @@ export async function startSessionRun(input: CreateRunInput): Promise<Run> {
   if (input.systemPrompt?.trim()) body.system_prompt = input.systemPrompt.trim();
   if (input.maxIterations !== undefined) body.max_iterations = input.maxIterations;
   if (input.reviewerEnabled !== undefined) body.reviewer_enabled = input.reviewerEnabled;
+  const context = requests.signal;
   const started = await backendRequest<{ session_id: string }>('POST', '/api/v1/sessions/start', body);
+  context.throwIfAborted();
   sessionRunIds.add(started.session_id);
-  return getRun(started.session_id);
+  return getRun(started.session_id).catch(() => {
+    throw new ExecutionBackendApiError(0, 'Session was submitted, but its details could not be loaded.');
+  });
 }
 
 export async function listRuns(): Promise<Run[]> {
+  const context = requests.signal;
   const [runsResponse, sessions] = await Promise.all([
     backendRequest<BackendRunListResponse>('GET', '/api/v1/runs'),
     backendRequest<BackendSessionRecord[]>('GET', '/api/v1/sessions'),
   ]);
+  context.throwIfAborted();
   for (const session of sessions) sessionRunIds.add(session.id);
   return [...runsResponse.runs.map(mapRun), ...sessions.map(mapSession)];
 }
@@ -126,12 +167,16 @@ export async function getRun(runId: string): Promise<Run> {
 }
 
 export async function stopRun(runId: string): Promise<Run> {
+  const context = requests.signal;
   if (sessionRunIds.has(runId)) {
     const target = await sessionControlTarget(runId);
+    context.throwIfAborted();
     await backendRequest('POST', `${target.path}/stop`);
+    context.throwIfAborted();
     return getRun(runId);
   }
   await backendRequest<{ run_id: string; status: string; accepted: boolean }>('POST', `/api/v1/runs/${encodeURIComponent(runId)}/stop`);
+  context.throwIfAborted();
   return getRun(runId);
 }
 
@@ -158,14 +203,18 @@ async function sessionControlTarget(sessionId: string): Promise<{ path: string; 
 }
 
 export async function setSessionPaused(sessionId: string, paused: boolean): Promise<void> {
+  const context = requests.signal;
   const target = await sessionControlTarget(sessionId);
+  context.throwIfAborted();
   await backendRequest('POST', `${target.path}/${paused ? 'pause' : 'resume'}`);
 }
 
 export async function sendSessionReply(sessionId: string, message: string): Promise<void> {
   const text = message.trim();
   if (!text) throw new ExecutionBackendApiError(422, 'text is required');
+  const context = requests.signal;
   const target = await sessionControlTarget(sessionId);
+  context.throwIfAborted();
   await backendRequest('POST', `${target.path}/send`, target.workflowMember ? { prompt: text } : { text });
 }
 

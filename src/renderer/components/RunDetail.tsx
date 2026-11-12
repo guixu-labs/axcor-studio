@@ -9,7 +9,9 @@ interface RunDetailProps {
   run: Run;
   events: RunEvent[];
   onStop: () => Promise<void>;
-  onOpenInsight: () => void;
+  onOpenInsight?: () => void;
+  offline?: boolean;
+  openingInsight?: boolean;
   onSetPaused: (paused: boolean) => Promise<void>;
   onSendReply: (text: string) => Promise<void>;
   messages: Messages;
@@ -81,7 +83,7 @@ function RunElapsed({ run, label }: { run: Run; label: string }): JSX.Element | 
   return <time className="run-elapsed" dateTime={'PT' + seconds + 'S'} title={label} aria-label={label + ' ' + time}>{time}</time>;
 }
 
-export function RunDetail({ run, events, onStop, onOpenInsight, onSetPaused, onSendReply, messages }: RunDetailProps): JSX.Element {
+export function RunDetail({ run, events, onStop, onOpenInsight, onSetPaused, onSendReply, offline, openingInsight, messages }: RunDetailProps): JSX.Element {
   const labels = messages.runDetail;
   const stopDialog = useRef<HTMLDialogElement>(null);
   const [reply, setReply] = useState('');
@@ -91,7 +93,7 @@ export function RunDetail({ run, events, onStop, onOpenInsight, onSetPaused, onS
   const isPaused = run.status === 'paused';
   const canReply = isSession && run.status !== 'failed' && run.status !== 'cancelled';
   const canSetPaused = isSession && (run.status === 'running' || isPaused);
-  const stopButton = <button className="secondary-button stop-run-button" type="button" disabled={isTerminalRun(run) || sessionActionPending}
+  const stopButton = <button className="secondary-button stop-run-button" type="button" disabled={offline || isTerminalRun(run) || sessionActionPending}
     onClick={() => stopDialog.current?.showModal()}>{labels.stop}</button>;
   const performSessionAction = async (action: () => Promise<void>): Promise<void> => {
     if (sessionActionPending) return;
@@ -122,7 +124,7 @@ export function RunDetail({ run, events, onStop, onOpenInsight, onSetPaused, onS
         <RunElapsed run={run} label={labels.elapsed} />
       </div>
       <div className="run-actions">
-        <button className="secondary-button" type="button" onClick={onOpenInsight}>{messages.openInInsight}</button>
+        {onOpenInsight && <button className="secondary-button" type="button" disabled={openingInsight} onClick={onOpenInsight}>{openingInsight ? messages.insightHint : messages.openInInsight}</button>}
         {!isSession && stopButton}
       </div>
     </header>
@@ -133,13 +135,13 @@ export function RunDetail({ run, events, onStop, onOpenInsight, onSetPaused, onS
             placeholder={labels.sessionReply} value={reply} disabled={sessionActionPending}
             onChange={event => setReply(event.target.value)} />
           <div className="session-reply-actions">
-            <button className="primary-button" type="button" disabled={sessionActionPending || !reply.trim()} onClick={() => {
+            <button className="primary-button" type="button" disabled={offline || sessionActionPending || !reply.trim()} onClick={() => {
               void performSessionAction(async () => {
                 await onSendReply(reply.trim());
                 setReply('');
               });
             }}>{labels.sendReply}</button>
-            {canSetPaused && <button className="secondary-button" type="button" disabled={sessionActionPending} onClick={() => {
+            {canSetPaused && <button className="secondary-button" type="button" disabled={offline || sessionActionPending} onClick={() => {
               void performSessionAction(() => onSetPaused(!isPaused));
             }}>{isPaused ? labels.resumeSession : labels.pauseSession}</button>}
             {stopButton}

@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackend/lifecycle';
+import { serviceSpawnError } from '../src/serviceStartupError';
 
 const FAKE_SERVER = `
 const http = require('http');
@@ -98,5 +99,30 @@ test('execution backend lifecycle', async t => {
     stopExecutionBackendIfStarted();
     assert.equal(await isExecutionBackendReachable(url), true);
     await new Promise<void>(resolve => { server.close(() => resolve()); });
+  });
+
+  await t.test('distinguishes a missing interpreter from a process that exits during startup', async () => {
+    const executable = path.join(binDir, 'workflow-controller');
+    const port = String(await freePort());
+    const missing = serviceSpawnError('workflow-controller', Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }));
+    assert.equal(missing.reason, 'missing-command');
+    assert.equal(missing.detail, 'workflow-controller');
+    await fs.writeFile(executable, '#!/bin/sh\necho "Invalid server configuration" >&2\nexit 7\n');
+    await assert.rejects(ensureExecutionBackendRunning(undefined, port), { reason: 'exited', detail: 'exit 7 · Invalid server configuration' });
+  });
+
+  await t.test('reports a readiness timeout while the service process stays alive', async t => {
+    const port = String(await freePort());
+    const url = `http://127.0.0.1:${port}`;
+    await fs.writeFile(path.join(binDir, 'workflow-controller'),
+      `#!/bin/sh\nexec "${process.execPath}" -e 'setInterval(() => {}, 1000)'\n`);
+    const start = Date.now();
+    let reads = 0;
+    t.mock.method(Date, 'now', () => start + reads++ * 11_000);
+    try {
+      await assert.rejects(ensureExecutionBackendRunning(undefined, port), { reason: 'timeout', detail: url });
+    } finally {
+      stopExecutionBackendIfStarted();
+    }
   });
 });

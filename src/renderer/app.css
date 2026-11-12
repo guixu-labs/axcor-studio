@@ -49,8 +49,8 @@ button:hover { border-color: color-mix(in srgb, var(--muted) 50%, var(--border))
 h1 { margin: 5px 0 0; color: var(--text); font-size: 26px; letter-spacing: -.035em; } h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 14px; }
 .file-entry { display: flex; align-items: center; gap: 7px; width: 100%; margin: 0; padding: 3px 8px; border: 0; border-radius: 0; background: transparent; color: var(--muted); text-align: left; font-size: 12px; line-height: 22px; } .file-entry:hover { background: var(--surface-3); color: var(--text); } .file-entry.active { background: var(--accent-soft); color: var(--text); box-shadow: inset 2px 0 var(--accent); }
 .workspace-explorer .explorer-heading { flex: none; }
-.explorer-actions { display: flex; align-items: center; gap: 2px; }
-.workspace-empty { display: grid; gap: 12px; padding: 2px 4px 10px; }
+.workspace-empty { padding: 2px 4px 10px; }
+.explorer-workspace-path { margin: 0 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .workspace-empty p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .workspace-open-button {
   padding: 6px 8px;

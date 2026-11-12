@@ -8,6 +8,13 @@ export interface InsightBounds {
   height: number;
 }
 
+export interface InsightTarget {
+  url: string;
+  ensureReady(onStarting?: () => void): Promise<void>;
+}
+
+export const localInsightTarget: InsightTarget = { url: insightBaseUrl, ensureReady: ensureInsightRunning };
+
 let insightView: WebContentsView | null = null;
 let insightVisible = false;
 let insightDark = true;
@@ -38,15 +45,15 @@ export function attachInsightViewTo(window: BrowserWindow): void {
   }
 }
 
-export async function showInsight(path: string, bounds: InsightBounds, isDark: boolean): Promise<void> {
+export async function showInsight(path: string, bounds: InsightBounds, isDark: boolean, target = localInsightTarget): Promise<void> {
   const view = ensureView();
   const request = ++requestId;
-  const url = insightBaseUrl + (path.startsWith('/') ? path : '/' + path);
+  const url = target.url + (path.startsWith('/') ? path : '/' + path);
   insightDark = isDark;
   insightVisible = true;
   view.setBounds(bounds);
   try {
-    await ensureInsightRunning();
+    await target.ensureReady();
     if (request !== requestId) return;
     if (view.webContents.getURL() !== url || view.webContents.isLoadingMainFrame()) {
       view.setVisible(false);

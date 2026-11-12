@@ -63,6 +63,7 @@ export interface GraphRunParams {
 export interface CreateRunInput {
   workflowId: string;
   workspacePath?: string;
+  workspaceId?: string;
   content?: string;
   runtime: RuntimeId;
   programPath?: string;

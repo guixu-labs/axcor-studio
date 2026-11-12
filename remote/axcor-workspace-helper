@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Serve the Axcor workspace file protocol over an authenticated SSH session."""
+
+import errno
+import fcntl
+import hashlib
+import json
+import os
+import secrets
+import shutil
+import socket
+import subprocess
+import stat
+import sys
+from contextlib import contextmanager
+
+MAX_FILE = 2 * 1024 * 1024
+MAX_LINE = 16 * 1024 * 1024
+MAX_NODES = 10_000
+MAX_DEPTH = 16
+SKIP = {'node_modules', 'out', 'dist', '__pycache__'}
+DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def components(path, absolute=False):
+    if not isinstance(path, str) or path.startswith('/') != absolute:
+        raise ValueError('Invalid workspace path')
+    parts = (path[1:] if absolute else path).split('/')
+    if any(part in ('', '.', '..') or '\0' in part for part in parts):
+        raise ValueError('Invalid workspace path')
+    return parts
+
+
+@contextmanager
+def directory(start, parts):
+    fd = os.dup(start)
+    try:
+        for part in parts:
+            child = os.open(part, DIR_FLAGS, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def read_file(parent, name):
+    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+    with os.fdopen(fd, 'rb') as source:
+        info = os.fstat(source.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError('Only regular files are supported')
+        data = source.read(MAX_FILE + 1)
+        if len(data) > MAX_FILE:
+            raise ValueError('File exceeds the 2 MiB editing limit')
+        return data, info
+
+
+def version(data, info):
+    return hashlib.sha256(data + str((info.st_dev, info.st_ino, info.st_mtime_ns, info.st_ctime_ns)).encode()).hexdigest()
+
+
+def save_file(parent, name, content, expected):
+    data = content.encode('utf-8')
+    if len(data) > MAX_FILE:
+        raise ValueError('File exceeds the 2 MiB editing limit')
+    # Serialize writes by Axcor clients in this directory. Check again after
+    # writing the temporary file to detect intervening external edits.
+    fcntl.flock(parent, fcntl.LOCK_EX)
+    temporary = None
+    try:
+        old, info = read_file(parent, name)
+        if version(old, info) != expected:
+            raise ValueError('File changed on the server. Reload before saving.')
+        # Replacing a directory entry alone would bypass the file's write permissions.
+        original = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        try:
+            if not os.path.samestat(info, os.fstat(original)):
+                raise ValueError('File changed on the server. Reload before saving.')
+        finally:
+            os.close(original)
+        candidate = '.axcor-save-' + secrets.token_hex(16)
+        fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+        temporary = candidate
+        with os.fdopen(fd, 'wb') as output:
+            created = os.fstat(output.fileno())
+            if (created.st_uid, created.st_gid) != (info.st_uid, info.st_gid):
+                os.fchown(output.fileno(), info.st_uid, info.st_gid)
+            os.fchmod(output.fileno(), stat.S_IMODE(info.st_mode) & 0o777)
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+        old, info = read_file(parent, name)
+        if version(old, info) != expected:
+            raise ValueError('File changed on the server. Reload before saving.')
+        os.replace(temporary, name, src_dir_fd=parent, dst_dir_fd=parent)
+        temporary = None
+        os.fsync(parent)
+        written = os.stat(name, dir_fd=parent, follow_symlinks=False)
+        return {'content': content, 'version': version(data, written)}
+    finally:
+        if temporary is not None:
+            os.unlink(temporary, dir_fd=parent)
+        fcntl.flock(parent, fcntl.LOCK_UN)
+
+
+def list_tree(root):
+    nodes = []
+
+    def visit(fd, prefix, depth):
+        if depth > MAX_DEPTH:
+            return
+        # Bound the per-directory scan as well as the returned tree.
+        with os.scandir(fd) as entries:
+            candidates = []
+            for entry in entries:
+                if len(candidates) >= MAX_NODES - len(nodes):
+                    break
+                if entry.is_dir(follow_symlinks=False) and not entry.name.startswith('.') and entry.name not in SKIP:
+                    candidates.append((entry.name, 'dir'))
+                elif entry.is_file(follow_symlinks=False) and not entry.name.startswith('.axcor-save-'):
+                    candidates.append((entry.name, 'file'))
+        for name, kind in sorted(candidates, key=lambda item: (item[1], item[0].casefold())):
+            if len(nodes) >= MAX_NODES:
+                break
+            relative = prefix + name
+            nodes.append({'name': name, 'path': relative, 'type': kind})
+            if kind == 'dir':
+                try:
+                    with directory(fd, [name]) as child:
+                        visit(child, relative + '/', depth + 1)
+                except (PermissionError, FileNotFoundError, NotADirectoryError):
+                    continue
+
+    visit(root, '', 0)
+    return nodes
+
+
+def remote_service(action, port, insight_port=None):
+    service, operation = action.split('-', 1)
+    executable_name = 'context-insight' if service == 'insight' else 'workflow-controller'
+    if type(port) is not int or not 1 <= port <= 65535:
+        raise ValueError('Invalid service port')
+    if service == 'controller' and (type(insight_port) is not int or not 1 <= insight_port <= 65535):
+        raise ValueError('Invalid Context Insight port')
+    home = os.path.expanduser('~')
+    state = os.path.join(home, '.local', 'state', 'axcor-studio')
+    os.makedirs(state, mode=0o700, exist_ok=True)
+    lock_path = os.path.join(state, f'{service}-{port}.lock')
+    lock = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 'starting'
+        if operation == 'state':
+            return 'stopped'
+        # A managed or externally started instance can win the race after the
+        # desktop probe. Let the desktop check it without launching a duplicate.
+        with socket.socket() as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                listener.bind(('127.0.0.1', port))
+            except OSError as error:
+                if error.errno == errno.EADDRINUSE:
+                    return 'occupied'
+                raise
+        env = dict(os.environ)
+        env['PATH'] = os.pathsep.join((env.get('PATH', os.defpath), os.path.join(home, '.local', 'bin')))
+        executable = shutil.which(executable_name, path=env['PATH'])
+        if not executable:
+            return 'missing-command'
+        command = [executable]
+        if service == 'insight':
+            env['CONTEXT_INSIGHT_PORT'] = str(port)
+            env['CONTEXT_NO_BROWSER'] = '1'
+        else:
+            env['WORKFLOW_CONTROLLER_INSIGHT_PORT'] = str(insight_port)
+            command += ['web', '--host', '127.0.0.1', '--port', str(port), '--no-open']
+        log_path = os.path.join(state, f'{service}-{port}.log')
+        log = os.open(log_path, os.O_CREAT | os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(log, 'ab') as output:
+            # The launcher inherits the lock. Closing the SSH session leaves the
+            # service and its startup lock alive until the launcher exits.
+            subprocess.Popen(command, cwd=home, env=env, stdin=subprocess.DEVNULL,
+                             stdout=output, stderr=output, start_new_session=True, pass_fds=(lock,))
+        return 'starting'
+    finally:
+        os.close(lock)
+
+
+def dispatch(root, root_path, request):
+    action = request['action']
+    if action in ('insight-start', 'insight-state', 'controller-start', 'controller-state'):
+        return remote_service(action, request['port'], request.get('insightPort'))
+    if action == 'list':
+        return list_tree(root)
+    if action in ('open', 'root'):
+        return root_path
+    parts = components(request['path'])
+    with directory(root, parts[:-1]) as parent:
+        name = parts[-1]
+        if action == 'read':
+            data, info = read_file(parent, name)
+            return {'content': data.decode('utf-8'), 'version': version(data, info)}
+        if action == 'write':
+            return save_file(parent, name, request['content'], request['version'])
+        if action == 'program':
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise ValueError('The workflow must be a regular file')
+                return root_path + '/' + '/'.join(parts)
+            finally:
+                os.close(fd)
+    raise ValueError('Unknown workspace operation')
+
+
+def serve():
+    root = None
+    root_path = None
+    slash = os.open('/', DIR_FLAGS)
+    try:
+        while line := sys.stdin.buffer.readline(MAX_LINE + 1):
+            if len(line) > MAX_LINE:
+                raise ValueError('Workspace request is too large')
+            response = {}
+            try:
+                request = json.loads(line)
+                if root is None:
+                    if request['action'] != 'open':
+                        raise ValueError('Open a workspace first')
+                    root_path = request['root']
+                    with directory(slash, components(root_path, absolute=True)) as opened:
+                        root = os.dup(opened)
+                # Detect replacement of the selected directory before using it.
+                with directory(slash, components(root_path, absolute=True)) as current:
+                    if not os.path.samestat(os.fstat(root), os.fstat(current)):
+                        raise ValueError('Workspace directory changed. Reconnect.')
+                response['value'] = dispatch(root, root_path, request)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as error:
+                response['error'] = ('Symbolic links are not allowed' if isinstance(error, OSError)
+                                     and error.errno == errno.ELOOP else str(error))
+            print(json.dumps(response, ensure_ascii=True), flush=True)
+    finally:
+        if root is not None:
+            os.close(root)
+        os.close(slash)
+
+
+if __name__ == '__main__':
+    if sys.argv[1:] != ['--stdio']:
+        sys.exit('Usage: axcor-workspace-helper --stdio')
+    serve()

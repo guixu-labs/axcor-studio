@@ -191,6 +191,11 @@ http.createServer((req, res) => {
   test('starts Insight on launch and waits for it before opening the workbench', async () => {
     const readyFile = await launch(fixture.url, true);
     page = await app.firstWindow();
+    await expect(page.getByRole('button', { name: '打开远程工作区' })).toBeVisible();
+    await expect(page.locator('.startup-services')).toHaveCount(0);
+    const chooserHeight = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].getContentBounds().height);
+    await page.getByRole('button', { name: '打开本地工作区' }).click();
     await expect(page.getByRole('heading', { name: 'Axcor Studio', exact: true })).toBeVisible();
     await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'ready');
     await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'starting');
@@ -200,7 +205,7 @@ http.createServer((req, res) => {
       visible: window.isVisible(),
       width: window.getContentBounds().width,
       height: window.getContentBounds().height,
-    })))).toEqual([{ visible: true, width: 640, height: 332 }]);
+    })))).toEqual([{ visible: true, width: 640, height: chooserHeight }]);
     await writeFile(readyFile, '');
     const splash = page;
     page = await workbenchPage(app);
@@ -219,12 +224,18 @@ http.createServer((req, res) => {
     try {
       await launch(backend.url);
       page = await app.firstWindow();
-      await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'failed');
+      await page.getByRole('button', { name: '打开本地工作区' }).click();
+      const failedService = page.locator('.startup-services li', { hasText: 'Workflow Controller' });
+      await expect(failedService).toHaveAttribute('data-phase', 'failed');
+      await expect(failedService).toContainText('进程在启动时退出 · exit 1');
       await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'ready');
       await expect(page.locator('.app-shell')).toHaveCount(0);
+      await expect(page.locator('.startup-body').getByRole('button')).toHaveText(['重试']);
       await expect(page.locator('input')).toHaveCount(0);
+      await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0].getContentBounds().height)).toBe(390);
       ready = true;
-      await page.getByRole('button', { name: '重试' }).click();
+      await failedService.getByRole('button', { name: '重试 Workflow Controller' }).click();
       page = await workbenchPage(app);
       await expect(page.locator('.app-shell')).toBeVisible();
     } finally {

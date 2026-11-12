@@ -55,3 +55,32 @@ test.describe('workspace tree', () => {
     await expect(window.getByRole('heading', { name: 'workflow.md' })).toBeVisible();
   });
 });
+
+test('chooses a local directory before checking services or opening the workspace', async () => {
+  const root = test.info().outputPath('selected-workspace');
+  await fs.mkdir(root, { recursive: true });
+  await fs.writeFile(path.join(root, 'workflow.md'), '# Selected at startup\n');
+  const app = await launchWorkbench({
+    args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+  });
+  try {
+    const startup = await app.firstWindow();
+    await app.evaluate(({ dialog }) => {
+      dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
+    });
+    const local = startup.getByRole('button', { name: '打开本地工作区' });
+    await local.click();
+    await expect(local).toBeEnabled();
+    await expect(startup.locator('.startup-services')).toHaveCount(0);
+
+    await app.evaluate(({ dialog }, selected) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
+    }, root);
+    await local.click();
+    const page = await workbenchPage(app, false);
+    await expect(page.locator('.explorer-workspace-path')).toHaveText(root);
+    await expect(page.locator('.view-lines')).toContainText('Selected at startup');
+  } finally {
+    await app.close();
+  }
+});

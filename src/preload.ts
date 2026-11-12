@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { RunEvent } from './shared/protocol';
 import type { ExecutionBackendBridge } from './shared/executionBackendIpc';
-import type { WorkspaceNode } from './workspaceFiles';
+import type { WorkspaceBridge } from './shared/workspace';
 import type { StartupBridge, StartupState } from './shared/startup';
 
 const startup: StartupBridge = {
-  run: () => ipcRenderer.invoke('startup:run'),
+  chooseLocal: () => ipcRenderer.invoke('startup:choose-local'),
+  run: (choice, retry) => ipcRenderer.invoke('startup:run', choice, retry),
   onProgress: listener => {
     const handler = (_event: Electron.IpcRendererEvent, state: StartupState): void => listener(state);
     ipcRenderer.on('startup:progress', handler);
@@ -20,13 +21,21 @@ const startup: StartupBridge = {
 };
 contextBridge.exposeInMainWorld('startup', startup);
 
-contextBridge.exposeInMainWorld('workbench', {
-  chooseWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke('workspace:choose'),
-  getWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke('workspace:get'),
-  listTree: (): Promise<WorkspaceNode[]> => ipcRenderer.invoke('workspace:list-tree'),
-  readFile: (filePath: string): Promise<string> => ipcRenderer.invoke('workspace:read-file', filePath),
-  writeFile: (filePath: string, content: string): Promise<void> => ipcRenderer.invoke('workspace:write-file', filePath, content),
-});
+const workbench: WorkspaceBridge = {
+  listSshHosts: () => ipcRenderer.invoke('workspace:ssh-hosts'),
+  saveSshHost: entry => ipcRenderer.invoke('workspace:ssh-host-save', entry),
+  reconnect: () => ipcRenderer.invoke('workspace:reconnect'),
+  getWorkspace: () => ipcRenderer.invoke('workspace:get'),
+  listTree: id => ipcRenderer.invoke('workspace:list-tree', id),
+  readFile: (id, file) => ipcRenderer.invoke('workspace:read-file', id, file),
+  writeFile: (id, file, content, version) => ipcRenderer.invoke('workspace:write-file', id, file, content, version),
+  onDisconnected: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, id: string): void => listener(id);
+    ipcRenderer.on('workspace:disconnected', handler);
+    return () => { ipcRenderer.removeListener('workspace:disconnected', handler); };
+  },
+};
+contextBridge.exposeInMainWorld('workbench', workbench);
 
 const executionBackend: ExecutionBackendBridge = {
   startRun: input => ipcRenderer.invoke('execution:start-run', input),

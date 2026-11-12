@@ -1,10 +1,21 @@
 import http from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
+import type { AddressInfo } from 'node:net';
 import { expect } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
-export async function workbenchPage(app: ElectronApplication): Promise<Page> {
+export async function workbenchPage(app: ElectronApplication, chooseLocal = true): Promise<Page> {
+  if (chooseLocal) {
+    const startup = await app.firstWindow();
+    const local = startup.getByRole('button', { name: '打开本地工作区', exact: true });
+    await startup.waitForLoadState('domcontentloaded').catch(() => {});
+    if (!startup.isClosed() && new URL(startup.url()).searchParams.has('startup')) {
+      await startup.locator('.startup-heading').waitFor({ state: 'visible' }).catch(() => {});
+      if (!startup.isClosed() && await startup.getByRole('heading', { name: '选择工作区' }).isVisible()) await local.click();
+    }
+  }
   let page: Page | undefined;
   await expect.poll(async () => {
     const url = await app.evaluate(({ BrowserWindow }) => {
@@ -41,8 +52,14 @@ export async function launchWorkbench({
     server.listen(0, '127.0.0.1', resolve);
   });
   const { port } = server.address() as AddressInfo;
+  let temporaryWorkspace: string | undefined;
   let app: ElectronApplication | undefined;
+  const close = (): void => {
+    server.close();
+    if (temporaryWorkspace) void rm(temporaryWorkspace, { recursive: true, force: true });
+  };
   try {
+    const directory = workspace ?? (temporaryWorkspace = await mkdtemp(path.join(tmpdir(), 'axcor-e2e-workspace-')));
     app = await electron.launch({
       ...options,
       args: [
@@ -51,19 +68,14 @@ export async function launchWorkbench({
         `--fixture-insight-port=${insightPort ?? port}`,
       ],
     });
-    app.process().once('exit', () => server.close());
-    if (workspace) {
-      const page = await workbenchPage(app);
-      await app.evaluate(({ dialog }, directory) => {
-        dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] });
-      }, workspace);
-      await page.locator('.workspace-open-button').click();
-      await expect(page.locator('.workspace-open-button')).toHaveCount(0);
-    }
+    app.process().once('exit', close);
+    await app.evaluate(({ dialog }, root) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [root] });
+    }, directory);
     return app;
   } catch (error) {
     await app?.close();
-    server.close();
+    close();
     throw error;
   }
 }

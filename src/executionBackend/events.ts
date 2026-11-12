@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import { createHash } from 'node:crypto';
 import type { RunEvent } from '../shared/protocol';
 import { mapEvent, type BackendEventPage, type BackendSessionEventPage } from './api';
-import { getRun, isSessionRun, backendRequest } from './http';
+import { getRun, isSessionRun, backendRequest, isBackendDisconnected } from './http';
 
 const POLL_INTERVAL_MS = 1_000;
 const POLL_PAGE_SIZE = 200;
@@ -35,7 +35,7 @@ class EventPoller {
   }
 
   private async poll(): Promise<void> {
-    if (this.running) return;
+    if (this.running || isBackendDisconnected()) return;
     this.running = true;
     try {
       if (isSessionRun(this.runId)) await this.pollSession();
