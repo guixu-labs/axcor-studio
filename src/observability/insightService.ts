@@ -2,9 +2,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import { delimiter, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { DEFAULT_INSIGHT_PORT } from '../shared/localServicePorts';
 
-export const insightPort = Number(process.env.CONTEXT_INSIGHT_PORT || '21025');
-export const insightBaseUrl = `http://127.0.0.1:${insightPort}`;
+export const insightBaseUrl = `http://127.0.0.1:${DEFAULT_INSIGHT_PORT}`;
 
 let child: ChildProcess | undefined;
 let starting: Promise<void> | undefined;
@@ -24,18 +24,12 @@ export async function getInsightStatus(): Promise<{ running: boolean; port: numb
   } catch {
     // A stopped or still-starting instance is reported as unavailable.
   }
-  return { running, port: insightPort };
+  return { running, port: DEFAULT_INSIGHT_PORT };
 }
 
 async function startInsight(onStarting?: () => void): Promise<void> {
-  if (!Number.isInteger(insightPort) || insightPort < 1 || insightPort > 65535) {
-    throw new Error('CONTEXT_INSIGHT_PORT must be a valid TCP port');
-  }
   if ((await getInsightStatus()).running) return;
   if (stopping) throw new Error('The workbench is closing');
-  if (process.env.CONTEXT_INSIGHT_NO_AUTOSTART === '1') {
-    throw new Error(`Context Insight is unavailable at ${insightBaseUrl}`);
-  }
 
   onStarting?.();
   let startupError: Error | undefined;
@@ -45,7 +39,7 @@ async function startInsight(onStarting?: () => void): Promise<void> {
       env: {
         ...process.env,
         PATH: [process.env.PATH, join(os.homedir(), '.local', 'bin'), '/usr/local/bin', '/opt/homebrew/bin'].filter(Boolean).join(delimiter),
-        CONTEXT_INSIGHT_PORT: String(insightPort),
+        CONTEXT_INSIGHT_PORT: String(DEFAULT_INSIGHT_PORT),
         CONTEXT_NO_BROWSER: '1',
       },
       stdio: ['ignore', 'inherit', 'inherit'],

@@ -22,8 +22,8 @@ test.describe('monaco editor', () => {
 
   test.beforeEach(async () => {
     app = await launchWorkbench({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
-      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+      workspace: workspaceDir,
     });
     window = await workbenchPage(app);
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));

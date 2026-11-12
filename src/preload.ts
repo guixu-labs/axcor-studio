@@ -5,7 +5,7 @@ import type { WorkspaceNode } from './workspaceFiles';
 import type { StartupBridge, StartupState } from './shared/startup';
 
 const startup: StartupBridge = {
-  run: url => ipcRenderer.invoke('startup:run', url),
+  run: () => ipcRenderer.invoke('startup:run'),
   onProgress: listener => {
     const handler = (_event: Electron.IpcRendererEvent, state: StartupState): void => listener(state);
     ipcRenderer.on('startup:progress', handler);
@@ -29,8 +29,6 @@ contextBridge.exposeInMainWorld('workbench', {
 });
 
 const executionBackend: ExecutionBackendBridge = {
-  setBaseUrl: url => ipcRenderer.invoke('execution:set-base-url', url),
-  getBaseUrl: () => ipcRenderer.invoke('execution:get-base-url'),
   startRun: input => ipcRenderer.invoke('execution:start-run', input),
   listRuns: () => ipcRenderer.invoke('execution:list-runs'),
   getRun: runId => ipcRenderer.invoke('execution:get-run', runId),

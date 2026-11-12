@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import started from 'electron-squirrel-startup';
 import { stopAllExecutionPolls } from './executionBackend/events';
 import { registerExecutionBackendIpc } from './executionBackend/ipc';
@@ -13,7 +12,7 @@ import { registerStartupIpc } from './startup';
 
 if (started) app.quit();
 
-let selectedWorkspace: string | undefined = process.env.WORKBENCH_WORKSPACE && existsSync(process.env.WORKBENCH_WORKSPACE) ? path.resolve(process.env.WORKBENCH_WORKSPACE) : undefined;
+let selectedWorkspace: string | undefined;
 
 const workspacePath = (filePath: string): string => {
   if (!selectedWorkspace) throw new Error('No workspace selected');
@@ -101,7 +100,7 @@ function createWorkbench(sender: WebContents): void {
 }
 
 app.whenReady().then(() => {
-  registerStartupIpc((sender, state) => {
+  registerStartupIpc(sender => !quitting && sender === splashWindow?.webContents, (sender, state) => {
     if (quitting || !splashWindow || sender !== splashWindow.webContents) return;
     if (state.execution.phase === 'ready' && state.insight.phase === 'ready') {
       createWorkbench(sender);

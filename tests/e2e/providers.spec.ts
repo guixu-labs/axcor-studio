@@ -2,7 +2,6 @@ import { launchWorkbench, workbenchPage } from './launch';
 import { test, expect } from '@playwright/test';
 import { type ElectronApplication, type Page } from 'playwright';
 import http from 'node:http';
-import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 
 test.describe('provider settings', () => {
@@ -73,8 +72,8 @@ test.describe('provider settings', () => {
   test.beforeEach(async () => {
     captured = [];
     app = await launchWorkbench({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
-      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: executionBackendUrl },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+      executionUrl: executionBackendUrl,
     });
     window = await workbenchPage(app);
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
@@ -120,7 +119,7 @@ test.describe('provider settings', () => {
     await window.keyboard.press('Enter');
     await expect(runtime).toHaveText(/Claude CLI/);
     await window.getByLabel('API 密钥').fill('sk-new-key');
-    await window.getByLabel('模型').fill('claude-opus-4-6');
+    await window.getByRole('textbox', { name: '模型', exact: true }).fill('claude-opus-4-6');
     await window.getByLabel('地址').fill('https://other.example.com');
     await window.locator('.providers-form').getByRole('button', { name: '测试' }).click();
     await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/test-key')).toBe(true);

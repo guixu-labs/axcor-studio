@@ -6,13 +6,11 @@ import { subscribeExecutionEvents, unsubscribeExecutionEvents } from './events';
 import {
   getRun,
   getRunSessions,
-  getBackendBaseUrl,
   importSessionToInsight,
   injectSessionPrompt,
   listRuns,
   listSessionModels,
   sendSessionReply,
-  setBackendBaseUrl,
   setSessionPaused,
   startWorkflowRun,
   startSessionRun,
@@ -30,8 +28,6 @@ export function registerExecutionBackendIpc(): void {
   ipcMain.handle('execution:list-runs', () => listRuns());
   ipcMain.handle('execution:get-run', (_event, runId: string) => getRun(runId));
   ipcMain.handle('execution:stop-run', (_event, runId: string) => stopRun(runId));
-  ipcMain.handle('execution:set-base-url', (_event, url: string) => { setBackendBaseUrl(url); });
-  ipcMain.handle('execution:get-base-url', () => getBackendBaseUrl());
   ipcMain.handle('execution:get-run-sessions', (_event, runId: string) => getRunSessions(runId));
   ipcMain.handle('execution:inject-prompt', (_event, runId: string, sessionId: string, prompt: string) => injectSessionPrompt(runId, sessionId, prompt));
   ipcMain.handle('execution:set-session-paused', (_event, sessionId: string, paused: boolean) => setSessionPaused(sessionId, paused));

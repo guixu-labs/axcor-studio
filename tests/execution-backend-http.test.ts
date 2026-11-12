@@ -13,7 +13,6 @@ import {
   listProviders,
   saveProviders,
   sendSessionReply,
-  setBackendBaseUrl,
   setSessionPaused,
   startWorkflowRun,
   startSessionRun,
@@ -22,6 +21,7 @@ import {
   testProviderKey,
 } from '../src/executionBackend/http';
 import { ExecutionBackendApiError } from '../src/executionBackend/api';
+import { DEFAULT_EXECUTION_BACKEND_URL } from '../src/shared/executionBackendConfig';
 
 interface CapturedRequest {
   method: string;
@@ -151,7 +151,11 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
 
 test('execution backend HTTP client', async t => {
   const fixture = await createFixtureServer();
-  setBackendBaseUrl(fixture.baseUrl);
+  const fetchRequest = globalThis.fetch;
+  t.mock.method(globalThis, 'fetch', (url: string, init?: RequestInit) => {
+    assert.ok(url.startsWith(DEFAULT_EXECUTION_BACKEND_URL + '/'));
+    return fetchRequest(fixture.baseUrl + url.slice(DEFAULT_EXECUTION_BACKEND_URL.length), init);
+  });
   t.after(() => fixture.server.close());
 
   await t.test('startWorkflowRun posts the workflow payload and maps the run', async () => {
@@ -345,18 +349,17 @@ test('execution backend HTTP client', async t => {
     );
   });
 
-  await t.test('a missing run collection identifies the incompatible backend URL', async () => {
-    const url = fixture.baseUrl + '/legacy';
-    setBackendBaseUrl(url);
+  await t.test('a missing run collection identifies the incompatible backend URL', async subtest => {
+    subtest.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
     await assert.rejects(
       () => listRuns(),
       (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 404 &&
-        error.message.includes(url) && error.message.includes('GET /api/v1/runs'),
+        error.message.includes(DEFAULT_EXECUTION_BACKEND_URL) && error.message.includes('GET /api/v1/runs'),
     );
   });
 
-  await t.test('unreachable backend reports a connection error', async () => {
-    setBackendBaseUrl('http://127.0.0.1:1');
+  await t.test('unreachable backend reports a connection error', async subtest => {
+    subtest.mock.method(globalThis, 'fetch', async () => { throw new Error('Connection refused'); });
     await assert.rejects(
       () => listRuns(),
       (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 0 && error.message.includes('无法连接 Workflow Controller'),

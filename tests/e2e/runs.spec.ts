@@ -167,8 +167,8 @@ test.describe('execution runs', () => {
 
   test.beforeEach(async () => {
     app = await launchWorkbench({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
-      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', EXECUTION_BACKEND_BASE_URL: fixture.url },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+      executionUrl: fixture.url,
     });
     window = await workbenchPage(app);
     window.on('console', message => console.log(`[renderer:${message.type()}] ${message.text()}`));
@@ -414,34 +414,12 @@ test.describe('execution runs', () => {
     await expect(window.getByRole('tab', { name: 'workflow.md', exact: true })).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('restores the backend URL and session mode from legacy settings', async () => {
-    const savedUrl = fixture.url + '/';
-    await window.evaluate(url => {
-      localStorage.setItem('workbench.opsbotUrl', JSON.stringify(url));
+  test('restores session mode from legacy settings', async () => {
+    await window.evaluate(() => {
       localStorage.setItem('workbench.runtime', JSON.stringify('opsbot-session'));
-    }, savedUrl);
+    });
     await window.reload();
     await window.getByRole('button', { name: '运行', exact: true }).click();
     await expect(window.getByLabel('运行时', { exact: true })).toHaveValue('session');
-    await window.locator('.rail-settings').click();
-    await window.getByRole('button', { name: '常规' }).click();
-    await expect(window.getByLabel('Workflow Controller 地址')).toHaveValue(savedUrl);
-    await expect.poll(() => window.evaluate(() => globalThis.window.executionBackend.getBaseUrl())).toBe(fixture.url);
-  });
-
-  test('reconnects when the execution backend URL is changed in settings', async () => {
-    await window.getByRole('button', { name: '运行', exact: true }).click();
-    await window.locator('.rail-settings').click();
-    await window.getByRole('button', { name: '常规' }).click();
-    await window.getByLabel('Workflow Controller 地址').fill('http://127.0.0.1:1');
-    await window.locator('.modal-close').click();
-    await expect(window.locator('.run-list-error')).toContainText('无法连接 Workflow Controller');
-    await window.locator('.rail-settings').click();
-    await window.getByRole('button', { name: '常规' }).click();
-    await window.getByLabel('Workflow Controller 地址').fill(fixture.url);
-    await expect.poll(() => window.evaluate(() => localStorage.getItem('workbench.executionBackendUrl')))
-      .toBe(JSON.stringify(fixture.url));
-    await window.locator('.modal-close').click();
-    await expect(window.getByRole('option', { name: /workflow\.md/ })).toBeVisible();
   });
 });

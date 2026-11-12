@@ -1,3 +1,4 @@
+import { DEFAULT_EXECUTION_BACKEND_URL } from '../../shared/executionBackendConfig';
 import { defaultFont, defaultTheme, fonts, themes } from '../settings';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { localeOptions, type LocaleId, type Messages } from '../i18n';
@@ -14,8 +15,6 @@ interface SettingsModalProps {
   onFontChange: (font: FontId) => void;
   locale: LocaleId;
   onLocaleChange: (locale: LocaleId) => void;
-  executionBackendUrl: string;
-  onExecutionBackendUrlChange: (url: string) => void;
   backgroundImage: string;
   backgroundFit: 'cover' | 'contain';
   onBackgroundImageChange: (dataUrl: string) => void;
@@ -142,28 +141,6 @@ function SelectField({ description, icon, ...select }: CustomSelectProps & { des
   </div>;
 }
 
-interface InputFieldProps {
-  title: string;
-  description: string;
-  icon: string;
-  value: string;
-  ariaLabel: string;
-  onChange: (value: string) => void;
-}
-
-function InputField({ title, description, icon, value, ariaLabel, onChange }: InputFieldProps): JSX.Element {
-  return <div className="settings-field">
-    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
-    <div className="settings-field-main">
-      <div className="settings-field-title">{title}</div>
-      <p className="settings-field-description">{description}</p>
-      <div className="settings-field-control">
-        <input className="settings-input" type="text" value={value} aria-label={ariaLabel} spellCheck={false} onChange={event => onChange(event.target.value)} />
-      </div>
-    </div>
-  </div>;
-}
-
 const PROVIDER_RUNTIME_OPTIONS = [
   { id: 'claude_sdk', label: 'Claude SDK' },
   { id: 'claude_cli', label: 'Claude CLI' },
@@ -204,13 +181,13 @@ function ProviderSection({ icon, title, children }: { icon: string; title: strin
 
 const providerNamesStorageKey = 'workbench.providerNames';
 
-async function providerIdentity(executionBackendUrl: string, provider: ProviderKey): Promise<string> {
-  const config = [executionBackendUrl.trim().replace(/\/+$/, ''), provider.key, provider.runtime, provider.model, provider.base_url];
+async function providerIdentity(provider: ProviderKey): Promise<string> {
+  const config = [DEFAULT_EXECUTION_BACKEND_URL, provider.key, provider.runtime, provider.model, provider.base_url];
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(config)));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function ProvidersPanel({ messages, executionBackendUrl }: { messages: Messages; executionBackendUrl: string }): JSX.Element {
+function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const [providers, setProviders] = useState<Array<ProviderKey & { identity: string }> | null>(null);
   const [providerNames, setProviderNames] = useState(() => loadWorkbenchState<Record<string, string>>(providerNamesStorageKey, {}));
   const [nameDraft, setNameDraft] = useState('');
@@ -227,7 +204,7 @@ function ProvidersPanel({ messages, executionBackendUrl }: { messages: Messages;
   const refresh = async (): Promise<void> => {
     try {
       const rows = await window.executionBackend.listProviders();
-      setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(executionBackendUrl, provider) }))));
+      setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(provider) }))));
       setError(undefined);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
@@ -375,7 +352,7 @@ function ProvidersPanel({ messages, executionBackendUrl }: { messages: Messages;
 const categories = ['general', 'appearance', 'providers'] as const;
 const themeOptions = ['dark', 'light'].flatMap(group => themes.filter(theme => theme.group === group));
 
-export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, executionBackendUrl, onExecutionBackendUrlChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
+export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
   const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
   const categoryLabels: Record<typeof categories[number], string> = { appearance: messages.appearance, general: messages.general, providers: messages.providers };
   const categoryLabel = categoryLabels[activeCategory];
@@ -457,16 +434,8 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                   defaultBadge={messages.defaultBadge}
                   onSelect={value => onLocaleChange(value as LocaleId)}
                 />
-                <InputField
-                  title={messages.executionBackendUrl}
-                  description={messages.executionBackendUrlDescription}
-                  icon="⇄"
-                  value={executionBackendUrl}
-                  ariaLabel={messages.executionBackendUrl}
-                  onChange={onExecutionBackendUrlChange}
-                />
               </div>
-              : <ProvidersPanel messages={messages} executionBackendUrl={executionBackendUrl} />}
+              : <ProvidersPanel messages={messages} />}
         </div>
       </div>
     </section>

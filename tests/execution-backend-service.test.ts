@@ -6,7 +6,6 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackend/lifecycle';
-import { setBackendBaseUrl } from '../src/executionBackend/http';
 
 const FAKE_SERVER = `
 const http = require('http');
@@ -79,9 +78,9 @@ test('execution backend lifecycle', async t => {
 
   await t.test('stops the instance it started on quit', async () => {
     process.env.PATH = binDir + ':' + (process.env.PATH ?? '');
-    const url = `http://127.0.0.1:${await freePort()}`;
-    setBackendBaseUrl(url);
-    assert.equal(await ensureExecutionBackendRunning(), true);
+    const port = String(await freePort());
+    const url = `http://127.0.0.1:${port}`;
+    assert.equal(await ensureExecutionBackendRunning(undefined, port), true);
     assert.equal(await isExecutionBackendReachable(url), true);
     stopExecutionBackendIfStarted();
     assert.equal(await unreachable(url), true);
@@ -93,9 +92,9 @@ test('execution backend lifecycle', async t => {
       res.end(JSON.stringify({ runs: [] }));
     });
     await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', () => resolve()); });
-    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    setBackendBaseUrl(url);
-    assert.equal(await ensureExecutionBackendRunning(), true);
+    const port = String((server.address() as AddressInfo).port);
+    const url = `http://127.0.0.1:${port}`;
+    assert.equal(await ensureExecutionBackendRunning(undefined, port), true);
     stopExecutionBackendIfStarted();
     assert.equal(await isExecutionBackendReachable(url), true);
     await new Promise<void>(resolve => { server.close(() => resolve()); });

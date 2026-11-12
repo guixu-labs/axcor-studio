@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron';
-import { getBackendBaseUrl, setBackendBaseUrl } from './executionBackend/http';
+import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_COMMAND } from './shared/executionBackendConfig';
 import { ensureExecutionBackendRunning } from './executionBackend/lifecycle';
 import { ensureInsightRunning } from './observability/insightService';
 import { initialStartupState, type StartupService, type StartupState } from './shared/startup';
@@ -26,19 +26,22 @@ async function checkService(service: StartupService, check: (onStarting: () => v
   publish();
 }
 
-export function registerStartupIpc(onState: (sender: Electron.WebContents, state: StartupState) => void): void {
-  ipcMain.handle('startup:run', async ({ sender }, executionUrl: string) => {
+export function registerStartupIpc(
+  isStartupWindow: (sender: Electron.WebContents) => boolean,
+  onState: (sender: Electron.WebContents, state: StartupState) => void,
+): void {
+  ipcMain.handle('startup:run', async ({ sender }) => {
+    if (!isStartupWindow(sender)) throw new Error('Invalid startup caller');
     if (inFlight) {
       publish();
     } else {
-      setBackendBaseUrl(executionUrl);
       state = initialStartupState();
       onState(sender, state);
       publish();
       inFlight = Promise.all([
         checkService('execution', async onStarting => {
           if (!await ensureExecutionBackendRunning(onStarting)) {
-            throw new Error(`workflow-controller · ${getBackendBaseUrl()}`);
+            throw new Error(`${EXECUTION_BACKEND_COMMAND} · ${DEFAULT_EXECUTION_BACKEND_URL}`);
           }
         }),
         checkService('insight', ensureInsightRunning),

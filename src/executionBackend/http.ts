@@ -19,22 +19,10 @@ import type {
   RunSession,
 } from '../shared/executionBackendIpc';
 
-const DEFAULT_BASE_URL = process.env.EXECUTION_BACKEND_BASE_URL ?? DEFAULT_EXECUTION_BACKEND_URL;
 const REQUEST_TIMEOUT_MS = 10_000;
 
-let baseUrl = DEFAULT_BASE_URL;
-
-export function setBackendBaseUrl(url: string): void {
-  const trimmed = url.trim().replace(/\/+$/, '');
-  baseUrl = trimmed || DEFAULT_BASE_URL;
-}
-
-export function getBackendBaseUrl(): string {
-  return baseUrl;
-}
-
 export async function backendRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPath: string, body?: Record<string, unknown>): Promise<T> {
-  const requestBaseUrl = baseUrl;
+  const requestBaseUrl = DEFAULT_EXECUTION_BACKEND_URL;
   let response: Response;
   try {
     response = await fetch(requestBaseUrl + apiPath, {

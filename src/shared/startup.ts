@@ -7,7 +7,7 @@ export function initialStartupState(): StartupState {
 }
 
 export interface StartupBridge {
-  run(executionUrl: string): Promise<StartupState>;
+  run(): Promise<StartupState>;
   onProgress(listener: (state: StartupState) => void): () => void;
   workbenchLoaded(error?: string): void;
   onWorkbenchFailed(listener: (message: string) => void): () => void;

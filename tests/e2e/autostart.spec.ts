@@ -48,8 +48,9 @@ test.describe('execution backend auto-start', () => {
 
   test.beforeEach(async () => {
     app = await launchWorkbench({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
-      env: { ...process.env, PATH: binDir + ':' + (process.env.PATH ?? ''), EXECUTION_BACKEND_BASE_URL: `http://127.0.0.1:${backendPort}` },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+      executionUrl: `http://127.0.0.1:${backendPort}`,
+      env: { ...process.env, PATH: binDir + path.delimiter + (process.env.PATH ?? '') },
     });
     window = await workbenchPage(app);
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

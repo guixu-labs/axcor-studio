@@ -59,8 +59,6 @@ export interface ProviderTestResult {
 }
 
 export interface ExecutionBackendBridge {
-  setBaseUrl(url: string): Promise<void>;
-  getBaseUrl(): Promise<string>;
   startRun(input: CreateRunInput): Promise<Run>;
   listRuns(): Promise<Run[]>;
   getRun(runId: string): Promise<Run>;

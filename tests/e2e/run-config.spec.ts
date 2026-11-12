@@ -102,8 +102,8 @@ test.describe('run configuration', () => {
   test.beforeEach(async () => {
     capturedBodies = [];
     app = await launchWorkbench({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
-      env: { ...process.env, EXECUTION_BACKEND_NO_AUTOSTART: '1', WORKBENCH_WORKSPACE: workspaceDir, EXECUTION_BACKEND_BASE_URL: executionBackendUrl },
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+      workspace: workspaceDir, executionUrl: executionBackendUrl,
     });
     window = await workbenchPage(app);
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

@@ -15,7 +15,7 @@ const runRecord = {
 const otherRunRecord = { ...runRecord, run_id: 'run-b', label: 'Second run' };
 const sessionRecord = { session_id: 'sess-1', role: 'executor', context: null, state: 'completed', stop_reason: null, in_flight: false };
 
-function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
+function startFixtureBackend(isReady = () => true): Promise<{ url: string; close: () => void }> {
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/api/v1/sessions') {
       res.setHeader('Content-Type', 'application/json');
@@ -24,7 +24,13 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
     }
     if (req.method === 'GET' && req.url === '/api/v1/runs') {
       res.setHeader('Content-Type', 'application/json');
+      if (!isReady()) { res.writeHead(503).end(); return; }
       res.end(JSON.stringify({ runs: [runRecord, otherRunRecord] }));
+      return;
+    }
+    if (req.url === '/api/observe/data?pageSize=1') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ items: [] }));
       return;
     }
     if (req.method === 'GET' && (req.url === '/api/v1/runs/run-a' || req.url === '/api/v1/runs/run-b')) {
@@ -60,6 +66,32 @@ async function insightLoaded(app: ElectronApplication, url: string): Promise<boo
     webContents.getAllWebContents().some(web => web.getURL() === target && !web.isLoadingMainFrame()), url);
 }
 
+test('reuses ready services and ignores old service preferences', async () => {
+  const backend = await startFixtureBackend();
+  const port = Number(new URL(backend.url).port);
+  const args = ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`];
+  let app: ElectronApplication | undefined;
+  try {
+    app = await launchWorkbench({ args, executionUrl: backend.url, insightPort: port });
+    const workbench = await workbenchPage(app);
+    await workbench.evaluate(() => {
+      localStorage.setItem('workbench.executionBackendUrl', JSON.stringify('http://127.0.0.1:1'));
+      localStorage.setItem('workbench.serviceStartupSettings', JSON.stringify({
+        insightPort: 1, executionAutoStart: false, insightAutoStart: false,
+      }));
+    });
+    await app.close();
+
+    app = await launchWorkbench({ args, executionUrl: backend.url, insightPort: port });
+    const reopened = await workbenchPage(app);
+    expect(await reopened.evaluate(() => window.executionBackend.insightStatus())).toEqual({ running: true, port });
+    expect((await reopened.evaluate(() => window.executionBackend.listRuns())).some(run => run.id === 'run-a')).toBe(true);
+  } finally {
+    await app?.close();
+    backend.close();
+  }
+});
+
 test.describe('insight observability view', () => {
   let app: ElectronApplication;
   let page: Page;
@@ -91,7 +123,7 @@ const { existsSync } = require('node:fs');
 if (process.argv.length !== 2 || process.env.CONTEXT_NO_BROWSER !== '1') process.exit(1);
 http.createServer((req, res) => {
   if (req.url === '/api/observe/data?pageSize=1') {
-    if (!existsSync(process.env.FIXTURE_INSIGHT_READY_FILE)) {
+    if (!existsSync(${JSON.stringify(readyFile)})) {
       res.writeHead(503).end();
       return;
     }
@@ -108,16 +140,13 @@ http.createServer((req, res) => {
 }).listen(Number(process.env.CONTEXT_INSIGHT_PORT), '127.0.0.1');
 `;
     await writeFile(path.join(binDir, 'context-insight'), script, { mode: 0o755 });
+    await writeFile(path.join(binDir, 'workflow-controller'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
     app = await launchWorkbench({
-      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`, path.resolve('.vite/build/main.js')],
+      args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
+      executionUrl: backendUrl, insightPort: port,
       env: {
         ...process.env,
         PATH: [binDir, process.env.PATH].join(path.delimiter),
-        EXECUTION_BACKEND_NO_AUTOSTART: '1',
-        EXECUTION_BACKEND_BASE_URL: backendUrl,
-        CONTEXT_INSIGHT_PORT: String(port),
-        CONTEXT_INSIGHT_NO_AUTOSTART: '0',
-        FIXTURE_INSIGHT_READY_FILE: readyFile,
       },
     });
     return readyFile;
@@ -184,18 +213,22 @@ http.createServer((req, res) => {
     expect(status).toEqual({ running: true, port: Number(new URL(insightOrigin).port) });
   });
 
-  test('keeps the startup screen on failure and accepts a corrected backend address', async () => {
-    await launch('http://127.0.0.1:1');
-    page = await app.firstWindow();
-    await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'failed');
-    await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'ready');
-    await expect(page.locator('.app-shell')).toHaveCount(0);
-    await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0].getContentBounds().height)).toBe(396);
-    await page.getByLabel('Workflow Controller 地址').fill(fixture.url);
-    await page.getByRole('button', { name: '重试' }).click();
-    page = await workbenchPage(app);
-    await expect(page.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
-    expect(await page.evaluate(() => window.executionBackend.getBaseUrl())).toBe(fixture.url);
+  test('retries probing and starting services from the startup screen', async () => {
+    let ready = false;
+    const backend = await startFixtureBackend(() => ready);
+    try {
+      await launch(backend.url);
+      page = await app.firstWindow();
+      await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'failed');
+      await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'ready');
+      await expect(page.locator('.app-shell')).toHaveCount(0);
+      await expect(page.locator('input')).toHaveCount(0);
+      ready = true;
+      await page.getByRole('button', { name: '重试' }).click();
+      page = await workbenchPage(app);
+      await expect(page.locator('.app-shell')).toBeVisible();
+    } finally {
+      backend.close();
+    }
   });
 });

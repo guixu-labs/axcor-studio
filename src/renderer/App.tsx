@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchExecutionClient } from './services/executionClient';
 import type { SessionModelOption } from '../shared/executionBackendIpc';
-import { DEFAULT_EXECUTION_BACKEND_URL } from '../shared/executionBackendConfig';
 import { GRAPH_WORKFLOW_FORMAT, type GraphRunParams, type Run, type RunEvent, type RuntimeId } from '../shared/protocol';
 import { isTerminalRun, runEventKey } from '../shared/run';
 import type { GraphVariableRow } from './components/RunsPanel';
@@ -15,7 +14,7 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
 import type { EditorGroupOrientation } from './workbench/layout';
 import { createWorkbenchLayout, toggleWorkbenchPart } from './workbench/layoutService';
-import { EXECUTION_BACKEND_URL_STORAGE_KEY, loadExecutionBackendUrl, loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
+import { loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
 import { createWorkbenchServices, WorkbenchCommandService } from './workbench/services';
 import { SettingsModal } from './components/SettingsModal';
 import type { FontId, ThemeId } from './components/SettingsModal';
@@ -99,7 +98,6 @@ export default function App(): JSX.Element {
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
   const [backgroundImage, setBackgroundImage] = useState(() => loadWorkbenchState('workbench.backgroundImage', ''));
   const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
-  const [executionBackendUrl, setExecutionBackendUrl] = useState(loadExecutionBackendUrl);
   const [executionError, setExecutionError] = useState<string>();
   const [runtime, setRuntime] = useState<RuntimeId>(() => {
     const stored = loadWorkbenchState<string>('workbench.runtime', 'workflow');
@@ -122,7 +120,6 @@ export default function App(): JSX.Element {
   const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
   const [insightPath, setInsightPath] = useState('/');
   const [insightFailed, setInsightFailed] = useState(false);
-  const effectiveExecutionBackendUrl = executionBackendUrl ?? DEFAULT_EXECUTION_BACKEND_URL;
   const appContent = useRef<HTMLDivElement>(null);
   const importedToInsight = useRef(new Set<string>());
   const t = messages[locale];
@@ -156,7 +153,6 @@ export default function App(): JSX.Element {
     }
   };
   useEffect(() => {
-    void window.executionBackend.setBaseUrl(executionBackendUrl ?? '');
     void window.workbench.getWorkspace().then(current => {
       if (!current) return;
       setWorkspace(current);
@@ -183,7 +179,7 @@ export default function App(): JSX.Element {
       }
     })();
     return () => { cancelled = true; };
-  }, [runtime, modelRuntime, activeNavigation, settingsOpen, executionBackendUrl]);
+  }, [runtime, modelRuntime, activeNavigation, settingsOpen]);
   useEffect(() => {
     if (!selectedRunId) return;
     let pending: RunEvent[] = [];
@@ -550,6 +546,6 @@ export default function App(): JSX.Element {
         <button className="primary-button" type="button" disabled={savingBeforeClose} onClick={() => void finishFileClose(true)}>{t.save}</button>
       </div>
     </dialog>
-    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} executionBackendUrl={effectiveExecutionBackendUrl} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onExecutionBackendUrlChange={url => { setExecutionBackendUrl(url); saveWorkbenchState(EXECUTION_BACKEND_URL_STORAGE_KEY, url); void window.executionBackend.setBaseUrl(url).then(() => client.listRuns()).then(setRuns).catch((error: Error) => setExecutionError(error.message)); }} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
+    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
   </main>;
 }

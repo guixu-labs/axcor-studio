@@ -63,8 +63,6 @@ body.startup-window { min-width: 0; }
 [data-phase="failed"] .startup-indicator { background: #ff8999; }
 .startup-error { margin: 12px 0 0; color: #ffb1b9; overflow-wrap: anywhere; }
 .startup-retry { display: flex; align-items: end; justify-content: end; gap: 12px; margin-top: 20px; }
-.startup-retry label { display: grid; flex: 1; gap: 5px; color: #adb6d0; font-size: 12px; }
-.startup-retry input { width: 100%; padding: 8px 10px; border: 1px solid #4b5270; border-radius: 6px; background: #0b0e19; color: #f1f3fa; font: inherit; }
 .startup-retry button { border-color: #8e84fa; background: #4b408c; }
 .startup-body:has(.startup-retry) { padding-block: 8px; }
 .startup-body:has(.startup-retry) .startup-services { margin-top: 12px; }
