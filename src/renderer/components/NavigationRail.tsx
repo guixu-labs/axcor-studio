@@ -5,7 +5,27 @@ interface NavigationRailProps {
 }
 
 export function NavigationRail({ active, onSelect, messages }: NavigationRailProps): JSX.Element {
-  const localizedItems = [{ id: 'workbench', label: messages.workbench, icon: '⌘' }, { id: 'runs', label: messages.runs, icon: '▶' }, { id: 'insight', label: messages.insight, icon: '◉' }];
+  const localizedItems = [
+    {
+      id: 'workbench',
+      label: messages.workbench,
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M9 4v16m4-11h4m-4 4h4" />
+      </svg>,
+    },
+    { id: 'runs', label: messages.runs, icon: '▶' },
+    {
+      id: 'insight',
+      label: messages.insight,
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M6.5 12h2.75l2-4 2.5 8 2-4h1.75" />
+      </svg>,
+    },
+  ];
   return <nav className="navigation-rail" aria-label={messages.workbench}>
     <div className="rail-items">
       {localizedItems.map(item => <button
