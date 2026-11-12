@@ -169,11 +169,25 @@ function providerRuntimeLabel(runtime?: string): string {
   return PROVIDER_RUNTIME_OPTIONS.find(item => item.id === runtime)?.label ?? runtime ?? '';
 }
 
-function ProviderSection({ icon, title, children }: { icon: string; title: string; children: ReactNode }): JSX.Element {
+type ProviderResult = { failed: boolean; message: string };
+
+function ProviderFeedback({ result }: { result?: ProviderResult }): JSX.Element {
+  return <span className="provider-feedback" title={result?.message}>
+    <span role="status">{result && !result.failed && <>
+      <span aria-hidden="true">✓ </span>{result.message}
+    </>}</span>
+    <span role="alert">{result?.failed && result.message}</span>
+  </span>;
+}
+
+function ProviderSection({ icon, title, children, result }: { icon: string; title: string; children: ReactNode; result?: ProviderResult }): JSX.Element {
   return <section className="settings-field">
     <span className="settings-field-icon" aria-hidden="true">{icon}</span>
     <div className="settings-field-main">
-      <h3 className="settings-field-title">{title}</h3>
+      <div className="provider-section-heading">
+        <h3 className="settings-field-title">{title}</h3>
+        <ProviderFeedback result={result} />
+      </div>
       <div className="settings-field-control">{children}</div>
     </div>
   </section>;
@@ -191,23 +205,24 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const [providers, setProviders] = useState<Array<ProviderKey & { identity: string }> | null>(null);
   const [providerNames, setProviderNames] = useState(() => loadWorkbenchState<Record<string, string>>(providerNamesStorageKey, {}));
   const [nameDraft, setNameDraft] = useState('');
-  const [error, setError] = useState<string>();
-  const [notice, setNotice] = useState<string>();
+  const [listResult, setListResult] = useState<ProviderResult>();
   const [activeIndex, setActiveIndex] = useState<number>();
   const [key, setKey] = useState('');
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [runtime, setRuntime] = useState('claude_sdk');
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState<string>();
+  const [candidateResult, setCandidateResult] = useState<ProviderResult>();
+  const [cardResult, setCardResult] = useState<ProviderResult & { cardId: string }>();
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   const refresh = async (): Promise<void> => {
     try {
       const rows = await window.executionBackend.listProviders();
       setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(provider) }))));
-      setError(undefined);
     } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
+      setListResult({ failed: true, message: refreshError instanceof Error ? refreshError.message : String(refreshError) });
     }
   };
   useEffect(() => { void refresh(); }, []);
@@ -222,31 +237,42 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
     saveWorkbenchState(providerNamesStorageKey, names);
   };
 
-  const run = async (action: () => Promise<void>): Promise<void> => {
+  const run = async (
+    action: () => Promise<void>,
+    report: (result?: ProviderResult) => void,
+    testId?: string,
+  ): Promise<void> => {
     setBusy(true);
-    setNotice(undefined);
+    setTesting(testId);
+    report(undefined);
     try {
       await action();
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : String(actionError));
+      const detail = actionError instanceof Error ? actionError.message : String(actionError);
+      report({ failed: true, message: testId ? `${messages.providerTestFailed}：${detail}` : detail });
     } finally {
+      setTesting(undefined);
       setBusy(false);
     }
   };
 
-  const testCandidate = async (): Promise<void> => {
-    setNotice(undefined);
-    setError(undefined);
-    try {
-      const result = await window.executionBackend.testProviderKey(key.trim(), model.trim(), baseUrl.trim(), runtime);
-      setNotice(result.success === false || result.error ? `${messages.providerTestFailed}：${result.error ?? 'unknown'}` : messages.providerTestPassed);
-    } catch (testError) {
-      setError(testError instanceof Error ? testError.message : String(testError));
+  const testResult = (result: { success?: boolean; error?: string }): ProviderResult => {
+    if (result.success === false || result.error) {
+      return { failed: true, message: result.error ? `${messages.providerTestFailed}：${result.error}` : messages.providerTestFailed };
     }
+    return { failed: false, message: messages.providerTestPassed };
   };
 
+  const testCandidate = (): Promise<void> => run(async () => {
+    const result = await window.executionBackend.testProviderKey(key.trim(), model.trim(), baseUrl.trim(), runtime);
+    setCandidateResult(testResult(result));
+  }, setCandidateResult, 'candidate');
+
   const addProvider = async (): Promise<void> => {
-    if (!key.trim()) { setError(messages.providerKey + ' 不能为空'); return; }
+    if (!key.trim()) {
+      setCandidateResult({ failed: true, message: messages.providerKey + ' 不能为空' });
+      return;
+    }
     await run(async () => {
       const rows = (providers ?? []).map(provider => ({
         key: provider.key,
@@ -256,22 +282,27 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
       }));
       rows.push({ key: key.trim(), ...(model.trim() ? { model: model.trim() } : {}), ...(baseUrl.trim() ? { base_url: baseUrl.trim() } : {}), runtime });
       const saved = await window.executionBackend.saveProviders(rows);
-      if (!saved.ok) { setError(saved.error ?? '保存失败'); return; }
+      if (!saved.ok) {
+        setCandidateResult({ failed: true, message: saved.error ?? '保存失败' });
+        return;
+      }
       setKey(''); setModel(''); setBaseUrl('');
-      setNotice(messages.providerSaved);
+      setCandidateResult({ failed: false, message: messages.providerSaved });
+      setListResult(undefined);
       await refresh();
-    });
+    }, setCandidateResult);
   };
 
   return <div className="settings-fields">
-    {error && <p className="run-list-error" role="alert">{error}</p>}
-    {notice && <p className="providers-notice" role="status">{notice}</p>}
     <ProviderSection icon="＋" title={messages.addProvider}>
       <div className="providers-form">
-        <div className="providers-form-grid">
+        <fieldset className="providers-form-grid" disabled={testing === 'candidate'} onChange={() => setCandidateResult(undefined)}>
           <div className="run-config-field">
             <span className="run-config-title">{messages.providerRuntime}</span>
-            <CustomSelect title={messages.providerRuntime} items={PROVIDER_RUNTIME_OPTIONS} selected={runtime} onSelect={setRuntime} />
+            <CustomSelect title={messages.providerRuntime} items={PROVIDER_RUNTIME_OPTIONS} selected={runtime} onSelect={value => {
+              setRuntime(value);
+              setCandidateResult(undefined);
+            }} />
           </div>
           <label className="run-config-field">
             <span className="run-config-title">{messages.providerBaseUrl}</span>
@@ -285,22 +316,26 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
             <span className="run-config-title">{messages.providerKey}</span>
             <input className="run-config-input" type="password" value={key} aria-label={messages.providerKey} onChange={event => setKey(event.target.value)} />
           </label>
-        </div>
+        </fieldset>
         <div className="providers-form-actions">
-          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void testCandidate()}>{messages.testKey}</button>
+          <button className="settings-image-button provider-test-button" type="button" disabled={busy} aria-busy={testing === 'candidate'} onClick={() => void testCandidate()}>
+            {testing === 'candidate' ? messages.providerTesting : messages.testKey}
+          </button>
           <button className="settings-image-button" type="button" disabled={busy} onClick={() => void addProvider()}>{messages.add}</button>
+          <ProviderFeedback result={candidateResult} />
         </div>
       </div>
     </ProviderSection>
-    <ProviderSection icon="☷" title={messages.providersExisting}>
+    <ProviderSection icon="☷" title={messages.providersExisting} result={listResult}>
       <div className="provider-list">
-        {providers === null && !error && <p className="providers-empty">{messages.providersDescription}</p>}
-        {providers?.length === 0 && !error && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
+        {providers === null && !listResult?.failed && <p className="providers-empty">{messages.providersDescription}</p>}
+        {providers?.length === 0 && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
         {providers?.map(provider => {
           const cardId = `${provider.provider_index}:${provider.identity}`;
           const isExpanded = cardId === expandedCard;
           const customName = providerNames[provider.identity] ?? '';
           const defaultName = [providerRuntimeLabel(provider.runtime), provider.model].filter(Boolean).join(' · ') || messages.defaultBadge;
+          const reportCardResult = (result?: ProviderResult): void => setCardResult(result && { ...result, cardId });
           return <div className={'provider-row provider-card' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={cardId}>
             <button className="provider-card-head" type="button" aria-expanded={isExpanded} onClick={() => {
               setNameDraft(customName);
@@ -324,22 +359,26 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
                 <span>{messages.providerKey}：{provider.masked}</span>
               </div>
               <div className="provider-actions">
-                <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
-                  const result = await window.executionBackend.testProvider(provider.provider_index);
-                  if (result.success === false || result.error) {
-                    setError(`${messages.providerTestFailed}：${result.error ?? 'unknown'}`);
-                  } else {
-                    setNotice(messages.providerTestPassed);
+                <button className="settings-image-button" type="button" disabled={busy} aria-busy={testing === cardId} onClick={() => void run(async () => {
+                  const result = testResult(await window.executionBackend.testProvider(provider.provider_index));
+                  reportCardResult(result);
+                  if (!result.failed) {
+                    setListResult(undefined);
                     await refresh();
                   }
-                })}>{messages.testKey}</button>
+                }, reportCardResult, cardId)}>{testing === cardId ? messages.providerTesting : messages.testKey}</button>
                 <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
                   const result = await window.executionBackend.activateProvider(provider.provider_index);
-                  if (!result.ok) { setError('激活失败'); return; }
-                  setError(undefined);
+                  if (!result.ok) { reportCardResult({ failed: true, message: '激活失败' }); return; }
                   setActiveIndex(result.activeIndex ?? provider.provider_index);
-                })}>{messages.providerActive}</button>
-                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => { await window.executionBackend.deleteProvider(provider.provider_index); setExpandedCard(null); setNotice(messages.providerDeleted); await refresh(); })}>×</button>
+                }, reportCardResult)}>{messages.providerActive}</button>
+                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => {
+                  await window.executionBackend.deleteProvider(provider.provider_index);
+                  setExpandedCard(null);
+                  setListResult({ failed: false, message: messages.providerDeleted });
+                  await refresh();
+                }, setListResult)}>{messages.deleteProvider}</button>
+                <ProviderFeedback result={cardResult?.cardId === cardId ? cardResult : undefined} />
               </div>
             </div>}
           </div>;

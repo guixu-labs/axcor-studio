@@ -38,11 +38,14 @@ export interface Messages {
   providers: string; providersDescription: string; providerKey: string; providerModel: string; providerBaseUrl: string; providerRuntime: string;
   providerActive: string; providerValidated: string; providerFailed: string; providerUntested: string; addProvider: string; testKey: string; saveProviders: string;
   providerTestPassed: string; providerTestFailed: string; providerSaved: string; providerDeleted: string; providerName: string;
+  providerTesting: string; deleteProvider: string;
   providersExisting: string; add: string;
 }
 
 export const messages: Record<LocaleId, Messages> = {
   'zh-CN': {
+    providerTesting: '测试中…',
+    deleteProvider: '删除',
     openFileHint: '从左侧工作区打开文件',
     runDetail: {
       log: '运行日志', waiting: '等待运行事件…', overview: '概览', id: '运行 ID', iteration: '迭代', elapsed: '耗时',
@@ -61,6 +64,8 @@ export const messages: Record<LocaleId, Messages> = {
     unsavedChanges: '有未保存的修改', saveChangesTitle: file => `是否保存对 ${file} 的修改？`, saveChangesMessage: '如果不保存，本次修改将丢失。', dontSave: '不保存', saveFileFailed: '保存失败，修改仍保留在编辑器中。', insight: '观测', insightHint: '正在加载 Context Insight。', insightLoadFailed: '无法加载观测视图。请确认 context-insight 可运行，然后重新打开观测页。', openInInsight: '在 Insight 中查看', noObservableSessions: '该运行没有可观测的会话', backgroundImage: '背景图', backgroundImageDescription: '文件区和运行区空态共用的背景图，支持常见图片格式（不超过 3MB）。', backgroundFit: '背景图显示方式', backgroundFitDescription: '选择背景图在文件区和运行区空态的显示方式。', fitCover: '铺满', fitContain: '完整显示', chooseImage: '选择图片', removeImage: '移除', emptyWorkspace: '工作区为空', runProgramPath: '运行文件', graphDefault: '使用 Graph 配置', graphReviewer: 'Reviewer', enabled: '启用', disabled: '禁用', runConfig: '运行配置', runtime: '运行时', runLabel: '运行名称', runLabelPlaceholder: '默认使用文件名', graphVariables: '工作流变量', addGraphVariable: '添加变量', paramKeyPlaceholder: '键', paramValuePlaceholder: '值', maxParallel: '最大并行数', removeGraphVariable: '移除变量', agentRuntime: 'Agent 运行时', sessionPrompt: '提示词', sessionModel: '模型', sessionSelectModel: '请选择模型', sessionModelsLoading: '正在加载模型…', sessionModelsUnavailable: '无法加载模型列表', sessionModelsEmpty: '该运行时没有可用模型', sessionSystemPrompt: '系统提示词', sessionMaxIterations: '最大迭代', sessionReviewerEnabled: '启用 Reviewer', prompt: '提示词', promptPlaceholder: '可选的工作流初始提示词', providers: '模型供应商', providersDescription: `配置 ${EXECUTION_BACKEND_NAME} 的模型供应商密钥与端点，供会话运行使用。`, providerKey: 'API 密钥', providerModel: '模型', providerBaseUrl: '地址', providerRuntime: '运行时', providerActive: '使用', providerValidated: '校验通过', providerFailed: '校验失败', providerUntested: '未校验', addProvider: '添加供应商', testKey: '测试', saveProviders: '保存供应商', providerTestPassed: '测试通过', providerTestFailed: '测试失败', providerSaved: '供应商已保存', providerDeleted: '供应商已删除', providerName: '显示名称', providersExisting: '已有供应商', add: '添加',
   },
   'en-US': {
+    providerTesting: 'Testing…',
+    deleteProvider: 'Delete',
     openFileHint: 'Open a file from the workspace sidebar',
     runDetail: {
       log: 'Run log', waiting: 'Waiting for run events…', overview: 'Overview', id: 'Run ID', iteration: 'Iteration', elapsed: 'Elapsed',

@@ -10,6 +10,12 @@ test.describe('provider settings', () => {
   let executionBackendUrl: string;
   let backendServer: http.Server;
   let captured: Array<{ method: string; url: string; body: Record<string, unknown> }> = [];
+  let finishCandidateTest: ((result: { success: boolean; error?: string }) => void) | undefined;
+
+  function respondToCandidateTest(result: { success: boolean; error?: string }): void {
+    finishCandidateTest?.(result);
+    finishCandidateTest = undefined;
+  }
 
   test.beforeAll(async () => {
     backendServer = http.createServer((req, res) => {
@@ -41,7 +47,7 @@ test.describe('provider settings', () => {
         }
         if (req.method === 'POST' && req.url === '/api/v1/auth/test-key') {
           record();
-          res.end(JSON.stringify({ success: true }));
+          finishCandidateTest = result => res.end(JSON.stringify(result));
           return;
         }
         if (req.method === 'POST' && req.url?.startsWith('/api/v1/auth/keys/') && req.url.endsWith('/test')) {
@@ -71,6 +77,7 @@ test.describe('provider settings', () => {
 
   test.beforeEach(async () => {
     captured = [];
+    finishCandidateTest = undefined;
     app = await launchWorkbench({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
       executionUrl: executionBackendUrl,
@@ -85,6 +92,7 @@ test.describe('provider settings', () => {
   });
 
   test.afterEach(async () => {
+    respondToCandidateTest({ success: false });
     if (app) await app.close();
   });
 
@@ -121,8 +129,29 @@ test.describe('provider settings', () => {
     await window.getByLabel('API 密钥').fill('sk-new-key');
     await window.getByRole('textbox', { name: '模型', exact: true }).fill('claude-opus-4-6');
     await window.getByLabel('地址').fill('https://other.example.com');
-    await window.locator('.providers-form').getByRole('button', { name: '测试' }).click();
-    await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/test-key')).toBe(true);
+    const form = window.locator('.providers-form');
+    const originalCardY = (await card.boundingBox())?.y;
+    await form.getByRole('button', { name: '测试', exact: true }).click();
+    await expect(form.getByRole('button', { name: '测试中…' })).toBeDisabled();
+    await expect(form.getByRole('button', { name: '添加', exact: true })).toBeDisabled();
+    await expect.poll(() => Boolean(finishCandidateTest)).toBe(true);
+    respondToCandidateTest({ success: false, error: 'Invalid API key' });
+    await expect(form.getByRole('alert')).toHaveText('测试失败：Invalid API key');
+    expect((await card.boundingBox())?.y).toBe(originalCardY);
+    await form.getByRole('button', { name: '测试', exact: true }).click();
+    await expect.poll(() => Boolean(finishCandidateTest)).toBe(true);
+    respondToCandidateTest({ success: true });
+    const candidateStatus = form.getByRole('status');
+    await expect(candidateStatus).toContainText('测试通过');
+    await expect(candidateStatus).toHaveCSS('text-align', 'end');
+    const [testBox, addBox, statusBox] = await Promise.all([
+      form.getByRole('button', { name: '测试', exact: true }).boundingBox(),
+      form.getByRole('button', { name: '添加', exact: true }).boundingBox(),
+      candidateStatus.boundingBox(),
+    ]);
+    expect(testBox!.x).toBeLessThan(addBox!.x);
+    expect(addBox!.x).toBeLessThan(statusBox!.x);
+    expect((await card.boundingBox())?.y).toBe(originalCardY);
     // Add and save the provider list.
     await window.getByRole('button', { name: '添加', exact: true }).click();
     await expect.poll(() => captured.some(request => request.method === 'POST' && request.url === '/api/v1/auth/keys')).toBe(true);
@@ -130,15 +159,29 @@ test.describe('provider settings', () => {
     expect((save?.body.keys as Array<Record<string, unknown>>).length).toBe(2);
     expect((save?.body.keys as Array<Record<string, unknown>>)[1].key).toBe('sk-new-key');
     expect((save?.body.keys as Array<Record<string, unknown>>)[1].runtime).toBe('claude_cli');
+    await expect(form.getByRole('status')).toContainText('供应商已保存');
+    expect((await card.boundingBox())?.y).toBe(originalCardY);
     // Expand the first card and activate the provider.
     await window.locator('.provider-card').first().locator('.provider-card-head').click();
+    const cardBeforeTest = await card.boundingBox();
+    const cardActions = card.locator('.provider-actions').getByRole('button');
+    const buttonSizes = await cardActions.evaluateAll(buttons =>
+      buttons.map(button => {
+        const { width, height } = button.getBoundingClientRect();
+        return { width, height };
+      }),
+    );
+    expect(buttonSizes).toEqual(Array(3).fill(buttonSizes[0]));
+    await card.getByRole('button', { name: '测试', exact: true }).click();
+    await expect(card.getByRole('status')).toContainText('测试通过');
+    expect(await card.boundingBox()).toEqual(cardBeforeTest);
     await window.locator('.provider-card').first().getByRole('button', { name: '使用' }).click();
     await expect.poll(() => captured.some(request => request.url === '/api/v1/auth/activate')).toBe(true);
     expect(captured.find(request => request.url === '/api/v1/auth/activate')?.body.index).toBe(0);
     await expect(card.locator('.provider-chip-active')).toBeVisible();
-    await expect(window.locator('.providers-notice')).toHaveCount(0);
+    await expect(card.getByRole('status')).toBeEmpty();
     // Delete the first provider.
-    await window.locator('.provider-card').first().getByRole('button', { name: '×' }).click();
+    await card.getByRole('button', { name: '删除', exact: true }).click();
     await expect.poll(() => captured.some(request => request.method === 'DELETE')).toBe(true);
   });
 });
