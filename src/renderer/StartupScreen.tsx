@@ -8,8 +8,6 @@ import { loadWorkbenchState, saveWorkbenchState } from './workbench/storage';
 import './startup.css';
 
 export function StartupScreen(): JSX.Element {
-  const remoteDialog = useRef<HTMLDialogElement>(null);
-  const [remoteFormOpen, setRemoteFormOpen] = useState(false);
   const [choice, setChoice] = useState<StartupChoice>();
   const [workspaceLabel, setWorkspaceLabel] = useState('');
   const [busy, setBusy] = useState(false);
@@ -69,6 +67,22 @@ export function StartupScreen(): JSX.Element {
       setBusy(false);
     }
   };
+  const chooseRemote = async (): Promise<void> => {
+    setBusy(true);
+    setRequestError('');
+    try {
+      const config = await window.startup.chooseRemote(english);
+      if (config) {
+        setWorkspaceLabel(config.host + ':' + config.root);
+        saveWorkbenchState(REMOTE_WORKSPACE_KEY, config);
+        await run({ kind: 'ssh', config });
+      }
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = window.startup.onProgress(setState);
@@ -102,10 +116,7 @@ export function StartupScreen(): JSX.Element {
             <span className="startup-workspace-copy"><strong>{localLabel}</strong><small>{copy.localHint}</small></span>
             <span className="startup-workspace-arrow" aria-hidden="true">›</span>
           </button>
-          <button className="startup-workspace-card" type="button" aria-label={remoteCopy.open} disabled={busy} onClick={() => {
-            setRemoteFormOpen(true);
-            remoteDialog.current?.showModal();
-          }}>
+          <button className="startup-workspace-card" type="button" aria-label={remoteCopy.open} disabled={busy} onClick={() => void chooseRemote()}>
             <span className="startup-workspace-icon" data-icon="terminal" aria-hidden="true"><i /></span>
             <span className="startup-workspace-copy"><strong>{remoteCopy.open}</strong><small>{copy.remoteHint}</small></span>
             <span className="startup-workspace-arrow" aria-hidden="true">›</span>
@@ -131,16 +142,30 @@ export function StartupScreen(): JSX.Element {
           {choice && <button className="startup-retry" type="button" disabled={busy} onClick={() => void run(choice)}>{copy.retry}</button>}
         </div>}
       </div>
-      <dialog ref={remoteDialog} className="workbench-dialog startup-remote-dialog" aria-label={remoteCopy.open}
-        onClose={() => setRemoteFormOpen(false)}>
-        {remoteFormOpen && <RemoteWorkspaceForm english={english} onCancel={() => remoteDialog.current?.close()} onConnect={async config => {
-          remoteDialog.current?.close();
-          setWorkspaceLabel(config.host + ':' + config.root);
-          saveWorkbenchState(REMOTE_WORKSPACE_KEY, config);
-          await run({ kind: 'ssh', config });
-        }} />}
-      </dialog>
       {choice && <progress className="startup-progress" max={services.length} value={readyCount} aria-label={copy.title} />}
     </main>
   );
+}
+
+export function RemoteWorkspaceScreen(): JSX.Element {
+  const content = useRef<HTMLElement>(null);
+  const english = loadWorkbenchState<LocaleId>('workbench.locale', 'zh-CN') === 'en-US';
+  const { open } = remoteWorkspaceCopy(english);
+  useEffect(() => {
+    document.title = open;
+    const element = content.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => window.startup.resizeRemote(element.getBoundingClientRect().height));
+    observer.observe(element);
+    const cancel = (event: KeyboardEvent): void => { if (event.key === 'Escape') window.close(); };
+    window.addEventListener('keydown', cancel);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('keydown', cancel);
+    };
+  }, [open]);
+  return <main ref={content} className="startup-remote-workspace" aria-label={open}>
+    <RemoteWorkspaceForm english={english} onCancel={() => window.close()}
+      onConnect={async config => { window.startup.submitRemote(config); }} />
+  </main>;
 }

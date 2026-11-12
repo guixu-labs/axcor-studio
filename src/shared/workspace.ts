@@ -25,13 +25,19 @@ export interface WorkspaceFile {
   version?: string;
 }
 
+export interface WorkspaceFileChange {
+  tree: boolean;
+  paths: string[] | null;
+}
+
 export interface WorkspaceBridge {
   listSshHosts(): Promise<string[]>;
   saveSshHost(entry: SshHostEntry): Promise<string>;
   reconnect(): Promise<Workspace>;
   getWorkspace(): Promise<Workspace | undefined>;
-  listTree(id: string): Promise<WorkspaceNode[]>;
+  listTree(id: string, directory?: string): Promise<WorkspaceNode[]>;
   readFile(id: string, file: string): Promise<WorkspaceFile>;
   writeFile(id: string, file: string, content: string, version?: string): Promise<WorkspaceFile>;
   onDisconnected(listener: (id: string) => void): () => void;
+  onFilesChanged(listener: (id: string, change: WorkspaceFileChange) => void): () => void;
 }

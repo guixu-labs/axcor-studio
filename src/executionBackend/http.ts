@@ -1,4 +1,5 @@
 import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_NAME } from '../shared/executionBackendConfig';
+import { importInsightTranscript } from '../observability/insightService';
 import type { CreateRunInput, Run } from '../shared/protocol';
 import {
   mapRun,
@@ -226,9 +227,24 @@ export async function injectSessionPrompt(runId: string, sessionId: string, prom
   );
 }
 
-export async function importSessionToInsight(sessionId: string): Promise<InsightImportResult> {
-  const result = await backendRequest<InsightImportResult>('POST', `/api/v1/insight/import?session_id=${encodeURIComponent(sessionId)}`);
-  return result.ok ? result : { ...result, ok: false };
+export async function importSessionToInsight(sessionId: string, insightUrl: string): Promise<InsightImportResult> {
+  const signal = requests.signal;
+  const transcript = await backendRequest<{
+    ok: boolean; source?: string; sessionId?: string; filePath?: string; error?: string;
+  }>('GET', `/api/v1/sessions/${encodeURIComponent(sessionId)}/transcript-source`).catch(error => {
+    if (error instanceof ExecutionBackendApiError && error.status === 404) {
+      throw new Error('升级 Workflow Controller 后重试。当前版本缺少会话转录源接口。');
+    }
+    throw error;
+  });
+  signal.throwIfAborted();
+  if (transcript?.ok === false) return { ok: false, error: transcript.error };
+  if (!transcript?.ok || !transcript.source || !transcript.sessionId || !transcript.filePath) {
+    throw new Error('Workflow Controller 未返回有效的会话转录源。');
+  }
+  return importInsightTranscript(insightUrl, {
+    source: transcript.source, sessionId: transcript.sessionId, filePath: transcript.filePath,
+  }, signal);
 }
 
 export async function listProviders(): Promise<ProviderKey[]> {

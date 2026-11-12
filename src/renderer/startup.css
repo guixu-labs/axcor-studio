@@ -160,4 +160,6 @@ body.startup-window { min-width: 0; }
 }
 
 .startup-workspace-path { overflow: hidden; margin: 6px 0 0; color: #adb6d0; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.startup-remote-dialog { max-height: calc(100% - 28px); overflow: auto; }
+body.remote-workspace-window { min-width: 0; background: #121522; }
+.remote-workspace-window #root { overflow: auto; }
+.startup-remote-workspace { padding: 20px 24px; }

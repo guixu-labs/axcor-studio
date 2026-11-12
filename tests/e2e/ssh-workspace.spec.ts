@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import type { BrowserWindow } from 'electron';
 import type { ElectronApplication } from 'playwright';
-import { chmod, mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, realpath, rename, stat, symlink, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import http from 'node:http';
 import net, { type AddressInfo } from 'node:net';
@@ -16,14 +17,19 @@ test('opens an SSH workspace, saves and runs remotely, then reconnects with its 
   const sshDir = path.join(scratch, '.ssh');
   const pidFile = path.join(scratch, 'ssh.pid');
   const insightPidFile = path.join(scratch, 'insight.pid');
+  const insightImportFile = path.join(scratch, 'insight-import.json');
   const controllerPidFile = path.join(scratch, 'controller.pid');
   await Promise.all([mkdir(workspace, { recursive: true }), mkdir(bin, { recursive: true }), mkdir(sshDir, { recursive: true })]);
+  await symlink(python.stdout.trim(), path.join(bin, 'python3'));
+  const installedHelpers = path.join(scratch, '.local', 'share', 'axcor-studio', 'helpers');
   const sshConfig = path.join(sshDir, 'config');
   const originalSshConfig = 'Include team.conf\nHost *\n  ServerAliveInterval 10\n';
   await writeFile(sshConfig, originalSshConfig);
   await writeFile(path.join(sshDir, 'team.conf'), 'Host fixture\n  HostName fixture.example\n');
   const file = path.join(workspace, 'workflow.yaml');
   await writeFile(file, 'name: initial\n');
+  await mkdir(path.join(workspace, 'nested'));
+  await writeFile(path.join(workspace, 'nested', 'existing.txt'), 'existing');
   // Exercise the desktop SSH process boundary with the real file helper and a
   // TCP forwarder. A real host and SSH credentials are not required in CI.
   const ssh = path.join(bin, 'ssh');
@@ -33,7 +39,7 @@ const { writeFileSync } = require('node:fs');
 const net = require('node:net');
 const args = process.argv.slice(2);
 if (!args.includes('StrictHostKeyChecking=yes') || !args.includes('BatchMode=yes')
-    || args.at(-2) !== 'fixture' || args.at(-1) !== 'axcor-workspace-helper --stdio') process.exit(2);
+    || args.at(-2) !== 'fixture' || !args.at(-1).startsWith('python3 -c ')) process.exit(2);
 const forwards = args.flatMap((arg, index) => arg === '-L' ? [args[index + 1]] : []);
 if (forwards.length !== 2) process.exit(3);
 Promise.all(forwards.map(forward => new Promise(resolve => {
@@ -49,7 +55,7 @@ Promise.all(forwards.map(forward => new Promise(resolve => {
   listener.listen(Number(localPort), localHost, resolve);
 }))).then(() => {
   writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
-  const helper = spawn(${JSON.stringify(python.stdout.trim())}, [${JSON.stringify(path.resolve('remote/axcor-workspace-helper'))}, '--stdio'], {
+  const helper = spawn('/bin/sh', ['-c', args.at(-1)], {
     stdio: 'inherit', env: { ...process.env, HOME: ${JSON.stringify(scratch)}, PATH: ${JSON.stringify(bin)} },
   });
   helper.on('exit', code => process.exit(code ?? 1));
@@ -57,6 +63,7 @@ Promise.all(forwards.map(forward => new Promise(resolve => {
 `);
   await chmod(ssh, 0o755);
   const insight = path.join(bin, 'context-insight');
+  const transcript = { source: 'claude-jsonl', sessionId: 'sdk-remote', filePath: '/remote/.claude/sdk-remote.jsonl' };
   await writeFile(insight, `#!${process.execPath}
 const http = require('node:http');
 const { writeFileSync } = require('node:fs');
@@ -65,6 +72,16 @@ http.createServer((request, response) => {
   if (request.url === '/api/observe/data?pageSize=1') {
     response.setHeader('content-type', 'application/json');
     response.end(JSON.stringify({ items: [] }));
+    return;
+  }
+  if (request.method === 'POST' && request.url === '/api/ingest/import-file') {
+    let body = '';
+    request.on('data', chunk => { body += chunk; });
+    request.on('end', () => {
+      writeFileSync(${JSON.stringify(insightImportFile)}, body);
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify({ imported: true, sessionId: 'remote-insight-row', taskId: 'sdk-remote' }));
+    });
     return;
   }
   response.setHeader('content-type', 'text/html');
@@ -86,8 +103,6 @@ http.createServer((request, response) => {
     occupied.closeAllConnections();
     await new Promise<void>(resolve => occupied.close(() => resolve()));
   };
-  const insightImports: string[] = [];
-
   const posts: Record<string, unknown>[] = [];
   const cursors: Array<string | null> = [];
   let stopped = false;
@@ -108,11 +123,6 @@ http.createServer((request, response) => {
     if (request.method === 'POST') {
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
-      if (url.pathname === '/api/v1/insight/import') {
-        insightImports.push(url.searchParams.get('session_id') ?? '');
-        reply({ ok: true, insightUrl: '/insight/session/session-remote' });
-        return;
-      }
       if (url.pathname === '/api/v1/runs') {
         posts.push(JSON.parse(Buffer.concat(chunks).toString()));
         reply({ run_id: run.run_id });
@@ -143,6 +153,10 @@ http.createServer((request, response) => {
       }
       if (url.pathname === '/api/v1/sessions') { reply(sessionStarted ? [session] : []); return; }
       if (url.pathname === '/api/v1/sessions/session-remote') { reply(session); return; }
+      if (url.pathname === '/api/v1/sessions/session-remote/transcript-source') {
+        reply({ ok: true, ...transcript });
+        return;
+      }
       if (url.pathname === '/api/v1/events') { reply({ cursor: 'session-event', events: [] }); return; }
       if (url.pathname === '/api/v1/auth/status') {
         reply({ providers: [{ index: 1, status: 'active', runtime: 'claude_sdk', model: 'fixture-model' }] });
@@ -163,7 +177,7 @@ const { writeFileSync } = require('node:fs');
 const args = process.argv.slice(2);
 const port = Number(args[args.indexOf('--port') + 1]);
 if (args[0] !== 'web' || !args.includes('--no-open') || args[args.indexOf('--host') + 1] !== '127.0.0.1'
-    || process.env.WORKFLOW_CONTROLLER_INSIGHT_PORT !== ${JSON.stringify(insightPort)}
+    || args.includes('--insight') || process.env.WORKFLOW_CONTROLLER_INSIGHT_PORT !== undefined
     || port !== ${Number(controllerPort)}) process.exit(2);
 net.createServer(socket => {
   const target = net.connect(${(server.address() as AddressInfo).port}, '127.0.0.1');
@@ -174,23 +188,50 @@ net.createServer(socket => {
   target.on('close', () => socket.destroy());
 }).listen(port, '127.0.0.1', () => writeFileSync(${JSON.stringify(controllerPidFile)}, String(process.pid)));
 `, { mode: 0o755 });
+  const env = { ...process.env, HOME: scratch, PATH: bin + path.delimiter + (process.env.PATH ?? '') };
+  Reflect.deleteProperty(env, 'WORKFLOW_CONTROLLER_INSIGHT_PORT');
   const launch = () => launchWorkbench({
     args: ['--no-sandbox', `--user-data-dir=${path.join(scratch, 'profile')}`],
     executionUrl: 'http://127.0.0.1:1',
     insightPort: 1,
-    env: { ...process.env, HOME: scratch, PATH: bin + path.delimiter + process.env.PATH },
+    env,
   });
   let app: ElectronApplication | undefined;
   try {
     app = await launch();
     const startup = await app.firstWindow();
+    const remoteWindow = app.waitForEvent('window');
     await startup.getByRole('button', { name: '打开远程工作区' }).click();
-    const form = startup.getByRole('dialog', { name: '打开远程工作区' });
+    const form = await remoteWindow;
+    await expect(form.getByRole('main', { name: '打开远程工作区' })).toBeVisible();
+    expect(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe('dark');
+    await expect(form).toHaveTitle('打开远程工作区');
+    const nativeWindow = await app.browserWindow(form);
+    expect(await nativeWindow.evaluate((child: BrowserWindow) => ({
+      hasParent: Boolean(child.getParentWindow()), modal: child.isModal(), movable: child.isMovable(),
+    }))).toEqual({ hasParent: true, modal: false, movable: true });
+    if (process.platform === 'darwin') {
+      expect(await nativeWindow.evaluate((child: BrowserWindow) => {
+        const parent = child.getParentWindow()!;
+        const parentPosition = parent.getPosition();
+        const [x, y] = child.getPosition();
+        child.setPosition(x + 24, y);
+        return { offset: child.getPosition()[0] - x, parentMoved: parent.getPosition().some((value, index) => value !== parentPosition[index]) };
+      })).toEqual({ offset: 24, parentMoved: false });
+    }
+    const fitsWindow = () => form.locator('#root').evaluate(root => root.scrollHeight <= root.clientHeight);
+    await expect.poll(fitsWindow).toBe(true);
+    await expect(form.getByRole('button', { name: '连接', exact: true })).toBeInViewport();
     const configuredHosts = form.getByLabel('SSH 配置中的主机');
     await expect(configuredHosts.locator('option')).toHaveText(['选择已配置的主机', 'fixture']);
-    await form.getByLabel('SSH 主机').fill('ubuntu@lab.example');
+    const hostInput = form.getByLabel('SSH 主机');
+    await hostInput.click();
+    await expect(hostInput).toBeFocused();
+    await form.keyboard.type('ubuntu@lab.example');
+    await expect(hostInput).toHaveValue('ubuntu@lab.example');
     await form.getByLabel('SSH 端口', { exact: true }).fill('2222');
     await form.locator('summary', { hasText: '保存到 SSH 配置' }).click();
+    await expect.poll(fitsWindow).toBe(true);
     await form.getByLabel('SSH 别名').fill('lab');
     await form.getByRole('button', { name: '保存到 SSH 配置' }).click();
     await expect(configuredHosts).toHaveValue('lab');
@@ -203,9 +244,14 @@ net.createServer(socket => {
     await form.getByLabel('远程 Insight 端口').fill(insightPort);
     await form.getByLabel('Controller 端口').fill(controllerPort);
     await form.getByRole('button', { name: '连接', exact: true }).click();
+    await expect.poll(() => form.isClosed()).toBe(true);
     const controllerRow = startup.locator('.startup-services li', { hasText: 'Workflow Controller' });
     const retry = controllerRow.getByRole('button', { name: '重试 Workflow Controller' });
     await expect(controllerRow).toContainText('端口已被占用 · ' + controllerPort);
+    const [installedHelper] = await readdir(installedHelpers);
+    const helperPath = path.join(installedHelpers, installedHelper);
+    expect(await readFile(helperPath, 'utf8')).toBe(await readFile('remote/axcor-workspace-helper', 'utf8'));
+    const helperInode = (await stat(helperPath)).ino;
     await closeOccupied();
     await retry.click();
     await expect(controllerRow).toContainText('找不到启动命令或解释器，请检查安装和 PATH · workflow-controller');
@@ -218,6 +264,33 @@ net.createServer(socket => {
     await rename(healthyController, controller);
     await retry.click();
     const page = await workbenchPage(app, false);
+    const explorer = page.locator('.workspace-explorer');
+    const folder = explorer.getByRole('button', { name: 'nested', exact: true });
+    await expect(folder).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('tab')).toHaveCount(0);
+    await explorer.getByRole('button', { name: 'workflow.yaml', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'workflow.yaml' })).toBeVisible();
+    await folder.click();
+    await expect(explorer.getByRole('button', { name: 'existing.txt' })).toBeVisible();
+    await writeFile(file, 'name: changed outside Axcor');
+    await writeFile(path.join(workspace, 'new-remote.md'), '# New remote file');
+    await explorer.getByRole('button', { name: '同步', exact: true }).click();
+    await expect(explorer.getByRole('button', { name: 'new-remote.md' })).toBeVisible();
+    await expect(page.locator('.view-lines')).toContainText('changed outside Axcor');
+    const notifyFileChange = async (paths: string[], tree: boolean): Promise<void> => {
+      if (process.platform === 'linux') return;
+      // The fixture runs the helper on macOS too, where Linux inotify is unavailable.
+      const id = await page.evaluate(async () => (await window.workbench.getWorkspace())?.id);
+      const native = await app!.browserWindow(page);
+      await native.evaluate((window: BrowserWindow, args) => {
+        window.webContents.send('workspace:files-changed', args.id, { paths: args.paths, tree: args.tree });
+      }, { id, paths, tree });
+    };
+    await writeFile(file, 'name: updated by watcher');
+    await writeFile(path.join(workspace, 'nested', 'watch-added.txt'), 'new');
+    await notifyFileChange(['workflow.yaml', 'nested/watch-added.txt'], true);
+    await expect(page.locator('.view-lines')).toContainText('updated by watcher');
+    await expect(explorer.getByRole('button', { name: 'watch-added.txt' })).toBeVisible();
     const originalControllerPid = await readFile(controllerPidFile, 'utf8');
     const originalInsightPid = await readFile(insightPidFile, 'utf8');
     const edit = async (value: string): Promise<void> => {
@@ -237,6 +310,7 @@ net.createServer(socket => {
     await page.getByRole('tab', { name: 'workflow.yaml' }).click();
     await edit('name: unsaved draft');
     await writeFile(file, 'name: external edit');
+    await notifyFileChange(['workflow.yaml'], false);
     await page.getByRole('button', { name: '运行工作流' }).click();
     await expect(page.locator('.run-list-error')).toContainText('File changed on the server');
     expect(posts).toHaveLength(1);
@@ -265,8 +339,8 @@ net.createServer(socket => {
       app!.evaluate(({ webContents }, target) => webContents.getAllWebContents().some(web =>
         web.getURL().endsWith(target) && !web.isLoadingMainFrame()), route);
     await page.getByRole('button', { name: '在 Insight 中查看' }).click();
-    await expect.poll(() => insightImports).toEqual(['session-remote']);
-    await expect.poll(() => remoteInsightLoaded('/session/session-remote')).toBe(true);
+    await expect.poll(() => remoteInsightLoaded('/run/solo:sdk-remote')).toBe(true);
+    expect(JSON.parse(await readFile(insightImportFile, 'utf8'))).toEqual(transcript);
 
     await page.getByRole('button', { name: '工作台', exact: true }).click();
     await expect(page.locator('.workspace-explorer').getByRole('button', { name: /打开.*工作区/ })).toHaveCount(0);
@@ -275,8 +349,9 @@ net.createServer(socket => {
     await app.close();
     app = await launch();
     const restart = await app.firstWindow();
+    const reopenedWindow = app.waitForEvent('window');
     await restart.getByRole('button', { name: '打开远程工作区' }).click();
-    const reopenedForm = restart.getByRole('dialog', { name: '打开远程工作区' });
+    const reopenedForm = await reopenedWindow;
     await expect(reopenedForm.getByLabel('SSH 主机')).toHaveValue('fixture');
     await reopenedForm.getByRole('button', { name: '连接', exact: true }).click();
     const reopened = await workbenchPage(app, false);
@@ -284,9 +359,10 @@ net.createServer(socket => {
     await reopened.getByRole('option', { name: /Remote session/ }).click();
     await expect(reopened.getByRole('tab', { name: 'Remote session' })).toBeVisible();
     await reopened.getByRole('button', { name: '在 Insight 中查看' }).click();
-    await expect.poll(() => remoteInsightLoaded('/session/session-remote')).toBe(true);
+    await expect.poll(() => remoteInsightLoaded('/run/solo:sdk-remote')).toBe(true);
     expect(await readFile(insightPidFile, 'utf8')).toBe(originalInsightPid);
     expect(await readFile(controllerPidFile, 'utf8')).toBe(originalControllerPid);
+    expect((await stat(helperPath)).ino).toBe(helperInode);
     expect(posts).toHaveLength(2);
   } finally {
     await app?.close();

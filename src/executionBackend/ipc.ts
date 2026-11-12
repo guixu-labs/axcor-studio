@@ -50,8 +50,9 @@ export function registerExecutionBackendIpc(
   ipcMain.handle('execution:set-session-paused', (_event, sessionId: string, paused: boolean) => setSessionPaused(sessionId, paused));
   ipcMain.handle('execution:send-session-reply', (_event, sessionId: string, text: string) => sendSessionReply(sessionId, text));
   ipcMain.handle('execution:import-to-insight', async (_event, sessionId: string) => {
-    await insightTarget().ensureReady();
-    return importSessionToInsight(sessionId);
+    const target = insightTarget();
+    await target.ensureReady();
+    return importSessionToInsight(sessionId, target.url);
   });
   ipcMain.handle('execution:insight-status', async () => {
     const { url } = insightTarget();

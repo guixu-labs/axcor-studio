@@ -43,9 +43,9 @@ function startFixtureBackend(isReady = () => true): Promise<{ url: string; close
       res.end(JSON.stringify({ events: [], next_cursor: 'cursor-1', limit: 200 }));
       return;
     }
-    if (req.method === 'POST' && req.url?.startsWith('/api/v1/insight/import')) {
+    if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-1/transcript-source') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, sessionId: 'sdk-session', insightUrl: '/insight/run/solo:sdk-session', imported: true }));
+      res.end(JSON.stringify({ ok: true, source: 'claude-jsonl', sessionId: 'sdk-session', filePath: '/local/session.jsonl' }));
       return;
     }
     res.statusCode = 404;
@@ -129,6 +129,20 @@ http.createServer((req, res) => {
     }
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ items: [] }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/ingest/import-file') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { source, sessionId, filePath } = JSON.parse(body);
+      if (source !== 'claude-jsonl' || sessionId !== 'sdk-session' || filePath !== '/local/session.jsonl') {
+        res.writeHead(422).end();
+        return;
+      }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ imported: true, sessionId: 'insight-row', taskId: sessionId }));
+    });
     return;
   }
   if (req.url === '/' || req.url === '/run/solo:sdk-session') {

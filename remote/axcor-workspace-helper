@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
 """Serve the Axcor workspace file protocol over an authenticated SSH session."""
 
+import ctypes
 import errno
 import fcntl
 import hashlib
 import json
 import os
+import select
 import secrets
 import shutil
 import socket
 import subprocess
 import stat
+import struct
 import sys
+import threading
 from contextlib import contextmanager
 
 MAX_FILE = 2 * 1024 * 1024
 MAX_LINE = 16 * 1024 * 1024
-MAX_NODES = 10_000
-MAX_DEPTH = 16
 SKIP = {'node_modules', 'out', 'dist', '__pycache__'}
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+IN_CONTENT = 0x02 | 0x04 | 0x08  # MODIFY, ATTRIB, CLOSE_WRITE
+IN_ENTRIES = 0x40 | 0x80 | 0x100 | 0x200  # MOVED_FROM, MOVED_TO, CREATE, DELETE
+IN_SELF = 0x400 | 0x800  # DELETE_SELF, MOVE_SELF
+IN_OVERFLOW = 0x4000
+IN_IGNORED = 0x8000
+IN_ISDIR = 0x40000000
+INOTIFY_EVENT = struct.Struct('iIII')
 
 
 def components(path, absolute=False):
@@ -104,45 +114,92 @@ def save_file(parent, name, content, expected):
         fcntl.flock(parent, fcntl.LOCK_UN)
 
 
-def list_tree(root):
+def list_directory(fd, prefix):
     nodes = []
+    with os.scandir(fd) as entries:
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False) and not entry.name.startswith('.') and entry.name not in SKIP:
+                kind = 'dir'
+            elif entry.is_file(follow_symlinks=False) and not entry.name.startswith('.axcor-save-'):
+                kind = 'file'
+            else:
+                continue
+            nodes.append({'name': entry.name, 'path': prefix + entry.name, 'type': kind})
+    return sorted(nodes, key=lambda node: (node['type'], node['name'].casefold()))
 
-    def visit(fd, prefix, depth):
-        if depth > MAX_DEPTH:
-            return
-        # Bound the per-directory scan as well as the returned tree.
-        with os.scandir(fd) as entries:
-            candidates = []
-            for entry in entries:
-                if len(candidates) >= MAX_NODES - len(nodes):
-                    break
-                if entry.is_dir(follow_symlinks=False) and not entry.name.startswith('.') and entry.name not in SKIP:
-                    candidates.append((entry.name, 'dir'))
-                elif entry.is_file(follow_symlinks=False) and not entry.name.startswith('.axcor-save-'):
-                    candidates.append((entry.name, 'file'))
-        for name, kind in sorted(candidates, key=lambda item: (item[1], item[0].casefold())):
-            if len(nodes) >= MAX_NODES:
-                break
-            relative = prefix + name
-            nodes.append({'name': name, 'path': relative, 'type': kind})
-            if kind == 'dir':
-                try:
-                    with directory(fd, [name]) as child:
-                        visit(child, relative + '/', depth + 1)
-                except (PermissionError, FileNotFoundError, NotADirectoryError):
+
+class WorkspaceWatcher:
+    def __init__(self, emit):
+        self.libc = ctypes.CDLL(None, use_errno=True)
+        self.fd = self.libc.inotify_init1(os.O_CLOEXEC | os.O_NONBLOCK)
+        if self.fd < 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+        self.paths = {}
+        self.lock = threading.Lock()
+        self.stopped = threading.Event()
+        self.thread = threading.Thread(target=self.listen, args=(emit,), daemon=True)
+        self.thread.start()
+
+    def list(self, fd, prefix):
+        with self.lock:
+            # The directory has already been opened with O_NOFOLLOW.
+            wd = self.libc.inotify_add_watch(self.fd, os.fsencode(f'/proc/self/fd/{fd}'),
+                                             IN_CONTENT | IN_ENTRIES | IN_SELF)
+            if wd >= 0:
+                self.paths[wd] = prefix
+            nodes = list_directory(fd, prefix)
+            children = {node['path'] + '/' for node in nodes if node['type'] == 'dir'}
+            for descriptor, watched in list(self.paths.items()):
+                if descriptor == wd or not watched.startswith(prefix):
                     continue
+                child = watched[len(prefix):].split('/', 1)[0]
+                if not child or prefix + child + '/' not in children:
+                    self.libc.inotify_rm_watch(self.fd, descriptor)
+                    del self.paths[descriptor]
+        return nodes
 
-    visit(root, '', 0)
-    return nodes
+    def listen(self, emit):
+        while not self.stopped.is_set():
+            if not select.select([self.fd], [], [], 0.2)[0]:
+                continue
+            with self.lock:
+                data = os.read(self.fd, 65536)
+                offset = 0
+                files = set()
+                tree = False
+                all_files = False
+                while offset < len(data):
+                    wd, mask, _, length = INOTIFY_EVENT.unpack_from(data, offset)
+                    offset += INOTIFY_EVENT.size
+                    name = os.fsdecode(data[offset:offset + length].split(b'\0', 1)[0])
+                    offset += length
+                    if mask & IN_OVERFLOW:
+                        tree = all_files = True
+                    elif mask & IN_IGNORED:
+                        self.paths.pop(wd, None)
+                    elif wd not in self.paths or name.startswith('.axcor-save-'):
+                        continue
+                    elif mask & IN_SELF or mask & IN_ISDIR and mask & IN_ENTRIES:
+                        if not name or (not name.startswith('.') and name not in SKIP):
+                            tree = all_files = True
+                    elif name and not mask & IN_ISDIR:
+                        files.add(self.paths[wd] + name)
+                        tree |= bool(mask & IN_ENTRIES)
+            if tree or files:
+                emit({'event': 'files-changed', 'tree': tree, 'paths': None if all_files else sorted(files)})
+
+    def close(self):
+        self.stopped.set()
+        self.thread.join(timeout=0.3)
+        os.close(self.fd)
 
 
-def remote_service(action, port, insight_port=None):
+def remote_service(action, port):
     service, operation = action.split('-', 1)
     executable_name = 'context-insight' if service == 'insight' else 'workflow-controller'
     if type(port) is not int or not 1 <= port <= 65535:
         raise ValueError('Invalid service port')
-    if service == 'controller' and (type(insight_port) is not int or not 1 <= insight_port <= 65535):
-        raise ValueError('Invalid Context Insight port')
     home = os.path.expanduser('~')
     state = os.path.join(home, '.local', 'state', 'axcor-studio')
     os.makedirs(state, mode=0o700, exist_ok=True)
@@ -175,7 +232,6 @@ def remote_service(action, port, insight_port=None):
             env['CONTEXT_INSIGHT_PORT'] = str(port)
             env['CONTEXT_NO_BROWSER'] = '1'
         else:
-            env['WORKFLOW_CONTROLLER_INSIGHT_PORT'] = str(insight_port)
             command += ['web', '--host', '127.0.0.1', '--port', str(port), '--no-open']
         log_path = os.path.join(state, f'{service}-{port}.log')
         log = os.open(log_path, os.O_CREAT | os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW, 0o600)
@@ -192,9 +248,7 @@ def remote_service(action, port, insight_port=None):
 def dispatch(root, root_path, request):
     action = request['action']
     if action in ('insight-start', 'insight-state', 'controller-start', 'controller-state'):
-        return remote_service(action, request['port'], request.get('insightPort'))
-    if action == 'list':
-        return list_tree(root)
+        return remote_service(action, request['port'])
     if action in ('open', 'root'):
         return root_path
     parts = components(request['path'])
@@ -220,6 +274,13 @@ def serve():
     root = None
     root_path = None
     slash = os.open('/', DIR_FLAGS)
+    watcher = None
+    output = threading.Lock()
+
+    def emit(message):
+        with output:
+            print(json.dumps(message, ensure_ascii=True), flush=True)
+
     try:
         while line := sys.stdin.buffer.readline(MAX_LINE + 1):
             if len(line) > MAX_LINE:
@@ -237,12 +298,26 @@ def serve():
                 with directory(slash, components(root_path, absolute=True)) as current:
                     if not os.path.samestat(os.fstat(root), os.fstat(current)):
                         raise ValueError('Workspace directory changed. Reconnect.')
-                response['value'] = dispatch(root, root_path, request)
+                if request['action'] == 'list':
+                    if watcher is None and sys.platform == 'linux':
+                        try:
+                            watcher = WorkspaceWatcher(emit)
+                        except OSError:
+                            pass  # The manual sync remains available.
+                    path = request.get('path', '')
+                    parts = components(path) if path != '' else []
+                    prefix = path + '/' if parts else ''
+                    with directory(root, parts) as fd:
+                        response['value'] = watcher.list(fd, prefix) if watcher else list_directory(fd, prefix)
+                else:
+                    response['value'] = dispatch(root, root_path, request)
             except (OSError, ValueError, TypeError, KeyError, AttributeError) as error:
                 response['error'] = ('Symbolic links are not allowed' if isinstance(error, OSError)
                                      and error.errno == errno.ELOOP else str(error))
-            print(json.dumps(response, ensure_ascii=True), flush=True)
+            emit(response)
     finally:
+        if watcher is not None:
+            watcher.close()
         if root is not None:
             os.close(root)
         os.close(slash)

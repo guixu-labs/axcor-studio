@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import { ServiceStartupError, serviceExitError, serviceSpawnError } from '../serviceStartupError';
-import { DEFAULT_EXECUTION_BACKEND_PORT, DEFAULT_INSIGHT_PORT } from '../shared/localServicePorts';
+import { DEFAULT_EXECUTION_BACKEND_PORT } from '../shared/localServicePorts';
 import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_COMMAND } from '../shared/executionBackendConfig';
 
 const PROBE_TIMEOUT_MS = 1_500;
@@ -44,7 +44,6 @@ function spawnExecutionBackend(port: string): Promise<BackendProcess> {
   const env = {
     ...process.env,
     PATH: (process.env.PATH ?? '') + ':' + pathPrefix,
-    WORKFLOW_CONTROLLER_INSIGHT_PORT: String(DEFAULT_INSIGHT_PORT),
   };
   return new Promise((resolve, reject) => {
     const child = spawn(EXECUTION_BACKEND_COMMAND, ['web', '--port', port, '--no-open'], {

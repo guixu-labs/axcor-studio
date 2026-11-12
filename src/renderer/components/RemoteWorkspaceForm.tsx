@@ -12,8 +12,7 @@ export function remoteWorkspaceCopy(english: boolean) {
     readHostsFailed: 'Could not read SSH config', sshPort: 'SSH port', sshPortDefault: 'Use SSH configuration',
     saveHost: 'Save to SSH config', alias: 'SSH alias', hostSaved: 'Saved to SSH config',
     connect: 'Connect', connecting: 'Connecting…', reconnect: 'Reconnect', cancel: 'Cancel',
-    disconnected: 'SSH disconnected', refresh: 'Refresh remote files', reload: 'Reload remote file',
-    discardFile: 'Discard this draft and reload the file from the server?',
+    disconnected: 'SSH disconnected', sync: 'Sync',
     reviewRuns: 'Refresh and review runs',
     insightPort: 'Remote Insight port', retryInsight: 'Retry Insight',
     checkRuns: 'The launch outcome is uncertain. Check the run list before submitting again.',
@@ -23,8 +22,7 @@ export function remoteWorkspaceCopy(english: boolean) {
     readHostsFailed: '无法读取 SSH 配置', sshPort: 'SSH 端口', sshPortDefault: '使用 SSH 配置',
     saveHost: '保存到 SSH 配置', alias: 'SSH 别名', hostSaved: '已保存到 SSH 配置',
     connect: '连接', connecting: '正在连接…', reconnect: '重新连接', cancel: '取消',
-    disconnected: 'SSH 已断开', refresh: '刷新远程文件', reload: '从服务器重新读取',
-    discardFile: '丢弃此文件的草稿，并从服务器重新读取？',
+    disconnected: 'SSH 已断开', sync: '同步',
     reviewRuns: '刷新并检查运行列表',
     insightPort: '远程 Insight 端口', retryInsight: '重试 Insight',
     checkRuns: '运行提交结果未确认。请先检查运行列表，再决定是否重新提交。',
@@ -102,7 +100,6 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
       .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))
       .finally(() => setBusy(false));
   }}>
-    <h2>{copy.open}</h2>
     <label>{copy.hosts}
       <select value={configuredHost ?? ''} disabled={disabled || !hosts.length} onChange={event => changeHost(event.currentTarget.value)}>
         <option value="">{hosts.length ? copy.chooseHost : copy.noHosts}</option>

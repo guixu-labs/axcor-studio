@@ -1,5 +1,4 @@
 .remote-workspace-form { display: grid; gap: 10px; }
-.remote-workspace-form h2 { margin: 0; }
 .remote-workspace-form label { display: grid; gap: 4px; font-size: 12px; }
 .remote-workspace-form input, .remote-workspace-form select {
   width: 100%;

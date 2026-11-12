@@ -10,6 +10,7 @@ import type { AddressInfo } from 'node:net';
 const FAKE_BACKEND_SERVER = `
 const http = require('http');
 const args = process.argv.slice(2);
+if (args.includes('--insight') || process.env.WORKFLOW_CONTROLLER_INSIGHT_PORT !== undefined) process.exit(2);
 const portIndex = args.indexOf('--port');
 const port = Number(portIndex >= 0 ? args[portIndex + 1] : 18600);
 const server = http.createServer((req, res) => {
@@ -47,10 +48,12 @@ test.describe('execution backend auto-start', () => {
   });
 
   test.beforeEach(async () => {
+    const env = { ...process.env, PATH: binDir + path.delimiter + (process.env.PATH ?? '') };
+    Reflect.deleteProperty(env, 'WORKFLOW_CONTROLLER_INSIGHT_PORT');
     app = await launchWorkbench({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
       executionUrl: `http://127.0.0.1:${backendPort}`,
-      env: { ...process.env, PATH: binDir + path.delimiter + (process.env.PATH ?? '') },
+      env,
     });
     window = await workbenchPage(app);
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));

@@ -55,13 +55,16 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         res.end(JSON.stringify({ run: { run_id: 'run-1', kind: 'workflow', format: 'markdown', status: 'running', program_ref: 'workflow.md', params: {}, label: 'workflow.md', work_dir: '/tmp/ws', max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1 }, sessions: [{ session_id: 'sess-1', role: 'executor', context: null, state: 'running', stop_reason: null, in_flight: true }] }));
         return;
       }
-      if (req.method === 'POST' && req.url?.startsWith('/api/v1/insight/import')) {
-        const sessionId = new URL(req.url, 'http://x').searchParams.get('session_id');
-        if (sessionId === 'sess-missing') {
-          res.end(JSON.stringify({ ok: false, error: 'Cannot connect to cannbot-insight at localhost:21025' }));
-          return;
-        }
-        res.end(JSON.stringify({ ok: true, sessionId, insightUrl: `/insight/session/${sessionId}`, imported: true }));
+      if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-1/transcript-source') {
+        res.end(JSON.stringify({ ok: true, source: 'claude-jsonl', sessionId: 'sdk-1', filePath: '/server/sdk-1.jsonl' }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-missing/transcript-source') {
+        res.end(JSON.stringify({ ok: false, error: 'Session not found' }));
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/api/ingest/import-file') {
+        res.end(JSON.stringify({ imported: false, reason: 'already-exists', sessionId: 'insight-row', taskId: 'sdk-1' }));
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
@@ -152,7 +155,12 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
 test('execution backend HTTP client', async t => {
   const fixture = await createFixtureServer();
   const fetchRequest = globalThis.fetch;
-  t.mock.method(globalThis, 'fetch', (url: string, init?: RequestInit) => {
+  t.mock.method(globalThis, 'fetch', (input: string | URL, init?: RequestInit) => {
+    if (input instanceof URL) {
+      assert.equal(input.origin, fixture.baseUrl);
+      return fetchRequest(input, init);
+    }
+    const url = input;
     assert.ok(url.startsWith(DEFAULT_EXECUTION_BACKEND_URL + '/'));
     return fetchRequest(fixture.baseUrl + url.slice(DEFAULT_EXECUTION_BACKEND_URL.length), init);
   });
@@ -262,17 +270,20 @@ test('execution backend HTTP client', async t => {
     assert.equal(sessions[0].role, 'executor');
   });
 
-  await t.test('importSessionToInsight posts the import and maps the result', async () => {
-    const result = await importSessionToInsight('sess-1');
-    assert.equal(result.ok, true);
-    assert.equal(result.insightUrl, '/insight/session/sess-1');
-    assert.ok(fixture.requests.some(r => r.method === 'POST' && r.url?.startsWith('/api/v1/insight/import?session_id=sess-1')));
+  await t.test('importSessionToInsight sends the transcript to Insight and opens existing imports', async () => {
+    const result = await importSessionToInsight('sess-1', fixture.baseUrl);
+    assert.deepEqual(result, { ok: true, sessionId: 'sdk-1', imported: false, insightUrl: '/run/solo:sdk-1' });
+    assert.deepEqual(fixture.requests.slice(-2), [
+      { method: 'GET', url: '/api/v1/sessions/sess-1/transcript-source', body: {} },
+      { method: 'POST', url: '/api/ingest/import-file', body: { source: 'claude-jsonl', sessionId: 'sdk-1', filePath: '/server/sdk-1.jsonl' } },
+    ]);
   });
 
   await t.test('importSessionToInsight surfaces service-level errors', async () => {
-    const result = await importSessionToInsight('sess-missing');
-    assert.equal(result.ok, false);
-    assert.match(result.error ?? '', /Cannot connect/);
+    const before = fixture.requests.length;
+    const result = await importSessionToInsight('sess-missing', fixture.baseUrl);
+    assert.deepEqual(result, { ok: false, error: 'Session not found' });
+    assert.equal(fixture.requests.length, before + 1);
   });
 
   await t.test('injectSessionPrompt posts to the inject endpoint', async () => {

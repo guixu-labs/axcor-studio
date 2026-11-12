@@ -161,13 +161,14 @@ test.describe('run configuration', () => {
   });
 
   test('completes the selected file with Tab and sends the edited path with the Graph format', async () => {
+    await window.locator('.file-list').getByRole('button', { name: 'notes.md', exact: true }).click();
     await window.getByRole('button', { name: '运行', exact: true }).click();
     const programPath = window.getByLabel('运行文件', { exact: true });
-    const suggestion = await programPath.getAttribute('placeholder');
-    expect(suggestion).toBeTruthy();
+    const suggestion = path.join(workspaceDir, 'notes.md');
+    await expect(programPath).toHaveAttribute('placeholder', suggestion);
     await programPath.focus();
     await window.keyboard.press('Tab');
-    await expect(programPath).toHaveValue(suggestion!);
+    await expect(programPath).toHaveValue(suggestion);
     await expect(window.getByLabel('运行名称', { exact: true })).toBeFocused();
     await window.getByRole('button', { name: '工作台', exact: true }).click();
     await window.getByRole('button', { name: /^关闭 .*\.md$/ }).click();

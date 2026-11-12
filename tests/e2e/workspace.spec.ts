@@ -42,11 +42,10 @@ test.describe('workspace tree', () => {
   test('shows the selected workspace tree and opens non-markdown files', async () => {
     await expect(window.getByRole('button', { name: '工作台', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(window.getByRole('heading', { name: '工作区', exact: true })).toBeVisible();
-    // Top-level files and the src directory are all visible; the first markdown is active.
     await expect(window.locator('.file-entry', { hasText: 'src' })).toBeVisible();
     await expect(window.locator('.file-entry', { hasText: 'workflow.md' })).toBeVisible();
-    await expect(window.locator('.monaco-editor')).toBeVisible({ timeout: 10_000 });
-    await expect(window.locator('.view-lines', { hasText: 'E2E workflow' })).toBeVisible();
+    await expect(window.getByRole('tab')).toHaveCount(0);
+    await expect(window.locator('.monaco-editor')).toHaveCount(0);
     // Expand the src directory and open the TypeScript file.
     await window.getByRole('button', { name: 'src', exact: true }).click();
     await window.locator('.file-entry', { hasText: 'main.ts' }).click();
@@ -79,7 +78,8 @@ test('chooses a local directory before checking services or opening the workspac
     await local.click();
     const page = await workbenchPage(app, false);
     await expect(page.locator('.explorer-workspace-path')).toHaveText(root);
-    await expect(page.locator('.view-lines')).toContainText('Selected at startup');
+    await expect(page.locator('.file-list').getByRole('button', { name: 'workflow.md' })).toBeVisible();
+    await expect(page.getByRole('tab')).toHaveCount(0);
   } finally {
     await app.close();
   }

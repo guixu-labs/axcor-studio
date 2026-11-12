@@ -24,6 +24,8 @@ test.describe('settings', () => {
   });
 
   test('opens the settings dialog and persists theme and font selections', async () => {
+    const nativeColorScheme = () => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource);
+    await expect.poll(nativeColorScheme).toBe('dark');
     await window.getByRole('button', { name: /^(Settings|设置)$/ }).click();
     await expect(window.getByRole('dialog', { name: /^(Settings|设置)$/ })).toBeVisible();
 
@@ -41,6 +43,11 @@ test.describe('settings', () => {
     await expect.poll(() => window.evaluate(() => JSON.parse(localStorage.getItem('workbench.font') ?? 'null'))).toBe('jetbrains-mono');
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-font'))).toContain('JetBrains Mono');
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.querySelector('.app-shell') as HTMLElement).getPropertyValue('--surface-0'))).toBe('#f6f8fa');
+    await expect.poll(nativeColorScheme).toBe('light');
+
+    await window.getByLabel('Theme').click();
+    await window.getByRole('option', { name: 'GitHub Dark' }).click();
+    await expect.poll(nativeColorScheme).toBe('dark');
 
     await window.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Settings' }).click();
     await expect(window.getByRole('dialog', { name: /^(Settings|设置)$/ })).toBeHidden();

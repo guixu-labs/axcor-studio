@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { stopAllExecutionPolls } from './executionBackend/events';
 import { setRemoteBackend } from './executionBackend/http';
 import type { CreateRunInput } from './shared/protocol';
-import { DEFAULT_REMOTE_INSIGHT_PORT, type RemoteWorkspaceConfig, type SshHostEntry, type Workspace, type WorkspaceFile } from './shared/workspace';
+import { DEFAULT_REMOTE_INSIGHT_PORT, type RemoteWorkspaceConfig, type SshHostEntry, type Workspace, type WorkspaceFile, type WorkspaceFileChange } from './shared/workspace';
 import { hideInsight, localInsightTarget, type InsightTarget } from './observability/insightView';
 import { listSshHosts, saveSshHost } from './sshConfig';
 import { SshWorkspace, validateRemoteConfig } from './sshWorkspace';
@@ -22,7 +22,11 @@ export class WorkspaceManager {
   private closed = false;
   private connectionAttempt = 0;
 
-  constructor(private readonly notifyDisconnect: (id: string) => void) {}
+  constructor(
+    private readonly workspaceHelper: string,
+    private readonly notifyDisconnect: (id: string) => void,
+    private readonly notifyFilesChanged: (id: string, change: WorkspaceFileChange) => void,
+  ) {}
 
   get workspace(): Workspace | undefined { return this.current; }
 
@@ -74,7 +78,7 @@ export class WorkspaceManager {
       const config = validateRemoteConfig(input);
       const id = 'ssh:' + JSON.stringify([config.host, config.root, config.controllerPort, config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT, config.sshPort]);
       if (this.locked && this.current?.id !== id) throw new Error('The workspace is fixed for this window.');
-      const session = await SshWorkspace.connect(config, disconnected => {
+      const session = await SshWorkspace.connect(config, this.workspaceHelper, disconnected => {
         if (this.ssh !== disconnected) return;
         this.ssh = undefined;
         this.current = { kind: 'ssh', id, root: config.root, config, connected: false };
@@ -89,6 +93,9 @@ export class WorkspaceManager {
       const switched = this.current?.id !== id;
       const previous = this.ssh;
       this.ssh = session;
+      session.onFilesChanged = change => {
+        if (this.ssh === session) this.notifyFilesChanged(id, change);
+      };
       this.current = { kind: 'ssh', id, root: config.root, config, connected: true };
       if (switched) stopAllExecutionPolls();
       hideInsight();
@@ -107,9 +114,9 @@ export class WorkspaceManager {
     return result;
   }
 
-  async list(id: string): Promise<WorkspaceNode[]> {
+  async list(id: string, directory = ''): Promise<WorkspaceNode[]> {
     const workspace = this.assertCurrent(id);
-    if (workspace.kind === 'ssh') return this.remote(id, 'list');
+    if (workspace.kind === 'ssh') return this.remote(id, 'list', { path: directory });
     return walkWorkspace(workspace.root);
   }
 
@@ -192,7 +199,7 @@ export class WorkspaceManager {
       return this.connect(current.config);
     });
     ipcMain.handle('workspace:get', event => { guard(event); return this.workspace; });
-    ipcMain.handle('workspace:list-tree', (event, id: string) => { guard(event); return this.list(id); });
+    ipcMain.handle('workspace:list-tree', (event, id: string, directory?: string) => { guard(event); return this.list(id, directory); });
     ipcMain.handle('workspace:read-file', (event, id: string, file: string) => { guard(event); return this.read(id, file); });
     ipcMain.handle('workspace:write-file', (event, id: string, file: string, content: string, version?: string) => {
       guard(event);

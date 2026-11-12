@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { StartupScreen } from './renderer/StartupScreen';
+import { RemoteWorkspaceScreen, StartupScreen } from './renderer/StartupScreen';
 import './renderer/app.css';
 
 const root = document.getElementById('root');
@@ -11,7 +11,11 @@ if (!root) {
 
 const renderer = createRoot(root);
 
-if (new URLSearchParams(window.location.search).has('startup')) {
+const query = new URLSearchParams(window.location.search);
+if (query.has('remote')) {
+  document.body.classList.add('remote-workspace-window');
+  renderer.render(<RemoteWorkspaceScreen />);
+} else if (query.has('startup')) {
   document.title = 'Axcor Studio';
   document.body.classList.add('startup-window');
   renderer.render(<StartupScreen />);

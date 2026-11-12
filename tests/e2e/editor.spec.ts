@@ -33,6 +33,7 @@ test.describe('monaco editor', () => {
     await window.evaluate(() => localStorage.clear());
     await window.reload();
     await expect(window.locator('.app-shell')).toBeVisible({ timeout: 10_000 });
+    await window.locator('.file-list').getByRole('button', { name: 'workflow.md' }).click();
   });
 
   test.afterEach(async () => {
@@ -127,7 +128,7 @@ test.describe('monaco editor', () => {
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');
     await window.keyboard.insertText('# Edited notes');
-    await window.getByRole('button', { name: '保存', exact: true }).click();
+    await window.keyboard.press('ControlOrMeta+s');
     await expect.poll(() => fs.readFile(path.join(workspaceDir, 'z-notes.md'), 'utf8')).toBe('# Edited notes');
     await window.getByRole('tab', { name: 'workflow.md', exact: true }).click();
     await expect(window.locator('.view-lines', { hasText: '# Hello workflow' })).toBeVisible();

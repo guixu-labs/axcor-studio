@@ -1,11 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { RunEvent } from './shared/protocol';
 import type { ExecutionBackendBridge } from './shared/executionBackendIpc';
-import type { WorkspaceBridge } from './shared/workspace';
+import type { WorkspaceBridge, WorkspaceFileChange } from './shared/workspace';
 import type { StartupBridge, StartupState } from './shared/startup';
 
 const startup: StartupBridge = {
   chooseLocal: () => ipcRenderer.invoke('startup:choose-local'),
+  chooseRemote: english => ipcRenderer.invoke('startup:choose-remote', english),
+  submitRemote: config => { ipcRenderer.send('startup:remote-submit', config); },
+  resizeRemote: height => { ipcRenderer.send('startup:remote-resize', height); },
   run: (choice, retry) => ipcRenderer.invoke('startup:run', choice, retry),
   onProgress: listener => {
     const handler = (_event: Electron.IpcRendererEvent, state: StartupState): void => listener(state);
@@ -21,18 +24,27 @@ const startup: StartupBridge = {
 };
 contextBridge.exposeInMainWorld('startup', startup);
 
+contextBridge.exposeInMainWorld('setNativeColorScheme', (scheme: 'light' | 'dark') => {
+  ipcRenderer.send('appearance:color-scheme', scheme);
+});
+
 const workbench: WorkspaceBridge = {
   listSshHosts: () => ipcRenderer.invoke('workspace:ssh-hosts'),
   saveSshHost: entry => ipcRenderer.invoke('workspace:ssh-host-save', entry),
   reconnect: () => ipcRenderer.invoke('workspace:reconnect'),
   getWorkspace: () => ipcRenderer.invoke('workspace:get'),
-  listTree: id => ipcRenderer.invoke('workspace:list-tree', id),
+  listTree: (id, directory) => ipcRenderer.invoke('workspace:list-tree', id, directory),
   readFile: (id, file) => ipcRenderer.invoke('workspace:read-file', id, file),
   writeFile: (id, file, content, version) => ipcRenderer.invoke('workspace:write-file', id, file, content, version),
   onDisconnected: listener => {
     const handler = (_event: Electron.IpcRendererEvent, id: string): void => listener(id);
     ipcRenderer.on('workspace:disconnected', handler);
     return () => { ipcRenderer.removeListener('workspace:disconnected', handler); };
+  },
+  onFilesChanged: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, id: string, change: WorkspaceFileChange): void => listener(id, change);
+    ipcRenderer.on('workspace:files-changed', handler);
+    return () => { ipcRenderer.removeListener('workspace:files-changed', handler); };
   },
 };
 contextBridge.exposeInMainWorld('workbench', workbench);

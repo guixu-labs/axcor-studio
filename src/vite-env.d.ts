@@ -4,6 +4,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 interface Window {
+  setNativeColorScheme(scheme: 'light' | 'dark'): void;
   startup: import('./shared/startup').StartupBridge;
   workbench: import('./shared/workspace').WorkspaceBridge;
   executionBackend: import('./shared/executionBackendIpc').ExecutionBackendBridge;

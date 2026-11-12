@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -15,6 +16,17 @@ await build({
   external: ['electron'],
   define: { MAIN_WINDOW_VITE_DEV_SERVER_URL: 'undefined', MAIN_WINDOW_VITE_NAME: '"main_window"' },
   plugins: [{
+    name: 'workspace-helper-source',
+    setup(builder) {
+      builder.onResolve({ filter: /axcor-workspace-helper\?raw$/ }, args => ({
+        path: path.resolve(args.resolveDir, args.path.slice(0, -4)),
+        namespace: 'workspace-helper',
+      }));
+      builder.onLoad({ filter: /.*/, namespace: 'workspace-helper' }, async args => ({
+        contents: await readFile(args.path), loader: 'text',
+      }));
+    },
+  }, {
     name: 'fixture-service-ports',
     setup(builder) {
       // Give parallel Electron tests isolated ports in the test bundle only.

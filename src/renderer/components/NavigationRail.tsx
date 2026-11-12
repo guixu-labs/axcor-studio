@@ -9,11 +9,7 @@ export function NavigationRail({ active, onSelect, messages }: NavigationRailPro
     {
       id: 'workbench',
       label: messages.workbench,
-      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="16" rx="3" />
-        <path d="M9 4v16m4-11h4m-4 4h4" />
-      </svg>,
+      icon: <span className="workspace-glyph">&#xeaf0;</span>,
     },
     { id: 'runs', label: messages.runs, icon: '▶' },
     {
