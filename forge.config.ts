@@ -6,10 +6,18 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: ['LICENSE'],
+    osxSign: {
+      identity: '-',
+      identityValidation: false,
+      preAutoEntitlements: false,
+      // Ad-hoc identities have no Team ID for hardened runtime library validation.
+      optionsForFile: () => ({ hardenedRuntime: false }),
+    },
   },
   rebuildConfig: {},
   makers: [
-    { name: '@electron-forge/maker-squirrel', config: {} },
+    { name: '@electron-forge/maker-squirrel', config: { setupExe: 'axcor-studio-setup.exe' } },
     { name: '@electron-forge/maker-zip', platforms: ['darwin', 'linux', 'win32'], config: {} },
     { name: '@electron-forge/maker-deb', config: {} },
     { name: '@electron-forge/maker-rpm', config: {} },

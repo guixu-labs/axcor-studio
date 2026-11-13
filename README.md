@@ -22,11 +22,7 @@ Axcor Studio 是面向工作流开发者的桌面工作台，贯通了工作流�
 
 ### 从安装包启动
 
-安装包通过 GitHub 构建并发布，在项目的 **GitHub Releases** 页面下载与系统和 CPU 架构匹配的安装包。
-
-- **macOS**：解压 ZIP，打开 `axcor-studio.app`。
-- **Windows**：运行 Squirrel 安装程序，或解压 ZIP 后运行其中的应用。
-- **Linux**：使用系统包管理器安装 DEB 或 RPM，或解压 ZIP 后运行其中的应用。
+首期安装包面向搭载 Apple 芯片的 Mac（macOS arm64）。发布后可从仓库的 **Releases** 页面下载 ZIP，解压并打开 `axcor-studio.app`。
 
 ### 从源码启动
 
@@ -66,6 +62,7 @@ SSH 服务端需要允许本地端口转发。桌面端沿用本机 `known_hosts
 
 ```bash
 npm run lint
+npm run typecheck
 npm test
 npm run test:e2e
 ```
@@ -81,7 +78,7 @@ HTTP 和 Electron E2E 测试使用本地 fixture，`MockExecutionClient` 用于�
 
 [Forge 配置](forge.config.ts)启用了 macOS ZIP、Windows Squirrel 和 ZIP，以及 Linux DEB、RPM 和 ZIP。平台配置表示可生成的目标格式，实际分发前需要在目标系统上验证启动。
 
-**macOS arm64 本地打包已知问题**：已检查的产物缺少渲染界面文件，且 macOS 签名校验失败。开发体验请使用 `npm run start`。
+发布流程见[版本发布指南](doc/axcor-studio-release.md)。
 
 ## 技术栈
 
@@ -93,3 +90,7 @@ HTTP 和 Electron E2E 测试使用本地 fixture，`MockExecutionClient` 用于�
 | 服务集成 | Electron IPC、HTTP API、WebContentsView |
 | 构建与分发 | Vite、Electron Forge、npm |
 | 测试与代码检查 | Node.js 测试运行器、tsx、Playwright、ESLint |
+
+## 许可证
+
+[MIT](LICENSE)。
