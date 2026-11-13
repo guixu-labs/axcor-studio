@@ -85,10 +85,7 @@ export function MonacoEditor({
   useEffect(() => {
     if (!host.current) return;
     editor.current = monaco.editor.create(host.current, {
-      value: content,
-      language: languageForFile(activeFile),
       automaticLayout: true,
-      fontFamily,
       fontSize: 13,
       lineHeight: 23,
       wordWrap: 'on',
