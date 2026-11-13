@@ -2,7 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { migrateLegacyThemeId, themes } from '../src/renderer/settings';
 
-const REQUIRED_TOKENS = ['surface-0', 'surface-1', 'surface-2', 'surface-3', 'border', 'text', 'muted', 'accent', 'accent-soft'];
+const REQUIRED_TOKENS = [
+  'surface-0',
+  'surface-1',
+  'surface-2',
+  'surface-3',
+  'border',
+  'text',
+  'muted',
+  'accent',
+  'accent-soft',
+];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 test('theme set matches the opsbot reference: 11 themes, 5 light and 6 dark', () => {
@@ -11,7 +21,19 @@ test('theme set matches the opsbot reference: 11 themes, 5 light and 6 dark', ()
   assert.equal(themes.filter(theme => theme.group === 'dark').length, 6);
   assert.deepEqual(
     themes.map(theme => theme.id),
-    ['github-light', 'vscode-light', 'one-light', 'cappuccino-latte', 'solarized-light', 'github-dark', 'vscode-dark', 'one-dark-pro', 'dracula', 'cappuccino-mocha', 'solarized-dark'],
+    [
+      'github-light',
+      'vscode-light',
+      'one-light',
+      'cappuccino-latte',
+      'solarized-light',
+      'github-dark',
+      'vscode-dark',
+      'one-dark-pro',
+      'dracula',
+      'cappuccino-mocha',
+      'solarized-dark',
+    ],
   );
 });
 

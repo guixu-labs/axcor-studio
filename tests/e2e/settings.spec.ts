@@ -39,10 +39,22 @@ test.describe('settings', () => {
     await window.getByLabel('Editor font').click();
     await window.getByRole('option', { name: 'JetBrains Mono' }).click();
 
-    await expect.poll(() => window.evaluate(() => JSON.parse(localStorage.getItem('workbench.theme') ?? 'null'))).toBe('github-light');
-    await expect.poll(() => window.evaluate(() => JSON.parse(localStorage.getItem('workbench.font') ?? 'null'))).toBe('jetbrains-mono');
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-font'))).toContain('JetBrains Mono');
-    await expect.poll(() => window.evaluate(() => getComputedStyle(document.querySelector('.app-shell') as HTMLElement).getPropertyValue('--surface-0'))).toBe('#f6f8fa');
+    await expect
+      .poll(() => window.evaluate(() => JSON.parse(localStorage.getItem('workbench.theme') ?? 'null')))
+      .toBe('github-light');
+    await expect
+      .poll(() => window.evaluate(() => JSON.parse(localStorage.getItem('workbench.font') ?? 'null')))
+      .toBe('jetbrains-mono');
+    await expect
+      .poll(() => window.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-font')))
+      .toContain('JetBrains Mono');
+    await expect
+      .poll(() =>
+        window.evaluate(() =>
+          getComputedStyle(document.querySelector('.app-shell') as HTMLElement).getPropertyValue('--surface-0'),
+        ),
+      )
+      .toBe('#f6f8fa');
     await expect.poll(nativeColorScheme).toBe('light');
 
     await window.getByLabel('Theme').click();

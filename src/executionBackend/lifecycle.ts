@@ -71,7 +71,10 @@ function spawnExecutionBackend(port: string): Promise<BackendProcess> {
 }
 
 /** Reuse the local execution backend if its API is ready, or start an instance. */
-export async function ensureExecutionBackendRunning(onStarting?: () => void, port = DEFAULT_EXECUTION_BACKEND_PORT): Promise<boolean> {
+export async function ensureExecutionBackendRunning(
+  onStarting?: () => void,
+  port = DEFAULT_EXECUTION_BACKEND_PORT,
+): Promise<boolean> {
   const baseUrl = `http://127.0.0.1:${port}`;
   if (await isExecutionBackendReachable(baseUrl)) return true;
   if (starting) return false;

@@ -13,8 +13,16 @@ export function serviceSpawnError(command: string, error: NodeJS.ErrnoException)
     : new ServiceStartupError('launch-error', error.message);
 }
 
-export function serviceExitError(code: number | null, signal: NodeJS.Signals | null, stderr: string): ServiceStartupError {
-  const detail = stderr.trim().split(/\r?\n/).filter(line => line.trim()).at(-1);
+export function serviceExitError(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  stderr: string,
+): ServiceStartupError {
+  const detail = stderr
+    .trim()
+    .split(/\r?\n/)
+    .filter(line => line.trim())
+    .at(-1);
   const status = signal ?? (code === null ? '' : 'exit ' + code);
   return new ServiceStartupError('exited', [status, detail].filter(Boolean).join(' · '));
 }

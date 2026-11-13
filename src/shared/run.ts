@@ -7,7 +7,8 @@ export const runEventKey = (event: RunEvent): string => `${event.source ?? ''}:$
 
 const subagentTools = new Set(['agent', 'task', 'spawn_agent']);
 
-export const isSubagentTool = (name: unknown): boolean => typeof name === 'string' && subagentTools.has(name.toLowerCase());
+export const isSubagentTool = (name: unknown): boolean =>
+  typeof name === 'string' && subagentTools.has(name.toLowerCase());
 
 export function eventPayloadRecord(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

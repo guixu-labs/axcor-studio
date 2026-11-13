@@ -61,7 +61,9 @@ async function startInsight(onStarting?: () => void): Promise<void> {
       cwd: os.homedir(),
       env: {
         ...process.env,
-        PATH: [process.env.PATH, join(os.homedir(), '.local', 'bin'), '/usr/local/bin', '/opt/homebrew/bin'].filter(Boolean).join(delimiter),
+        PATH: [process.env.PATH, join(os.homedir(), '.local', 'bin'), '/usr/local/bin', '/opt/homebrew/bin']
+          .filter(Boolean)
+          .join(delimiter),
         CONTEXT_INSIGHT_PORT: String(DEFAULT_INSIGHT_PORT),
         CONTEXT_NO_BROWSER: '1',
       },

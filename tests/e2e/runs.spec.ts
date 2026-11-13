@@ -12,8 +12,15 @@ const runRecord = {
 };
 
 const sessionRecord = {
-  id: 'session-a', name: '会话日志示例', state: 'idle', stop_reason: 'max_iterations', created_at_iso: '2026-11-03T10:00:00+00:00',
-  model: 'fixture-model', current_iteration: 2, max_iterations: 2, elapsed_seconds: 65,
+  id: 'session-a',
+  name: '会话日志示例',
+  state: 'idle',
+  stop_reason: 'max_iterations',
+  created_at_iso: '2026-11-03T10:00:00+00:00',
+  model: 'fixture-model',
+  current_iteration: 2,
+  max_iterations: 2,
+  elapsed_seconds: 65,
 };
 
 const assistantEvent = {
@@ -25,7 +32,13 @@ const assistantEvent = {
 
 function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
   let eventCursorSeen = false;
-  const interactive = { ...sessionRecord, id: 'session-interactive', name: '人工交互会话', state: 'running', stop_reason: null as string | null };
+  const interactive = {
+    ...sessionRecord,
+    id: 'session-interactive',
+    name: '人工交互会话',
+    state: 'running',
+    stop_reason: null as string | null,
+  };
   const replies: string[] = [];
   const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -61,7 +74,11 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
       res.end(JSON.stringify({ ok: true, resumed }));
       return;
     }
-    if (req.method === 'POST' && (req.url === '/api/v1/sessions/session-interactive/pause' || req.url === '/api/v1/sessions/session-interactive/resume')) {
+    if (
+      req.method === 'POST' &&
+      (req.url === '/api/v1/sessions/session-interactive/pause' ||
+        req.url === '/api/v1/sessions/session-interactive/resume')
+    ) {
       const paused = req.url.endsWith('/pause');
       interactive.state = paused ? 'idle' : 'running';
       interactive.stop_reason = paused ? 'user_pause' : null;
@@ -81,43 +98,180 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
     if (req.method === 'GET' && req.url?.startsWith('/api/v1/events?session_id=session-a')) {
       const params = new URL(req.url, 'http://localhost').searchParams;
       const cursor = params.get('cursor');
-      const events = cursor === null ? [
-        assistantEvent,
-        { ...assistantEvent, data: { content: [{ type: 'thinking', thinking: '下一步检查配置。' }] } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'thinking_tokens', estimated_tokens_delta: 1 } },
-        { ...assistantEvent, event_type: 'session_activated', data: { state: 'running' } },
-        { ...assistantEvent, event_type: 'iteration_start', data: { iteration: 2 } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'commands_changed', commands: ['fixture-command'] } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'task_notification', summary: '后台任务完成', status: 'completed' } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'task_summary', detail: '已检查任务。' } },
-        { ...assistantEvent, event_type: 'tool_use', data: { name: 'Read', id: 'tool-a', input: { file_path: 'workflow.md' } } },
-        { ...assistantEvent, event_type: 'tool_call', data: { name: 'Read', arg: 'workflow.md', tool_use_id: 'tool-a' } },
-        { ...assistantEvent, event_type: 'user_message', data: { content: [
-          { type: 'text', text: '继续检查。' }, { type: 'tool_result', tool_use_id: 'tool-a', content: '内嵌工具结果' },
-        ] } },
-        { ...assistantEvent, event_type: 'tool_result', data: { tool_use_id: 'tool-a', content: '读取到工作流定义。' } },
-        { ...assistantEvent, event_type: 'tool_result', data: { tool_use_id: 'unmatched-tool', content: '未关联的工具结果。' } },
-        { ...assistantEvent, event_type: 'tool_call', data: { name: 'WebSearch', arg: JSON.stringify({ query: '检查示例'.repeat(40) }), is_error: true } },
-        { ...assistantEvent, event_type: 'tool_call', data: { name: 'Glob', arg: '*.md' } },
-        { ...assistantEvent, event_type: 'tool_call', data: { name: 'Agent', arg: '检查工作区' } },
-        { ...assistantEvent, event_type: 'subagent_start', data: { agent_id: 'agent-a', agent_type: 'Explore' } },
-        { ...assistantEvent, event_type: 'subagent_progress', data: { agent_id: 'agent-a', messages: [{ type: 'text', text: '正在检查工作区。' }] } },
-        { ...assistantEvent, event_type: 'subagent_stop', data: { agent_id: 'agent-a', content: '检查完成。' } },
-        { ...assistantEvent, event_type: 'subagent_start', data: { agent_id: 'nested-agent', agent_type: 'Verifier', parent_agent_id: 'agent-a' } },
-        { ...assistantEvent, event_type: 'tool_use', data: { id: 'call-beijing', name: 'Agent', input: { description: '查询北京天气', subagent_type: 'general-purpose' } } },
-        { ...assistantEvent, event_type: 'tool_call', data: { tool_use_id: 'call-beijing', name: 'Agent' } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'task_started', task_type: 'local_agent', task_id: 'task-beijing', tool_use_id: 'call-beijing' } },
-        { ...assistantEvent, event_type: 'tool_call', data: { tool_use_id: 'call-shanghai', name: 'Agent', arg: '{"description":"查询上海天气"}' } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'task_started', task_type: 'local_agent', task_id: 'task-shanghai', tool_use_id: 'call-shanghai' } },
-        { ...assistantEvent, event_type: 'subagent_start', data: { agent_id: 'task-shanghai', agent_type: 'general-purpose' } },
-        { ...assistantEvent, event_type: 'notification', data: { subtype: 'task_started', task_type: 'local_bash', task_id: 'background-shell', description: '后台命令' } },
-        { ...assistantEvent, event_type: 'step_finish', data: { modelUsage: { 'fixture-model': { contextWindow: 200000 } } } },
-        ...Array.from({ length: 90 }, (_, index) => ({ ...assistantEvent, event_type: 'process_output', data: { line: `工作区检查输出 ${index + 1}` } })),
-      ] : cursor === '1' ? [
-        assistantEvent,
-        { ...assistantEvent, timestamp: '2026-11-03T10:00:02+00:00', event_type: 'context_usage', data: { context_usage: { input_tokens: 1200, output_tokens: 60, cache_read_input_tokens: 800, cache_creation_input_tokens: 40 } } },
-        { ...assistantEvent, timestamp: '2026-11-03T10:00:02+00:00', event_type: 'notification', data: { subtype: 'task_notification', task_id: 'task-beijing', tool_use_id: 'call-beijing', status: 'completed' } },
-      ] : [];
+      const events =
+        cursor === null
+          ? [
+              assistantEvent,
+              { ...assistantEvent, data: { content: [{ type: 'thinking', thinking: '下一步检查配置。' }] } },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: { subtype: 'thinking_tokens', estimated_tokens_delta: 1 },
+              },
+              { ...assistantEvent, event_type: 'session_activated', data: { state: 'running' } },
+              { ...assistantEvent, event_type: 'iteration_start', data: { iteration: 2 } },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: { subtype: 'commands_changed', commands: ['fixture-command'] },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: { subtype: 'task_notification', summary: '后台任务完成', status: 'completed' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: { subtype: 'task_summary', detail: '已检查任务。' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_use',
+                data: { name: 'Read', id: 'tool-a', input: { file_path: 'workflow.md' } },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_call',
+                data: { name: 'Read', arg: 'workflow.md', tool_use_id: 'tool-a' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'user_message',
+                data: {
+                  content: [
+                    { type: 'text', text: '继续检查。' },
+                    { type: 'tool_result', tool_use_id: 'tool-a', content: '内嵌工具结果' },
+                  ],
+                },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_result',
+                data: { tool_use_id: 'tool-a', content: '读取到工作流定义。' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_result',
+                data: { tool_use_id: 'unmatched-tool', content: '未关联的工具结果。' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_call',
+                data: { name: 'WebSearch', arg: JSON.stringify({ query: '检查示例'.repeat(40) }), is_error: true },
+              },
+              { ...assistantEvent, event_type: 'tool_call', data: { name: 'Glob', arg: '*.md' } },
+              { ...assistantEvent, event_type: 'tool_call', data: { name: 'Agent', arg: '检查工作区' } },
+              {
+                ...assistantEvent,
+                event_type: 'subagent_start',
+                data: { agent_id: 'agent-a', agent_type: 'Explore' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'subagent_progress',
+                data: { agent_id: 'agent-a', messages: [{ type: 'text', text: '正在检查工作区。' }] },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'subagent_stop',
+                data: { agent_id: 'agent-a', content: '检查完成。' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'subagent_start',
+                data: { agent_id: 'nested-agent', agent_type: 'Verifier', parent_agent_id: 'agent-a' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_use',
+                data: {
+                  id: 'call-beijing',
+                  name: 'Agent',
+                  input: { description: '查询北京天气', subagent_type: 'general-purpose' },
+                },
+              },
+              { ...assistantEvent, event_type: 'tool_call', data: { tool_use_id: 'call-beijing', name: 'Agent' } },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: {
+                  subtype: 'task_started',
+                  task_type: 'local_agent',
+                  task_id: 'task-beijing',
+                  tool_use_id: 'call-beijing',
+                },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'tool_call',
+                data: { tool_use_id: 'call-shanghai', name: 'Agent', arg: '{"description":"查询上海天气"}' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: {
+                  subtype: 'task_started',
+                  task_type: 'local_agent',
+                  task_id: 'task-shanghai',
+                  tool_use_id: 'call-shanghai',
+                },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'subagent_start',
+                data: { agent_id: 'task-shanghai', agent_type: 'general-purpose' },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'notification',
+                data: {
+                  subtype: 'task_started',
+                  task_type: 'local_bash',
+                  task_id: 'background-shell',
+                  description: '后台命令',
+                },
+              },
+              {
+                ...assistantEvent,
+                event_type: 'step_finish',
+                data: { modelUsage: { 'fixture-model': { contextWindow: 200000 } } },
+              },
+              ...Array.from({ length: 90 }, (_, index) => ({
+                ...assistantEvent,
+                event_type: 'process_output',
+                data: { line: `工作区检查输出 ${index + 1}` },
+              })),
+            ]
+          : cursor === '1'
+            ? [
+                assistantEvent,
+                {
+                  ...assistantEvent,
+                  timestamp: '2026-11-03T10:00:02+00:00',
+                  event_type: 'context_usage',
+                  data: {
+                    context_usage: {
+                      input_tokens: 1200,
+                      output_tokens: 60,
+                      cache_read_input_tokens: 800,
+                      cache_creation_input_tokens: 40,
+                    },
+                  },
+                },
+                {
+                  ...assistantEvent,
+                  timestamp: '2026-11-03T10:00:02+00:00',
+                  event_type: 'notification',
+                  data: {
+                    subtype: 'task_notification',
+                    task_id: 'task-beijing',
+                    tool_use_id: 'call-beijing',
+                    status: 'completed',
+                  },
+                },
+              ]
+            : [];
       res.end(JSON.stringify({ cursor: cursor === null ? '1' : '2', events }));
       return;
     }
@@ -130,10 +284,30 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
       return;
     }
     if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-a/events')) {
-      const events = eventCursorSeen ? [] : [
-        { id: 1, run_id: 'run-a', session_id: null, iteration: null, timestamp: '2026-11-03T10:00:01+00:00', event_type: 'session_state_changed', data: JSON.stringify({ state: 'running' }), source: 'run_events' },
-        { id: 1, run_id: 'run-a', session_id: null, iteration: null, timestamp: '2026-11-03T10:00:02+00:00', event_type: 'process_output', data: JSON.stringify({ line: 'workflow output line' }), source: 'events' },
-      ];
+      const events = eventCursorSeen
+        ? []
+        : [
+            {
+              id: 1,
+              run_id: 'run-a',
+              session_id: null,
+              iteration: null,
+              timestamp: '2026-11-03T10:00:01+00:00',
+              event_type: 'session_state_changed',
+              data: JSON.stringify({ state: 'running' }),
+              source: 'run_events',
+            },
+            {
+              id: 1,
+              run_id: 'run-a',
+              session_id: null,
+              iteration: null,
+              timestamp: '2026-11-03T10:00:02+00:00',
+              event_type: 'process_output',
+              data: JSON.stringify({ line: 'workflow output line' }),
+              source: 'events',
+            },
+          ];
       eventCursorSeen = true;
       res.end(JSON.stringify({ events, next_cursor: 'cursor-1', limit: 200 }));
       return;
@@ -212,7 +386,9 @@ test.describe('execution runs', () => {
     await window.getByRole('option', { name: /会话日志示例/ }).click();
     const log = window.getByRole('log', { name: '运行日志' });
     const overview = window.locator('.run-overview');
-    const assistant = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^已读完工作区文件。$/ }) });
+    const assistant = log
+      .locator('.event')
+      .filter({ has: window.locator('.event-preview', { hasText: /^已读完工作区文件。$/ }) });
     await expect(assistant.locator('summary')).toHaveText('已读完工作区文件。');
     await expect(assistant.locator('.event-thinking')).toBeHidden();
     await assistant.locator('summary').click();
@@ -235,7 +411,9 @@ test.describe('execution runs', () => {
     await expect(tool.locator('.event-block')).toHaveText([/参数.*workflow\.md/s, /结果.*读取到工作流定义。/s]);
     await tool.locator('summary').click();
     await expect(tool.locator('.event-content')).toBeHidden();
-    const failedTool = log.locator('.event').filter({ has: window.locator('.event-preview', { hasText: /^WebSearch$/ }) });
+    const failedTool = log
+      .locator('.event')
+      .filter({ has: window.locator('.event-preview', { hasText: /^WebSearch$/ }) });
     await expect(failedTool.locator(':scope > .event-state')).toHaveText('失败');
     await expect(failedTool.getByText(/检查示例/)).toBeHidden();
     const gap = await failedTool.evaluate(node => {
@@ -264,7 +442,9 @@ test.describe('execution runs', () => {
       await expect(row.locator('details')).toHaveCount(0);
     }
     await expect(log).toContainText('后台任务完成');
-    await expect(log).not.toContainText(/thinking_tokens|session_activated|session_state_changed|iteration_start|context_usage|commands_changed|内嵌工具结果/);
+    await expect(log).not.toContainText(
+      /thinking_tokens|session_activated|session_state_changed|iteration_start|context_usage|commands_changed|内嵌工具结果/,
+    );
     await expect(window.locator('.run-detail-title .status-badge')).toHaveText('已完成');
     await expect(window.locator('.run-detail-title .run-elapsed')).toHaveText('00:01:05');
     await expect(overview).toContainText('fixture-model');
@@ -333,7 +513,10 @@ test.describe('execution runs', () => {
     const disabledBackground = await send.evaluate(button => getComputedStyle(button).backgroundColor);
     await expect(pause).toBeEnabled();
     await expect(stop).toBeEnabled();
-    await expect(stop).not.toHaveCSS('background-color', await pause.evaluate(button => getComputedStyle(button).backgroundColor));
+    await expect(stop).not.toHaveCSS(
+      'background-color',
+      await pause.evaluate(button => getComputedStyle(button).backgroundColor),
+    );
     await pause.click();
     await expect(status).toHaveText('已暂停');
     await resume.click();

@@ -45,18 +45,89 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/runs') {
-        res.end(JSON.stringify({ runs: [
-          { run_id: 'run-1', kind: 'workflow', format: 'markdown', status: 'running', program_ref: 'workflow.md', params: {}, label: 'workflow.md', work_dir: '/tmp/ws', max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1 },
-          { run_id: 'run-2', kind: 'workflow', format: 'markdown', status: 'stopped', program_ref: '', params: {}, label: null, work_dir: null, max_parallel: null, pause_reason: null, created_at: '2026-11-03T09:00:00+00:00', finished_at: '2026-11-03T09:30:00+00:00', reopened_at: null, error: null, member_count: 0, running_count: 0 },
-        ] }));
+        res.end(
+          JSON.stringify({
+            runs: [
+              {
+                run_id: 'run-1',
+                kind: 'workflow',
+                format: 'markdown',
+                status: 'running',
+                program_ref: 'workflow.md',
+                params: {},
+                label: 'workflow.md',
+                work_dir: '/tmp/ws',
+                max_parallel: null,
+                pause_reason: null,
+                created_at: '2026-11-03T10:00:00+00:00',
+                finished_at: null,
+                reopened_at: null,
+                error: null,
+                member_count: 1,
+                running_count: 1,
+              },
+              {
+                run_id: 'run-2',
+                kind: 'workflow',
+                format: 'markdown',
+                status: 'stopped',
+                program_ref: '',
+                params: {},
+                label: null,
+                work_dir: null,
+                max_parallel: null,
+                pause_reason: null,
+                created_at: '2026-11-03T09:00:00+00:00',
+                finished_at: '2026-11-03T09:30:00+00:00',
+                reopened_at: null,
+                error: null,
+                member_count: 0,
+                running_count: 0,
+              },
+            ],
+          }),
+        );
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/runs/run-1') {
-        res.end(JSON.stringify({ run: { run_id: 'run-1', kind: 'workflow', format: 'markdown', status: 'running', program_ref: 'workflow.md', params: {}, label: 'workflow.md', work_dir: '/tmp/ws', max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1 }, sessions: [{ session_id: 'sess-1', role: 'executor', context: null, state: 'running', stop_reason: null, in_flight: true }] }));
+        res.end(
+          JSON.stringify({
+            run: {
+              run_id: 'run-1',
+              kind: 'workflow',
+              format: 'markdown',
+              status: 'running',
+              program_ref: 'workflow.md',
+              params: {},
+              label: 'workflow.md',
+              work_dir: '/tmp/ws',
+              max_parallel: null,
+              pause_reason: null,
+              created_at: '2026-11-03T10:00:00+00:00',
+              finished_at: null,
+              reopened_at: null,
+              error: null,
+              member_count: 1,
+              running_count: 1,
+            },
+            sessions: [
+              {
+                session_id: 'sess-1',
+                role: 'executor',
+                context: null,
+                state: 'running',
+                stop_reason: null,
+                in_flight: true,
+              },
+            ],
+          }),
+        );
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-1/transcript-source') {
-        res.end(JSON.stringify({ ok: true, source: 'claude-jsonl', sessionId: 'sdk-1', filePath: '/server/sdk-1.jsonl' }));
+        res.end(
+          JSON.stringify({ ok: true, source: 'claude-jsonl', sessionId: 'sdk-1', filePath: '/server/sdk-1.jsonl' }),
+        );
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-missing/transcript-source') {
@@ -64,7 +135,9 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         return;
       }
       if (req.method === 'POST' && req.url === '/api/ingest/import-file') {
-        res.end(JSON.stringify({ imported: false, reason: 'already-exists', sessionId: 'insight-row', taskId: 'sdk-1' }));
+        res.end(
+          JSON.stringify({ imported: false, reason: 'already-exists', sessionId: 'insight-row', taskId: 'sdk-1' }),
+        );
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/runs/run-1/sessions/sess-1/inject') {
@@ -75,7 +148,10 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         res.end(JSON.stringify({ id: 'sess-1', run_id: 'run-1', state: 'idle', stop_reason: 'user_pause' }));
         return;
       }
-      if (req.method === 'POST' && /^\/api\/v1\/runs\/run-1\/sessions\/sess-1\/(pause|resume|send|stop)$/.test(req.url ?? '')) {
+      if (
+        req.method === 'POST' &&
+        /^\/api\/v1\/runs\/run-1\/sessions\/sess-1\/(pause|resume|send|stop)$/.test(req.url ?? '')
+      ) {
         res.statusCode = 202;
         res.end(JSON.stringify({ accepted: true }));
         return;
@@ -109,11 +185,33 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/sessions') {
-        res.end(JSON.stringify([{ id: 'sess-9', name: 'ad-hoc-session', role: 'worker', state: 'running', created_at: '2026-11-03T09:00:00+00:00', stop_reason: null, loop_status: 'yes' }]));
+        res.end(
+          JSON.stringify([
+            {
+              id: 'sess-9',
+              name: 'ad-hoc-session',
+              role: 'worker',
+              state: 'running',
+              created_at: '2026-11-03T09:00:00+00:00',
+              stop_reason: null,
+              loop_status: 'yes',
+            },
+          ]),
+        );
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-9') {
-        res.end(JSON.stringify({ id: 'sess-9', name: 'ad-hoc-session', role: 'worker', state: 'running', created_at: '2026-11-03T09:00:00+00:00', stop_reason: null, loop_status: 'yes' }));
+        res.end(
+          JSON.stringify({
+            id: 'sess-9',
+            name: 'ad-hoc-session',
+            role: 'worker',
+            state: 'running',
+            created_at: '2026-11-03T09:00:00+00:00',
+            stop_reason: null,
+            loop_status: 'yes',
+          }),
+        );
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/sessions/start') {
@@ -122,7 +220,17 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-new') {
-        res.end(JSON.stringify({ id: 'sess-new', name: 'my prompt', role: 'worker', state: 'running', created_at: '2026-11-03T09:30:00+00:00', stop_reason: null, loop_status: 'yes' }));
+        res.end(
+          JSON.stringify({
+            id: 'sess-new',
+            name: 'my prompt',
+            role: 'worker',
+            state: 'running',
+            created_at: '2026-11-03T09:30:00+00:00',
+            stop_reason: null,
+            loop_status: 'yes',
+          }),
+        );
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/sessions/sess-new/stop') {
@@ -167,7 +275,14 @@ test('execution backend HTTP client', async t => {
   t.after(() => fixture.server.close());
 
   await t.test('startWorkflowRun posts the workflow payload and maps the run', async () => {
-    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow', programPath: '/tmp/ws/workflow.md', format: 'graph-yaml@1' });
+    const run = await startWorkflowRun({
+      workflowId: 'workflow.md',
+      workspacePath: '/tmp/ws',
+      content: '# wf',
+      runtime: 'workflow',
+      programPath: '/tmp/ws/workflow.md',
+      format: 'graph-yaml@1',
+    });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs');
     assert.ok(post);
     assert.equal(post.body.format, 'graph-yaml@1');
@@ -180,17 +295,35 @@ test('execution backend HTTP client', async t => {
   });
 
   await t.test('startWorkflowRun passes label, params and max_parallel when provided', async () => {
-    const run = await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', content: '# wf', runtime: 'workflow', label: 'release-check', params: { variables: '{"dataset":"core","mode":"fast"}', max_iterations: 3, reviewer_enabled: false }, maxParallel: 4 });
+    const run = await startWorkflowRun({
+      workflowId: 'workflow.md',
+      workspacePath: '/tmp/ws',
+      content: '# wf',
+      runtime: 'workflow',
+      label: 'release-check',
+      params: { variables: '{"dataset":"core","mode":"fast"}', max_iterations: 3, reviewer_enabled: false },
+      maxParallel: 4,
+    });
     const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
     assert.ok(post);
     assert.equal(post.body.label, 'release-check');
-    assert.deepEqual(post.body.params, { variables: '{"dataset":"core","mode":"fast"}', max_iterations: 3, reviewer_enabled: false });
+    assert.deepEqual(post.body.params, {
+      variables: '{"dataset":"core","mode":"fast"}',
+      max_iterations: 3,
+      reviewer_enabled: false,
+    });
     assert.equal(post.body.max_parallel, 4);
     assert.equal(run.id, 'run-1');
   });
 
   await t.test('startWorkflowRun forwards the specified program path and format', async () => {
-    await startWorkflowRun({ workflowId: 'workflow.md', workspacePath: '/tmp/ws', runtime: 'workflow', programPath: '../other/program.yaml', format: 'custom@2' });
+    await startWorkflowRun({
+      workflowId: 'workflow.md',
+      workspacePath: '/tmp/ws',
+      runtime: 'workflow',
+      programPath: '../other/program.yaml',
+      format: 'custom@2',
+    });
     const post = fixture.requests.filter(r => r.method === 'POST' && r.url === '/api/v1/runs').at(-1);
     assert.ok(post);
     assert.equal(post.body.program_path, '../other/program.yaml');
@@ -227,7 +360,17 @@ test('execution backend HTTP client', async t => {
   });
 
   await t.test('startSessionRun posts the session payload and maps the run', async () => {
-    const run = await startSessionRun({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'session', prompt: 'my prompt', sessionRuntime: 'claude_sdk', model: 'claude-sonnet', systemPrompt: 'be brief', maxIterations: 12, reviewerEnabled: true });
+    const run = await startSessionRun({
+      workflowId: '',
+      workspacePath: '/tmp/ws',
+      runtime: 'session',
+      prompt: 'my prompt',
+      sessionRuntime: 'claude_sdk',
+      model: 'claude-sonnet',
+      systemPrompt: 'be brief',
+      maxIterations: 12,
+      reviewerEnabled: true,
+    });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/sessions/start');
     assert.ok(post);
     assert.equal(post.body.project_dir, '/tmp/ws');
@@ -244,7 +387,8 @@ test('execution backend HTTP client', async t => {
   await t.test('startSessionRun requires a prompt', async () => {
     await assert.rejects(
       () => startSessionRun({ workflowId: '', workspacePath: '/tmp/ws', runtime: 'session' }),
-      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 422 && error.message.includes('提示词'),
+      (error: ExecutionBackendApiError) =>
+        error instanceof ExecutionBackendApiError && error.status === 422 && error.message.includes('提示词'),
     );
   });
 
@@ -275,7 +419,11 @@ test('execution backend HTTP client', async t => {
     assert.deepEqual(result, { ok: true, sessionId: 'sdk-1', imported: false, insightUrl: '/run/solo:sdk-1' });
     assert.deepEqual(fixture.requests.slice(-2), [
       { method: 'GET', url: '/api/v1/sessions/sess-1/transcript-source', body: {} },
-      { method: 'POST', url: '/api/ingest/import-file', body: { source: 'claude-jsonl', sessionId: 'sdk-1', filePath: '/server/sdk-1.jsonl' } },
+      {
+        method: 'POST',
+        url: '/api/ingest/import-file',
+        body: { source: 'claude-jsonl', sessionId: 'sdk-1', filePath: '/server/sdk-1.jsonl' },
+      },
     ]);
   });
 
@@ -288,7 +436,9 @@ test('execution backend HTTP client', async t => {
 
   await t.test('injectSessionPrompt posts to the inject endpoint', async () => {
     await injectSessionPrompt('run-1', 'sess-1', '请继续推进');
-    const inject = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject');
+    const inject = fixture.requests.find(
+      r => r.method === 'POST' && r.url === '/api/v1/runs/run-1/sessions/sess-1/inject',
+    );
     assert.ok(inject);
     assert.equal(inject.body.prompt, '请继续推进');
   });
@@ -356,7 +506,10 @@ test('execution backend HTTP client', async t => {
   await t.test('404 surfaces the backend detail message', async () => {
     await assert.rejects(
       () => getRun('missing'),
-      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 404 && error.message.includes('session 不在账面：missing'),
+      (error: ExecutionBackendApiError) =>
+        error instanceof ExecutionBackendApiError &&
+        error.status === 404 &&
+        error.message.includes('session 不在账面：missing'),
     );
   });
 
@@ -373,7 +526,10 @@ test('execution backend HTTP client', async t => {
     subtest.mock.method(globalThis, 'fetch', async () => { throw new Error('Connection refused'); });
     await assert.rejects(
       () => listRuns(),
-      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 0 && error.message.includes('无法连接 Workflow Controller'),
+      (error: ExecutionBackendApiError) =>
+        error instanceof ExecutionBackendApiError &&
+        error.status === 0 &&
+        error.message.includes('无法连接 Workflow Controller'),
     );
   });
 });

@@ -16,7 +16,26 @@ const port = Number(portIndex >= 0 ? args[portIndex + 1] : 18600);
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.method === 'GET' && req.url === '/api/v1/runs') {
-    res.end(JSON.stringify({ runs: [{ run_id: 'auto-1', kind: 'container', format: '', status: 'running', program_ref: '', params: {}, label: 'auto-started', work_dir: null, max_parallel: null, pause_reason: null, created_at: '2026-11-05T10:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 }] }));
+    res.end(JSON.stringify({
+      runs: [{
+        run_id: 'auto-1',
+        kind: 'container',
+        format: '',
+        status: 'running',
+        program_ref: '',
+        params: {},
+        label: 'auto-started',
+        work_dir: null,
+        max_parallel: null,
+        pause_reason: null,
+        created_at: '2026-11-05T10:00:00+00:00',
+        finished_at: null,
+        reopened_at: null,
+        error: null,
+        member_count: 0,
+        running_count: 0,
+      }],
+    }));
     return;
   }
   if (req.method === 'GET' && req.url === '/api/v1/sessions') { res.end(JSON.stringify([])); return; }
@@ -35,7 +54,11 @@ test.describe('execution backend auto-start', () => {
   test.beforeAll(async () => {
     binDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-autostart-'));
     await fs.writeFile(path.join(binDir, 'fake-backend-server.js'), FAKE_BACKEND_SERVER);
-    await fs.writeFile(path.join(binDir, 'workflow-controller'), `#!/bin/sh\nexec node "${path.join(binDir, 'fake-backend-server.js')}" "$@"\n`, { mode: 0o755 });
+    await fs.writeFile(
+      path.join(binDir, 'workflow-controller'),
+      `#!/bin/sh\nexec node "${path.join(binDir, 'fake-backend-server.js')}" "$@"\n`,
+      { mode: 0o755 },
+    );
     // Find a free port for the fake backend.
     const probe = http.createServer(() => {});
     await new Promise<void>(resolve => { probe.listen(0, '127.0.0.1', () => resolve()); });

@@ -35,34 +35,54 @@ interface BackgroundImageFieldProps {
   onChange: (dataUrl: string) => void;
 }
 
-function BackgroundImageField({ title, description, icon, hasImage, chooseLabel, removeLabel, onChange }: BackgroundImageFieldProps): JSX.Element {
+function BackgroundImageField({
+  title,
+  description,
+  icon,
+  hasImage,
+  chooseLabel,
+  removeLabel,
+  onChange,
+}: BackgroundImageFieldProps): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
-  return <div className="settings-field">
-    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
-    <div className="settings-field-main">
-      <div className="settings-field-title">{title}</div>
-      <p className="settings-field-description">{description}</p>
-      <div className="settings-field-control">
-        <input
-          ref={input}
-          className="settings-file-input"
-          type="file"
-          accept="image/*"
-          aria-label={title}
-          onChange={event => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (!file || file.size > MAX_BACKGROUND_IMAGE_BYTES) return;
-            const reader = new FileReader();
-            reader.onload = () => { if (typeof reader.result === 'string') onChange(reader.result); };
-            reader.readAsDataURL(file);
-          }}
-        />
-        <button className="settings-image-button" type="button" onClick={() => input.current?.click()}>{chooseLabel}</button>
-        {hasImage && <button className="settings-image-button" type="button" onClick={() => onChange('')}>{removeLabel}</button>}
+  return (
+    <div className="settings-field">
+      <span className="settings-field-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div className="settings-field-main">
+        <div className="settings-field-title">{title}</div>
+        <p className="settings-field-description">{description}</p>
+        <div className="settings-field-control">
+          <input
+            ref={input}
+            className="settings-file-input"
+            type="file"
+            accept="image/*"
+            aria-label={title}
+            onChange={event => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (!file || file.size > MAX_BACKGROUND_IMAGE_BYTES) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result === 'string') onChange(reader.result);
+              };
+              reader.readAsDataURL(file);
+            }}
+          />
+          <button className="settings-image-button" type="button" onClick={() => input.current?.click()}>
+            {chooseLabel}
+          </button>
+          {hasImage && (
+            <button className="settings-image-button" type="button" onClick={() => onChange('')}>
+              {removeLabel}
+            </button>
+          )}
+        </div>
       </div>
     </div>
-  </div>;
+  );
 }
 
 interface CustomSelectProps {
@@ -75,13 +95,23 @@ interface CustomSelectProps {
   onSelect: (value: string) => void;
 }
 
-function CustomSelect({ title, items, groupLabels, selected, defaultId, defaultBadge, onSelect }: CustomSelectProps): JSX.Element {
+function CustomSelect({
+  title,
+  items,
+  groupLabels,
+  selected,
+  defaultId,
+  defaultBadge,
+  onSelect,
+}: CustomSelectProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const selectedItem = items.find(item => item.id === selected) ?? items[0];
   useEffect(() => {
-    const close = (event: MouseEvent): void => { if (container.current && !container.current.contains(event.target as Node)) setOpen(false); };
+    const close = (event: MouseEvent): void => {
+      if (container.current && !container.current.contains(event.target as Node)) setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
@@ -89,56 +119,93 @@ function CustomSelect({ title, items, groupLabels, selected, defaultId, defaultB
     if (open) container.current?.querySelector<HTMLButtonElement>('[role="option"][aria-selected="true"]')?.focus();
   }, [open]);
 
-  return <div className={'custom-select' + (open ? ' open' : '')} ref={container} onKeyDown={event => {
-    if (event.key === 'Escape' && open) {
-      event.preventDefault();
-      setOpen(false);
-      trigger.current?.focus();
-    }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-    event.preventDefault();
-    if (!open) { setOpen(true); return; }
-    const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
-    const current = options.indexOf(event.target as HTMLButtonElement);
-    const next = Math.min(options.length - 1, Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1)));
-    options[next]?.focus();
-  }}>
-    <button className="custom-select-trigger" ref={trigger} type="button" aria-label={title} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(value => !value)}>
-      <span>{selectedItem?.label}</span>
-      <b aria-hidden="true">⌄</b>
-    </button>
-    {open && <div className="custom-select-menu" role="listbox" aria-label={title}>
-      {items.map((item, index) => <Fragment key={item.id}>
-        {item.group && item.group !== items[index - 1]?.group && <div className="custom-select-group" role="presentation">{groupLabels?.[item.group] ?? item.group}</div>}
-        <button
-          className={'custom-select-option' + (item.id === selected ? ' selected' : '')}
-          role="option"
-          aria-selected={item.id === selected}
-          type="button"
-          onClick={() => { onSelect(item.id); setOpen(false); trigger.current?.focus(); }}
-        >
-          <span>{item.label}</span>
-          <span className="custom-select-tags">
-            {item.id === defaultId && <em aria-hidden="true">{defaultBadge}</em>}
-            {item.id === selected && <b aria-hidden="true">✓</b>}
-          </span>
-        </button>
-      </Fragment>)}
-    </div>}
-  </div>;
+  return (
+    <div
+      className={'custom-select' + (open ? ' open' : '')}
+      ref={container}
+      onKeyDown={event => {
+        if (event.key === 'Escape' && open) {
+          event.preventDefault();
+          setOpen(false);
+          trigger.current?.focus();
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        if (!open) {
+          setOpen(true);
+          return;
+        }
+        const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+        const current = options.indexOf(event.target as HTMLButtonElement);
+        const next = Math.min(options.length - 1, Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1)));
+        options[next]?.focus();
+      }}
+    >
+      <button
+        className="custom-select-trigger"
+        ref={trigger}
+        type="button"
+        aria-label={title}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen(value => !value)}
+      >
+        <span>{selectedItem?.label}</span>
+        <b aria-hidden="true">⌄</b>
+      </button>
+      {open && (
+        <div className="custom-select-menu" role="listbox" aria-label={title}>
+          {items.map((item, index) => (
+            <Fragment key={item.id}>
+              {item.group && item.group !== items[index - 1]?.group && (
+                <div className="custom-select-group" role="presentation">
+                  {groupLabels?.[item.group] ?? item.group}
+                </div>
+              )}
+              <button
+                className={'custom-select-option' + (item.id === selected ? ' selected' : '')}
+                role="option"
+                aria-selected={item.id === selected}
+                type="button"
+                onClick={() => {
+                  onSelect(item.id);
+                  setOpen(false);
+                  trigger.current?.focus();
+                }}
+              >
+                <span>{item.label}</span>
+                <span className="custom-select-tags">
+                  {item.id === defaultId && <em aria-hidden="true">{defaultBadge}</em>}
+                  {item.id === selected && <b aria-hidden="true">✓</b>}
+                </span>
+              </button>
+            </Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function SelectField({ description, icon, ...select }: CustomSelectProps & { description: string; icon: string }): JSX.Element {
-  return <div className="settings-field">
-    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
-    <div className="settings-field-main">
-      <div className="settings-field-title">{select.title}</div>
-      <p className="settings-field-description">{description}</p>
-      <div className="settings-field-control">
-        <CustomSelect {...select} />
+function SelectField({
+  description,
+  icon,
+  ...select
+}: CustomSelectProps & { description: string; icon: string }): JSX.Element {
+  return (
+    <div className="settings-field">
+      <span className="settings-field-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div className="settings-field-main">
+        <div className="settings-field-title">{select.title}</div>
+        <p className="settings-field-description">{description}</p>
+        <div className="settings-field-control">
+          <CustomSelect {...select} />
+        </div>
       </div>
     </div>
-  </div>;
+  );
 }
 
 const PROVIDER_RUNTIME_OPTIONS = [
@@ -153,14 +220,20 @@ function validationChip(validation: ProviderKey['worker_validation'], messages: 
   // The backend reports validation either as a success boolean (test responses)
   // or as a status string (persisted provider state).
   if (typeof validation.success === 'boolean') {
-    return validation.success
-      ? <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>
-      : <span className="provider-chip provider-chip-fail">{messages.providerFailed}</span>;
+    return validation.success ? (
+      <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>
+    ) : (
+      <span className="provider-chip provider-chip-fail">{messages.providerFailed}</span>
+    );
   }
   if (typeof validation.status === 'string' && validation.status !== '') {
-    return validation.status === 'valid'
-      ? <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>
-      : <span className="provider-chip provider-chip-fail" title={validation.error}>{messages.providerFailed}</span>;
+    return validation.status === 'valid' ? (
+      <span className="provider-chip provider-chip-ok">{messages.providerValidated}</span>
+    ) : (
+      <span className="provider-chip provider-chip-fail" title={validation.error}>
+        {messages.providerFailed}
+      </span>
+    );
   }
   return <span className="provider-chip provider-chip-untested">{messages.providerUntested}</span>;
 }
@@ -172,25 +245,46 @@ function providerRuntimeLabel(runtime?: string): string {
 type ProviderResult = { failed: boolean; message: string };
 
 function ProviderFeedback({ result }: { result?: ProviderResult }): JSX.Element {
-  return <span className="provider-feedback" title={result?.message}>
-    <span role="status">{result && !result.failed && <>
-      <span aria-hidden="true">✓ </span>{result.message}
-    </>}</span>
-    <span role="alert">{result?.failed && result.message}</span>
-  </span>;
+  return (
+    <span className="provider-feedback" title={result?.message}>
+      <span role="status">
+        {result && !result.failed && (
+          <>
+            <span aria-hidden="true">✓ </span>
+            {result.message}
+          </>
+        )}
+      </span>
+      <span role="alert">{result?.failed && result.message}</span>
+    </span>
+  );
 }
 
-function ProviderSection({ icon, title, children, result }: { icon: string; title: string; children: ReactNode; result?: ProviderResult }): JSX.Element {
-  return <section className="settings-field">
-    <span className="settings-field-icon" aria-hidden="true">{icon}</span>
-    <div className="settings-field-main">
-      <div className="provider-section-heading">
-        <h3 className="settings-field-title">{title}</h3>
-        <ProviderFeedback result={result} />
+function ProviderSection({
+  icon,
+  title,
+  children,
+  result,
+}: {
+  icon: string;
+  title: string;
+  children: ReactNode;
+  result?: ProviderResult;
+}): JSX.Element {
+  return (
+    <section className="settings-field">
+      <span className="settings-field-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div className="settings-field-main">
+        <div className="provider-section-heading">
+          <h3 className="settings-field-title">{title}</h3>
+          <ProviderFeedback result={result} />
+        </div>
+        <div className="settings-field-control">{children}</div>
       </div>
-      <div className="settings-field-control">{children}</div>
-    </div>
-  </section>;
+    </section>
+  );
 }
 
 const providerNamesStorageKey = 'workbench.providerNames';
@@ -203,7 +297,9 @@ async function providerIdentity(provider: ProviderKey): Promise<string> {
 
 function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const [providers, setProviders] = useState<Array<ProviderKey & { identity: string }> | null>(null);
-  const [providerNames, setProviderNames] = useState(() => loadWorkbenchState<Record<string, string>>(providerNamesStorageKey, {}));
+  const [providerNames, setProviderNames] = useState(() =>
+    loadWorkbenchState<Record<string, string>>(providerNamesStorageKey, {}),
+  );
   const [nameDraft, setNameDraft] = useState('');
   const [listResult, setListResult] = useState<ProviderResult>();
   const [activeIndex, setActiveIndex] = useState<number>();
@@ -220,12 +316,19 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
   const refresh = async (): Promise<void> => {
     try {
       const rows = await window.executionBackend.listProviders();
-      setProviders(await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(provider) }))));
+      setProviders(
+        await Promise.all(rows.map(async provider => ({ ...provider, identity: await providerIdentity(provider) }))),
+      );
     } catch (refreshError) {
-      setListResult({ failed: true, message: refreshError instanceof Error ? refreshError.message : String(refreshError) });
+      setListResult({
+        failed: true,
+        message: refreshError instanceof Error ? refreshError.message : String(refreshError),
+      });
     }
   };
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   const saveProviderName = (identity: string): void => {
     const names = { ...providerNames };
@@ -258,15 +361,28 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
 
   const testResult = (result: { success?: boolean; error?: string }): ProviderResult => {
     if (result.success === false || result.error) {
-      return { failed: true, message: result.error ? `${messages.providerTestFailed}：${result.error}` : messages.providerTestFailed };
+      return {
+        failed: true,
+        message: result.error ? `${messages.providerTestFailed}：${result.error}` : messages.providerTestFailed,
+      };
     }
     return { failed: false, message: messages.providerTestPassed };
   };
 
-  const testCandidate = (): Promise<void> => run(async () => {
-    const result = await window.executionBackend.testProviderKey(key.trim(), model.trim(), baseUrl.trim(), runtime);
-    setCandidateResult(testResult(result));
-  }, setCandidateResult, 'candidate');
+  const testCandidate = (): Promise<void> =>
+    run(
+      async () => {
+        const result = await window.executionBackend.testProviderKey(
+          key.trim(),
+          model.trim(),
+          baseUrl.trim(),
+          runtime,
+        );
+        setCandidateResult(testResult(result));
+      },
+      setCandidateResult,
+      'candidate',
+    );
 
   const addProvider = async (): Promise<void> => {
     if (!key.trim()) {
@@ -280,189 +396,359 @@ function ProvidersPanel({ messages }: { messages: Messages }): JSX.Element {
         ...(provider.base_url ? { base_url: provider.base_url } : {}),
         ...(provider.runtime ? { runtime: provider.runtime } : {}),
       }));
-      rows.push({ key: key.trim(), ...(model.trim() ? { model: model.trim() } : {}), ...(baseUrl.trim() ? { base_url: baseUrl.trim() } : {}), runtime });
+      rows.push({
+        key: key.trim(),
+        ...(model.trim() ? { model: model.trim() } : {}),
+        ...(baseUrl.trim() ? { base_url: baseUrl.trim() } : {}),
+        runtime,
+      });
       const saved = await window.executionBackend.saveProviders(rows);
       if (!saved.ok) {
         setCandidateResult({ failed: true, message: saved.error ?? '保存失败' });
         return;
       }
-      setKey(''); setModel(''); setBaseUrl('');
+      setKey('');
+      setModel('');
+      setBaseUrl('');
       setCandidateResult({ failed: false, message: messages.providerSaved });
       setListResult(undefined);
       await refresh();
     }, setCandidateResult);
   };
 
-  return <div className="settings-fields">
-    <ProviderSection icon="＋" title={messages.addProvider}>
-      <div className="providers-form">
-        <fieldset className="providers-form-grid" disabled={testing === 'candidate'} onChange={() => setCandidateResult(undefined)}>
-          <div className="run-config-field">
-            <span className="run-config-title">{messages.providerRuntime}</span>
-            <CustomSelect title={messages.providerRuntime} items={PROVIDER_RUNTIME_OPTIONS} selected={runtime} onSelect={value => {
-              setRuntime(value);
-              setCandidateResult(undefined);
-            }} />
-          </div>
-          <label className="run-config-field">
-            <span className="run-config-title">{messages.providerBaseUrl}</span>
-            <input className="run-config-input" type="text" value={baseUrl} aria-label={messages.providerBaseUrl} onChange={event => setBaseUrl(event.target.value)} />
-          </label>
-          <label className="run-config-field">
-            <span className="run-config-title">{messages.providerModel}</span>
-            <input className="run-config-input" type="text" value={model} aria-label={messages.providerModel} onChange={event => setModel(event.target.value)} />
-          </label>
-          <label className="run-config-field">
-            <span className="run-config-title">{messages.providerKey}</span>
-            <input className="run-config-input" type="password" value={key} aria-label={messages.providerKey} onChange={event => setKey(event.target.value)} />
-          </label>
-        </fieldset>
-        <div className="providers-form-actions">
-          <button className="settings-image-button provider-test-button" type="button" disabled={busy} aria-busy={testing === 'candidate'} onClick={() => void testCandidate()}>
-            {testing === 'candidate' ? messages.providerTesting : messages.testKey}
-          </button>
-          <button className="settings-image-button" type="button" disabled={busy} onClick={() => void addProvider()}>{messages.add}</button>
-          <ProviderFeedback result={candidateResult} />
-        </div>
-      </div>
-    </ProviderSection>
-    <ProviderSection icon="☷" title={messages.providersExisting} result={listResult}>
-      <div className="provider-list">
-        {providers === null && !listResult?.failed && <p className="providers-empty">{messages.providersDescription}</p>}
-        {providers?.length === 0 && <p className="providers-empty">{messages.providerUntested} — {messages.providersDescription}</p>}
-        {providers?.map(provider => {
-          const cardId = `${provider.provider_index}:${provider.identity}`;
-          const isExpanded = cardId === expandedCard;
-          const customName = providerNames[provider.identity] ?? '';
-          const defaultName = [providerRuntimeLabel(provider.runtime), provider.model].filter(Boolean).join(' · ') || messages.defaultBadge;
-          const reportCardResult = (result?: ProviderResult): void => setCardResult(result && { ...result, cardId });
-          return <div className={'provider-row provider-card' + (provider.provider_index === activeIndex ? ' provider-row-active' : '')} key={cardId}>
-            <button className="provider-card-head" type="button" aria-expanded={isExpanded} onClick={() => {
-              setNameDraft(customName);
-              setExpandedCard(isExpanded ? null : cardId);
-            }}>
-              <span className="provider-name">{customName || defaultName}</span>
-              {validationChip(provider.worker_validation, messages)}
-              {provider.provider_index === activeIndex && <span className="provider-chip provider-chip-active">{messages.providerActive}</span>}
-              <span className="provider-chevron" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+  return (
+    <div className="settings-fields">
+      <ProviderSection icon="＋" title={messages.addProvider}>
+        <div className="providers-form">
+          <fieldset
+            className="providers-form-grid"
+            disabled={testing === 'candidate'}
+            onChange={() => setCandidateResult(undefined)}
+          >
+            <div className="run-config-field">
+              <span className="run-config-title">{messages.providerRuntime}</span>
+              <CustomSelect
+                title={messages.providerRuntime}
+                items={PROVIDER_RUNTIME_OPTIONS}
+                selected={runtime}
+                onSelect={value => {
+                  setRuntime(value);
+                  setCandidateResult(undefined);
+                }}
+              />
+            </div>
+            <label className="run-config-field">
+              <span className="run-config-title">{messages.providerBaseUrl}</span>
+              <input
+                className="run-config-input"
+                type="text"
+                value={baseUrl}
+                aria-label={messages.providerBaseUrl}
+                onChange={event => setBaseUrl(event.target.value)}
+              />
+            </label>
+            <label className="run-config-field">
+              <span className="run-config-title">{messages.providerModel}</span>
+              <input
+                className="run-config-input"
+                type="text"
+                value={model}
+                aria-label={messages.providerModel}
+                onChange={event => setModel(event.target.value)}
+              />
+            </label>
+            <label className="run-config-field">
+              <span className="run-config-title">{messages.providerKey}</span>
+              <input
+                className="run-config-input"
+                type="password"
+                value={key}
+                aria-label={messages.providerKey}
+                onChange={event => setKey(event.target.value)}
+              />
+            </label>
+          </fieldset>
+          <div className="providers-form-actions">
+            <button
+              className="settings-image-button provider-test-button"
+              type="button"
+              disabled={busy}
+              aria-busy={testing === 'candidate'}
+              onClick={() => void testCandidate()}
+            >
+              {testing === 'candidate' ? messages.providerTesting : messages.testKey}
             </button>
-            {isExpanded && <div className="provider-card-detail">
-              <form className="provider-name-form" onSubmit={event => { event.preventDefault(); saveProviderName(provider.identity); }}>
-                <label className="run-config-field">
-                  <span className="run-config-title">{messages.providerName}</span>
-                  <input className="run-config-input" value={nameDraft} placeholder={defaultName} onChange={event => setNameDraft(event.target.value)} />
-                </label>
-                <button className="settings-image-button" type="submit" disabled={nameDraft.trim() === customName}>{messages.save}</button>
-              </form>
-              <div className="provider-meta">
-                <span>{messages.providerBaseUrl}：{provider.base_url || messages.defaultBadge}</span>
-                <span>{messages.providerKey}：{provider.masked}</span>
+            <button
+              className="settings-image-button"
+              type="button"
+              disabled={busy}
+              onClick={() => void addProvider()}
+            >
+              {messages.add}
+            </button>
+            <ProviderFeedback result={candidateResult} />
+          </div>
+        </div>
+      </ProviderSection>
+      <ProviderSection icon="☷" title={messages.providersExisting} result={listResult}>
+        <div className="provider-list">
+          {providers === null && !listResult?.failed && (
+            <p className="providers-empty">{messages.providersDescription}</p>
+          )}
+          {providers?.length === 0 && (
+            <p className="providers-empty">
+              {messages.providerUntested} — {messages.providersDescription}
+            </p>
+          )}
+          {providers?.map(provider => {
+            const cardId = `${provider.provider_index}:${provider.identity}`;
+            const isExpanded = cardId === expandedCard;
+            const customName = providerNames[provider.identity] ?? '';
+            const defaultName =
+              [providerRuntimeLabel(provider.runtime), provider.model].filter(Boolean).join(' · ') ||
+              messages.defaultBadge;
+            const reportCardResult = (result?: ProviderResult): void =>
+              setCardResult(result && { ...result, cardId });
+            return (
+              <div
+                className={
+                  'provider-row provider-card' +
+                  (provider.provider_index === activeIndex ? ' provider-row-active' : '')
+                }
+                key={cardId}
+              >
+                <button
+                  className="provider-card-head"
+                  type="button"
+                  aria-expanded={isExpanded}
+                  onClick={() => {
+                    setNameDraft(customName);
+                    setExpandedCard(isExpanded ? null : cardId);
+                  }}
+                >
+                  <span className="provider-name">{customName || defaultName}</span>
+                  {validationChip(provider.worker_validation, messages)}
+                  {provider.provider_index === activeIndex && (
+                    <span className="provider-chip provider-chip-active">{messages.providerActive}</span>
+                  )}
+                  <span className="provider-chevron" aria-hidden="true">
+                    {isExpanded ? '▾' : '▸'}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="provider-card-detail">
+                    <form
+                      className="provider-name-form"
+                      onSubmit={event => {
+                        event.preventDefault();
+                        saveProviderName(provider.identity);
+                      }}
+                    >
+                      <label className="run-config-field">
+                        <span className="run-config-title">{messages.providerName}</span>
+                        <input
+                          className="run-config-input"
+                          value={nameDraft}
+                          placeholder={defaultName}
+                          onChange={event => setNameDraft(event.target.value)}
+                        />
+                      </label>
+                      <button
+                        className="settings-image-button"
+                        type="submit"
+                        disabled={nameDraft.trim() === customName}
+                      >
+                        {messages.save}
+                      </button>
+                    </form>
+                    <div className="provider-meta">
+                      <span>
+                        {messages.providerBaseUrl}：{provider.base_url || messages.defaultBadge}
+                      </span>
+                      <span>
+                        {messages.providerKey}：{provider.masked}
+                      </span>
+                    </div>
+                    <div className="provider-actions">
+                      <button
+                        className="settings-image-button"
+                        type="button"
+                        disabled={busy}
+                        aria-busy={testing === cardId}
+                        onClick={() =>
+                          void run(
+                            async () => {
+                              const result = testResult(
+                                await window.executionBackend.testProvider(provider.provider_index),
+                              );
+                              reportCardResult(result);
+                              if (!result.failed) {
+                                setListResult(undefined);
+                                await refresh();
+                              }
+                            },
+                            reportCardResult,
+                            cardId,
+                          )
+                        }
+                      >
+                        {testing === cardId ? messages.providerTesting : messages.testKey}
+                      </button>
+                      <button
+                        className="settings-image-button"
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            const result = await window.executionBackend.activateProvider(provider.provider_index);
+                            if (!result.ok) {
+                              reportCardResult({ failed: true, message: '激活失败' });
+                              return;
+                            }
+                            setActiveIndex(result.activeIndex ?? provider.provider_index);
+                          }, reportCardResult)
+                        }
+                      >
+                        {messages.providerActive}
+                      </button>
+                      <button
+                        className="settings-image-button provider-delete"
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await window.executionBackend.deleteProvider(provider.provider_index);
+                            setExpandedCard(null);
+                            setListResult({ failed: false, message: messages.providerDeleted });
+                            await refresh();
+                          }, setListResult)
+                        }
+                      >
+                        {messages.deleteProvider}
+                      </button>
+                      <ProviderFeedback result={cardResult?.cardId === cardId ? cardResult : undefined} />
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="provider-actions">
-                <button className="settings-image-button" type="button" disabled={busy} aria-busy={testing === cardId} onClick={() => void run(async () => {
-                  const result = testResult(await window.executionBackend.testProvider(provider.provider_index));
-                  reportCardResult(result);
-                  if (!result.failed) {
-                    setListResult(undefined);
-                    await refresh();
-                  }
-                }, reportCardResult, cardId)}>{testing === cardId ? messages.providerTesting : messages.testKey}</button>
-                <button className="settings-image-button" type="button" disabled={busy} onClick={() => void run(async () => {
-                  const result = await window.executionBackend.activateProvider(provider.provider_index);
-                  if (!result.ok) { reportCardResult({ failed: true, message: '激活失败' }); return; }
-                  setActiveIndex(result.activeIndex ?? provider.provider_index);
-                }, reportCardResult)}>{messages.providerActive}</button>
-                <button className="settings-image-button provider-delete" type="button" disabled={busy} onClick={() => void run(async () => {
-                  await window.executionBackend.deleteProvider(provider.provider_index);
-                  setExpandedCard(null);
-                  setListResult({ failed: false, message: messages.providerDeleted });
-                  await refresh();
-                }, setListResult)}>{messages.deleteProvider}</button>
-                <ProviderFeedback result={cardResult?.cardId === cardId ? cardResult : undefined} />
-              </div>
-            </div>}
-          </div>;
-        })}
-      </div>
-    </ProviderSection>
-  </div>;
+            );
+          })}
+        </div>
+      </ProviderSection>
+    </div>
+  );
 }
 
 const categories = ['general', 'appearance', 'providers'] as const;
 const themeOptions = ['dark', 'light'].flatMap(group => themes.filter(theme => theme.group === group));
 
-export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange, onLocaleChange, backgroundImage, backgroundFit, onBackgroundImageChange, onBackgroundFitChange, onClose, messages }: SettingsModalProps): JSX.Element {
-  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>('appearance');
-  const categoryLabels: Record<typeof categories[number], string> = { appearance: messages.appearance, general: messages.general, providers: messages.providers };
+export function SettingsModal({
+  theme,
+  font,
+  locale,
+  onThemeChange,
+  onFontChange,
+  onLocaleChange,
+  backgroundImage,
+  backgroundFit,
+  onBackgroundImageChange,
+  onBackgroundFitChange,
+  onClose,
+  messages,
+}: SettingsModalProps): JSX.Element {
+  const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>('appearance');
+  const categoryLabels: Record<(typeof categories)[number], string> = {
+    appearance: messages.appearance,
+    general: messages.general,
+    providers: messages.providers,
+  };
   const categoryLabel = categoryLabels[activeCategory];
-  return <div className="settings-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <header className="settings-header">
-        <div className="settings-title">
-          <span className="settings-title-glyph" aria-hidden="true">⚙</span>
-          <h1 id="settings-title">{messages.settings}</h1>
-        </div>
-        <button className="modal-close" type="button" onClick={onClose} aria-label={messages.settings}>×</button>
-      </header>
-      <div className="settings-body">
-        <nav className="settings-nav" aria-label={messages.settings}>
-          {categories.map(category => <button
-            className={'settings-nav-item' + (activeCategory === category ? ' active' : '')}
-            key={category}
-            type="button"
-            aria-current={activeCategory === category ? 'page' : undefined}
-            onClick={() => setActiveCategory(category)}
-          >
-            {categoryLabels[category]}
-          </button>)}
-        </nav>
-        <div className="settings-content">
-          <div className="settings-content-header"><h2>{categoryLabel}</h2></div>
-          {activeCategory === 'appearance'
-            ? <div className="settings-fields">
-              <SelectField
-                title={messages.theme}
-                description={messages.themeDescription}
-                icon="◐"
-                items={themeOptions}
-                groupLabels={{ light: messages.lightThemes, dark: messages.darkThemes }}
-                selected={theme}
-                defaultId={defaultTheme.id}
-                defaultBadge={messages.defaultBadge}
-                onSelect={onThemeChange}
-              />
-              <SelectField
-                title={messages.editorFont}
-                description={messages.editorFontDescription}
-                icon="Aa"
-                items={fonts}
-                selected={font}
-                defaultId={defaultFont.id}
-                defaultBadge={messages.defaultBadge}
-                onSelect={onFontChange}
-              />
-              <BackgroundImageField
-                title={messages.backgroundImage}
-                description={messages.backgroundImageDescription}
-                icon="▧"
-                hasImage={backgroundImage !== ''}
-                chooseLabel={messages.chooseImage}
-                removeLabel={messages.removeImage}
-                onChange={onBackgroundImageChange}
-              />
-              <SelectField
-                title={messages.backgroundFit}
-                description={messages.backgroundFitDescription}
-                icon="⇱"
-                items={[{ id: 'cover', label: messages.fitCover }, { id: 'contain', label: messages.fitContain }]}
-                selected={backgroundFit}
-                defaultId="cover"
-                defaultBadge={messages.defaultBadge}
-                onSelect={value => onBackgroundFitChange(value as 'cover' | 'contain')}
-              />
+  return (
+    <div
+      className="settings-backdrop"
+      role="presentation"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header className="settings-header">
+          <div className="settings-title">
+            <span className="settings-title-glyph" aria-hidden="true">
+              ⚙
+            </span>
+            <h1 id="settings-title">{messages.settings}</h1>
+          </div>
+          <button className="modal-close" type="button" onClick={onClose} aria-label={messages.settings}>
+            ×
+          </button>
+        </header>
+        <div className="settings-body">
+          <nav className="settings-nav" aria-label={messages.settings}>
+            {categories.map(category => (
+              <button
+                className={'settings-nav-item' + (activeCategory === category ? ' active' : '')}
+                key={category}
+                type="button"
+                aria-current={activeCategory === category ? 'page' : undefined}
+                onClick={() => setActiveCategory(category)}
+              >
+                {categoryLabels[category]}
+              </button>
+            ))}
+          </nav>
+          <div className="settings-content">
+            <div className="settings-content-header">
+              <h2>{categoryLabel}</h2>
             </div>
-            : activeCategory === 'general'
-              ? <div className="settings-fields">
+            {activeCategory === 'appearance' ? (
+              <div className="settings-fields">
+                <SelectField
+                  title={messages.theme}
+                  description={messages.themeDescription}
+                  icon="◐"
+                  items={themeOptions}
+                  groupLabels={{ light: messages.lightThemes, dark: messages.darkThemes }}
+                  selected={theme}
+                  defaultId={defaultTheme.id}
+                  defaultBadge={messages.defaultBadge}
+                  onSelect={onThemeChange}
+                />
+                <SelectField
+                  title={messages.editorFont}
+                  description={messages.editorFontDescription}
+                  icon="Aa"
+                  items={fonts}
+                  selected={font}
+                  defaultId={defaultFont.id}
+                  defaultBadge={messages.defaultBadge}
+                  onSelect={onFontChange}
+                />
+                <BackgroundImageField
+                  title={messages.backgroundImage}
+                  description={messages.backgroundImageDescription}
+                  icon="▧"
+                  hasImage={backgroundImage !== ''}
+                  chooseLabel={messages.chooseImage}
+                  removeLabel={messages.removeImage}
+                  onChange={onBackgroundImageChange}
+                />
+                <SelectField
+                  title={messages.backgroundFit}
+                  description={messages.backgroundFitDescription}
+                  icon="⇱"
+                  items={[
+                    { id: 'cover', label: messages.fitCover },
+                    { id: 'contain', label: messages.fitContain },
+                  ]}
+                  selected={backgroundFit}
+                  defaultId="cover"
+                  defaultBadge={messages.defaultBadge}
+                  onSelect={value => onBackgroundFitChange(value as 'cover' | 'contain')}
+                />
+              </div>
+            ) : activeCategory === 'general' ? (
+              <div className="settings-fields">
                 <SelectField
                   title={messages.language}
                   description={messages.languageDescription}
@@ -474,9 +760,12 @@ export function SettingsModal({ theme, font, locale, onThemeChange, onFontChange
                   onSelect={value => onLocaleChange(value as LocaleId)}
                 />
               </div>
-              : <ProvidersPanel messages={messages} />}
+            ) : (
+              <ProvidersPanel messages={messages} />
+            )}
+          </div>
         </div>
-      </div>
-    </section>
-  </div>;
+      </section>
+    </div>
+  );
 }

@@ -53,7 +53,17 @@ const FILE_ICONS = [
 ];
 const DEFAULT_FILE_ICON = { glyph: '\uea7b', tone: 'muted' };
 
-export function WorkspaceExplorer({ tree, hasWorkspace, activeFile, onSelect, onExpand, onSync, syncLabel, workspacePath, messages }: WorkspaceExplorerProps): JSX.Element {
+export function WorkspaceExplorer({
+  tree,
+  hasWorkspace,
+  activeFile,
+  onSelect,
+  onExpand,
+  onSync,
+  syncLabel,
+  workspacePath,
+  messages,
+}: WorkspaceExplorerProps): JSX.Element {
   const roots = useMemo(() => buildTree(tree), [tree]);
   const topLevelDirs = new Set(roots.filter(node => node.type === 'dir').map(node => node.path));
   const [expanded, setExpanded] = useState<Set<string>>(() => onExpand ? new Set() : topLevelDirs);
@@ -71,34 +81,76 @@ export function WorkspaceExplorer({ tree, hasWorkspace, activeFile, onSelect, on
     const style = { '--tree-depth': depth } as React.CSSProperties;
     if (node.type === 'dir') {
       const isExpanded = expanded.has(node.path);
-      return <Fragment key={node.path}>
-        <button className="file-entry file-entry-dir" style={style} type="button" onClick={() => toggle(node.path)} aria-expanded={isExpanded} title={node.path}>
-          <span className="workspace-glyph tree-disclosure" aria-hidden="true">{isExpanded ? '\ueab4' : '\ueab6'}</span>
-          <span className="workspace-glyph tree-icon" data-tone="folder" aria-hidden="true">{isExpanded ? '\ueaf7' : '\uea83'}</span>
-          <span className="tree-name">{node.name}</span>
-        </button>
-        {isExpanded && node.children.map(child => renderNode(child, depth + 1))}
-      </Fragment>;
+      return (
+        <Fragment key={node.path}>
+          <button
+            className="file-entry file-entry-dir"
+            style={style}
+            type="button"
+            onClick={() => toggle(node.path)}
+            aria-expanded={isExpanded}
+            title={node.path}
+          >
+            <span className="workspace-glyph tree-disclosure" aria-hidden="true">
+              {isExpanded ? '\ueab4' : '\ueab6'}
+            </span>
+            <span className="workspace-glyph tree-icon" data-tone="folder" aria-hidden="true">
+              {isExpanded ? '\ueaf7' : '\uea83'}
+            </span>
+            <span className="tree-name">{node.name}</span>
+          </button>
+          {isExpanded && node.children.map(child => renderNode(child, depth + 1))}
+        </Fragment>
+      );
     }
     const extension = node.name.split('.').at(-1)?.toLowerCase() ?? '';
     const icon = FILE_ICONS.find(item => item.extensions.includes(extension)) ?? DEFAULT_FILE_ICON;
-    return <button className={'file-entry' + (node.path === activeFile ? ' active' : '')} style={style} key={node.path} type="button" title={node.path} onClick={() => onSelect(node.path)}>
-      <span className="workspace-glyph tree-icon" data-tone={icon.tone} aria-hidden="true">{icon.glyph}</span>
-      <span className="tree-name">{node.name}</span>
-    </button>;
+    return (
+      <button
+        className={'file-entry' + (node.path === activeFile ? ' active' : '')}
+        style={style}
+        key={node.path}
+        type="button"
+        title={node.path}
+        onClick={() => onSelect(node.path)}
+      >
+        <span className="workspace-glyph tree-icon" data-tone={icon.tone} aria-hidden="true">
+          {icon.glyph}
+        </span>
+        <span className="tree-name">{node.name}</span>
+      </button>
+    );
   };
 
-  return <aside className="workspace-explorer">
-    <div className="explorer-heading">
-      <h2>{messages.workspace}</h2>
-      {onSync && <button className="icon-button explorer-sync" type="button" onClick={onSync} aria-label={syncLabel} title={syncLabel}>
-        <span className="workspace-glyph" aria-hidden="true">&#xeb37;</span>
-      </button>}
-    </div>
-    {roots.length === 0 && <div className="workspace-empty">
-      <p>{hasWorkspace ? messages.emptyWorkspace : messages.noWorkspace}</p>
-    </div>}
-    {workspacePath && <p className="explorer-workspace-path" title={workspacePath}>{workspacePath}</p>}
-    {roots.length > 0 && <div className="file-list">{roots.map(node => renderNode(node, 0))}</div>}
-  </aside>;
+  return (
+    <aside className="workspace-explorer">
+      <div className="explorer-heading">
+        <h2>{messages.workspace}</h2>
+        {onSync && (
+          <button
+            className="icon-button explorer-sync"
+            type="button"
+            onClick={onSync}
+            aria-label={syncLabel}
+            title={syncLabel}
+          >
+            <span className="workspace-glyph" aria-hidden="true">
+              &#xeb37;
+            </span>
+          </button>
+        )}
+      </div>
+      {roots.length === 0 && (
+        <div className="workspace-empty">
+          <p>{hasWorkspace ? messages.emptyWorkspace : messages.noWorkspace}</p>
+        </div>
+      )}
+      {workspacePath && (
+        <p className="explorer-workspace-path" title={workspacePath}>
+          {workspacePath}
+        </p>
+      )}
+      {roots.length > 0 && <div className="file-list">{roots.map(node => renderNode(node, 0))}</div>}
+    </aside>
+  );
 }

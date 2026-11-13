@@ -21,7 +21,9 @@ let insightDark = true;
 let requestId = 0;
 
 function applyTheme(view: WebContentsView): void {
-  void view.webContents.executeJavaScript(`document.documentElement.classList.toggle('dark', ${insightDark})`).catch(() => {});
+  void view.webContents
+    .executeJavaScript(`document.documentElement.classList.toggle('dark', ${insightDark})`)
+    .catch(() => {});
 }
 
 function ensureView(): WebContentsView {
@@ -45,7 +47,12 @@ export function attachInsightViewTo(window: BrowserWindow): void {
   }
 }
 
-export async function showInsight(path: string, bounds: InsightBounds, isDark: boolean, target = localInsightTarget): Promise<void> {
+export async function showInsight(
+  path: string,
+  bounds: InsightBounds,
+  isDark: boolean,
+  target = localInsightTarget,
+): Promise<void> {
   const view = ensureView();
   const request = ++requestId;
   const url = target.url + (path.startsWith('/') ? path : '/' + path);

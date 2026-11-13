@@ -36,7 +36,9 @@ interface Props {
 }
 
 export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JSX.Element {
-  const [saved] = useState(() => loadWorkbenchState<RemoteWorkspaceConfig | undefined>(REMOTE_WORKSPACE_KEY, undefined));
+  const [saved] = useState(() =>
+    loadWorkbenchState<RemoteWorkspaceConfig | undefined>(REMOTE_WORKSPACE_KEY, undefined),
+  );
   const [host, setHost] = useState(saved?.host ?? '');
   const [hosts, setHosts] = useState<string[]>([]);
   const [hostsError, setHostsError] = useState('');
@@ -89,41 +91,134 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
     }
   };
 
-  return <form className="remote-workspace-form" onSubmit={event => {
-    event.preventDefault();
-    if (disabled) return;
-    setBusy(true);
-    setError('');
-    void onConnect({ host: configuredHost ?? host, root, controllerPort: port, insightPort,
-      ...(!configuredHost && sshPort ? { sshPort: Number(sshPort) } : {}),
-    })
-      .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))
-      .finally(() => setBusy(false));
-  }}>
-    <label>{copy.hosts}
-      <select value={configuredHost ?? ''} disabled={disabled || !hosts.length} onChange={event => changeHost(event.currentTarget.value)}>
-        <option value="">{hosts.length ? copy.chooseHost : copy.noHosts}</option>
-        {hosts.map(name => <option key={name} value={name}>{name}</option>)}
-      </select>
-    </label>
-    {hostsError && <p role="status">{copy.readHostsFailed} · {hostsError}</p>}
-    <label>{copy.host}<input required value={host} placeholder="user@server.example" disabled={disabled} onChange={event => changeHost(event.currentTarget.value)} /></label>
-    {!configuredHost && <label>{copy.sshPort}
-      <input type="number" min="1" max="65535" value={sshPort} placeholder={copy.sshPortDefault} disabled={disabled} onChange={event => setSshPort(event.currentTarget.value)} />
-    </label>}
-    {!configuredHost && host.trim() && <details className="ssh-save-host">
-      <summary>{copy.saveHost}</summary>
-      <label>{copy.alias}<input value={alias} placeholder="dev-server" disabled={disabled} onChange={event => setAlias(event.currentTarget.value)} /></label>
-      <button type="button" disabled={disabled || !alias.trim()} onClick={() => void saveHost()}>{copy.saveHost}</button>
-    </details>}
-    {savedAlias && <p role="status">{copy.hostSaved} · {savedAlias}</p>}
-    <label>{copy.root}<input required value={root} placeholder="/home/user/project" disabled={disabled} onChange={event => setRoot(event.currentTarget.value)} /></label>
-    <label>{copy.port}<input required type="number" min="1" max="65535" value={port} disabled={disabled} onChange={event => setPort(Number(event.currentTarget.value))} /></label>
-    <label>{copy.insightPort}<input required type="number" min="1" max="65535" value={insightPort} disabled={disabled} onChange={event => setInsightPort(Number(event.currentTarget.value))} /></label>
-    {error && <p role="alert">{error}</p>}
-    <div className="workbench-dialog-actions">
-      <button type="button" disabled={disabled} onClick={onCancel}>{copy.cancel}</button>
-      <button type="submit" disabled={disabled}>{busy ? copy.connecting : copy.connect}</button>
-    </div>
-  </form>;
+  return (
+    <form
+      className="remote-workspace-form"
+      onSubmit={event => {
+        event.preventDefault();
+        if (disabled) return;
+        setBusy(true);
+        setError('');
+        void onConnect({
+          host: configuredHost ?? host,
+          root,
+          controllerPort: port,
+          insightPort,
+          ...(!configuredHost && sshPort ? { sshPort: Number(sshPort) } : {}),
+        })
+          .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))
+          .finally(() => setBusy(false));
+      }}
+    >
+      <label>
+        {copy.hosts}
+        <select
+          value={configuredHost ?? ''}
+          disabled={disabled || !hosts.length}
+          onChange={event => changeHost(event.currentTarget.value)}
+        >
+          <option value="">{hosts.length ? copy.chooseHost : copy.noHosts}</option>
+          {hosts.map(name => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {hostsError && (
+        <p role="status">
+          {copy.readHostsFailed} · {hostsError}
+        </p>
+      )}
+      <label>
+        {copy.host}
+        <input
+          required
+          value={host}
+          placeholder="user@server.example"
+          disabled={disabled}
+          onChange={event => changeHost(event.currentTarget.value)}
+        />
+      </label>
+      {!configuredHost && (
+        <label>
+          {copy.sshPort}
+          <input
+            type="number"
+            min="1"
+            max="65535"
+            value={sshPort}
+            placeholder={copy.sshPortDefault}
+            disabled={disabled}
+            onChange={event => setSshPort(event.currentTarget.value)}
+          />
+        </label>
+      )}
+      {!configuredHost && host.trim() && (
+        <details className="ssh-save-host">
+          <summary>{copy.saveHost}</summary>
+          <label>
+            {copy.alias}
+            <input
+              value={alias}
+              placeholder="dev-server"
+              disabled={disabled}
+              onChange={event => setAlias(event.currentTarget.value)}
+            />
+          </label>
+          <button type="button" disabled={disabled || !alias.trim()} onClick={() => void saveHost()}>
+            {copy.saveHost}
+          </button>
+        </details>
+      )}
+      {savedAlias && (
+        <p role="status">
+          {copy.hostSaved} · {savedAlias}
+        </p>
+      )}
+      <label>
+        {copy.root}
+        <input
+          required
+          value={root}
+          placeholder="/home/user/project"
+          disabled={disabled}
+          onChange={event => setRoot(event.currentTarget.value)}
+        />
+      </label>
+      <label>
+        {copy.port}
+        <input
+          required
+          type="number"
+          min="1"
+          max="65535"
+          value={port}
+          disabled={disabled}
+          onChange={event => setPort(Number(event.currentTarget.value))}
+        />
+      </label>
+      <label>
+        {copy.insightPort}
+        <input
+          required
+          type="number"
+          min="1"
+          max="65535"
+          value={insightPort}
+          disabled={disabled}
+          onChange={event => setInsightPort(Number(event.currentTarget.value))}
+        />
+      </label>
+      {error && <p role="alert">{error}</p>}
+      <div className="workbench-dialog-actions">
+        <button type="button" disabled={disabled} onClick={onCancel}>
+          {copy.cancel}
+        </button>
+        <button type="submit" disabled={disabled}>
+          {busy ? copy.connecting : copy.connect}
+        </button>
+      </div>
+    </form>
+  );
 }

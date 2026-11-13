@@ -5,7 +5,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { ensureExecutionBackendRunning, isExecutionBackendReachable, stopExecutionBackendIfStarted } from '../src/executionBackend/lifecycle';
+import {
+  ensureExecutionBackendRunning,
+  isExecutionBackendReachable,
+  stopExecutionBackendIfStarted,
+} from '../src/executionBackend/lifecycle';
 import { serviceSpawnError } from '../src/serviceStartupError';
 
 const FAKE_SERVER = `
@@ -69,7 +73,11 @@ test('isExecutionBackendReachable', async t => {
 test('execution backend lifecycle', async t => {
   const binDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-service-'));
   await fs.writeFile(path.join(binDir, 'fake-server.js'), FAKE_SERVER);
-  await fs.writeFile(path.join(binDir, 'workflow-controller'), `#!/bin/sh\nexec node "${path.join(binDir, 'fake-server.js')}" "$@"\n`, { mode: 0o755 });
+  await fs.writeFile(
+    path.join(binDir, 'workflow-controller'),
+    `#!/bin/sh\nexec node "${path.join(binDir, 'fake-server.js')}" "$@"\n`,
+    { mode: 0o755 },
+  );
   const originalPath = process.env.PATH;
   t.after(async () => {
     stopExecutionBackendIfStarted();
@@ -104,11 +112,17 @@ test('execution backend lifecycle', async t => {
   await t.test('distinguishes a missing interpreter from a process that exits during startup', async () => {
     const executable = path.join(binDir, 'workflow-controller');
     const port = String(await freePort());
-    const missing = serviceSpawnError('workflow-controller', Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }));
+    const missing = serviceSpawnError(
+      'workflow-controller',
+      Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }),
+    );
     assert.equal(missing.reason, 'missing-command');
     assert.equal(missing.detail, 'workflow-controller');
     await fs.writeFile(executable, '#!/bin/sh\necho "Invalid server configuration" >&2\nexit 7\n');
-    await assert.rejects(ensureExecutionBackendRunning(undefined, port), { reason: 'exited', detail: 'exit 7 · Invalid server configuration' });
+    await assert.rejects(ensureExecutionBackendRunning(undefined, port), {
+      reason: 'exited',
+      detail: 'exit 7 · Invalid server configuration',
+    });
   });
 
   await t.test('reports a readiness timeout while the service process stays alive', async t => {

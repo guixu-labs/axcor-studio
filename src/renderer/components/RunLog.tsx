@@ -28,7 +28,17 @@ interface LogEntry {
 }
 
 const visibleEvents = new Set(['process_output', 'process_exit', 'error', 'rate_limit_event', 'run_failed']);
-const notificationSubtypes = new Set(['task_started', 'task_progress', 'task_notification', 'task_summary', 'post_turn_summary', 'notification', 'api_retry', 'warning', 'error']);
+const notificationSubtypes = new Set([
+  'task_started',
+  'task_progress',
+  'task_notification',
+  'task_summary',
+  'post_turn_summary',
+  'notification',
+  'api_retry',
+  'warning',
+  'error',
+]);
 
 function nonempty(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
@@ -61,11 +71,25 @@ function notificationText(data: Payload | undefined): string | undefined {
   if (!data || typeof data.subtype !== 'string') return undefined;
   if (data.subtype === 'hook_response') {
     if (typeof data.exit_code !== 'number' || data.exit_code === 0) return undefined;
-    return [data.hook_name, data.stderr || data.output].map(nonempty).filter(Boolean).join('\n') || `hook_response (${data.exit_code})`;
+    return (
+      [data.hook_name, data.stderr || data.output].map(nonempty).filter(Boolean).join('\n') ||
+      `hook_response (${data.exit_code})`
+    );
   }
   if (!notificationSubtypes.has(data.subtype)) return undefined;
-  const message = [data.text, data.description, data.summary, data.detail, data.status_detail, data.needs_action, data.message, data.error]
-    .map(nonempty).filter(Boolean).join('\n');
+  const message = [
+    data.text,
+    data.description,
+    data.summary,
+    data.detail,
+    data.status_detail,
+    data.needs_action,
+    data.message,
+    data.error,
+  ]
+    .map(nonempty)
+    .filter(Boolean)
+    .join('\n');
   if (message) return message;
   if (data.subtype === 'api_retry' && typeof data.attempt === 'number') {
     return ['api_retry #' + data.attempt, data.error_status].filter(Boolean).join(' · ');
@@ -107,12 +131,19 @@ function buildLog(events: RunEvent[], labels: Labels): LogEntry[] {
     return content.flatMap(value => {
       const block = record(value);
       if (block?.type === 'text' && nonempty(block.text)) return [{ text: String(block.text) }];
-      if (block?.type === 'thinking' && nonempty(block.thinking)) return [{ text: String(block.thinking), label: 'thinking' as const }];
+      if (block?.type === 'thinking' && nonempty(block.thinking))
+        return [{ text: String(block.thinking), label: 'thinking' as const }];
       if (block?.type === 'tool_result' && !attachResult(event, block, false)) {
         return [{ text: payloadText(block.content ?? block), label: 'toolResult' as const }];
       }
       if (block?.type === 'tool_use' && !tools.has(toolKey(event, block.id) ?? '')) {
-        return [{ text: [block.name, payloadText(block.input)].filter(Boolean).join('\n'), label: 'toolInput' as const, code: true }];
+        return [
+          {
+            text: [block.name, payloadText(block.input)].filter(Boolean).join('\n'),
+            label: 'toolInput' as const,
+            code: true,
+          },
+        ];
       }
       return [];
     });
@@ -130,13 +161,20 @@ function buildLog(events: RunEvent[], labels: Labels): LogEntry[] {
     let preview: string | undefined;
     let blocks: Block[] = [];
     const subagent = event.type !== 'subagent_context' && Object.hasOwn(labels.subagentEvents, event.type);
-    if (event.type === 'assistant_message' || event.type === 'user_message' || event.type === 'log_query' || event.type === 'log_manual') {
+    if (
+      event.type === 'assistant_message' ||
+      event.type === 'user_message' ||
+      event.type === 'log_query' ||
+      event.type === 'log_manual'
+    ) {
       kind = event.type === 'assistant_message' ? labels.assistant : labels.user;
       blocks = contentBlocks(event, data?.content ?? data?.prompt ?? data?.text ?? event.payload);
     } else if (event.type === 'tool_result') {
       if (data && attachResult(event, data, true)) continue;
       kind = labels.toolResult;
-      blocks = [{ text: payloadText(data?.content ?? data?.output ?? data?.result ?? event.payload), label: 'toolResult' }];
+      blocks = [
+        { text: payloadText(data?.content ?? data?.output ?? data?.result ?? event.payload), label: 'toolResult' },
+      ];
     } else if (event.type === 'notification') {
       const text = notificationText(data);
       if (!text) continue;
@@ -183,24 +221,61 @@ const LogRow = memo(function LogRow({ row, labels }: { row: LogEntry; labels: La
   });
   const preview = row.preview.trim().split(/\r?\n/, 1)[0].slice(0, 240);
   const singleBlock = row.blocks.length === 1 ? row.blocks[0] : undefined;
-  const expandable = row.blocks.length > 0 && (!singleBlock || singleBlock.label !== undefined || singleBlock.text.trim() !== preview);
+  const expandable =
+    row.blocks.length > 0 && (!singleBlock || singleBlock.label !== undefined || singleBlock.text.trim() !== preview);
   const displayText = expandable ? preview : row.preview.trim();
-  const summary = <span className={'event-preview' + (row.code ? ' event-mono' : '')} title={displayText}>{displayText}</span>;
-  return <div className={'event' + (event.source === 'run_events' ? ' event-workflow' : '') + (row.subagent ? ' event-subagent' : '')}>
-    <time dateTime={event.timestamp} title={event.timestamp}>{time}</time>
-    <span className="event-kind" title={row.kind}>{row.kind}</span>
-    {expandable ? <details className="event-disclosure">
-      <summary className="event-summary">{summary}</summary>
-      <div className="event-content">{row.blocks.map((block, index) => <div key={index} className={'event-block' + (block.label === 'thinking' ? ' event-thinking' : '')}>
-        {block.label && <strong>{labels[block.label]}</strong>}
-        <div className={block.code || (!block.label && row.code) ? 'event-mono' : undefined}>{block.text}</div>
-      </div>)}</div>
-    </details> : <div className="event-summary event-summary-static">{summary}</div>}
-    {row.status && <span className={'event-state event-state-' + row.status}>{row.status === 'failed' ? labels.status.failed : labels.toolReturned}</span>}
-  </div>;
+  const summary = (
+    <span className={'event-preview' + (row.code ? ' event-mono' : '')} title={displayText}>
+      {displayText}
+    </span>
+  );
+  return (
+    <div
+      className={
+        'event' + (event.source === 'run_events' ? ' event-workflow' : '') + (row.subagent ? ' event-subagent' : '')
+      }
+    >
+      <time dateTime={event.timestamp} title={event.timestamp}>
+        {time}
+      </time>
+      <span className="event-kind" title={row.kind}>
+        {row.kind}
+      </span>
+      {expandable ? (
+        <details className="event-disclosure">
+          <summary className="event-summary">{summary}</summary>
+          <div className="event-content">
+            {row.blocks.map((block, index) => (
+              <div key={index} className={'event-block' + (block.label === 'thinking' ? ' event-thinking' : '')}>
+                {block.label && <strong>{labels[block.label]}</strong>}
+                <div className={block.code || (!block.label && row.code) ? 'event-mono' : undefined}>
+                  {block.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : (
+        <div className="event-summary event-summary-static">{summary}</div>
+      )}
+      {row.status && (
+        <span className={'event-state event-state-' + row.status}>
+          {row.status === 'failed' ? labels.status.failed : labels.toolReturned}
+        </span>
+      )}
+    </div>
+  );
 });
 
-export function RunLog({ events, messages, children }: { events: RunEvent[]; messages: Messages; children?: ReactNode }): JSX.Element {
+export function RunLog({
+  events,
+  messages,
+  children,
+}: {
+  events: RunEvent[];
+  messages: Messages;
+  children?: ReactNode;
+}): JSX.Element {
   const log = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const labels = messages.runDetail;
@@ -209,14 +284,31 @@ export function RunLog({ events, messages, children }: { events: RunEvent[]; mes
     if (log.current && following.current) log.current.scrollTop = log.current.scrollHeight;
   }, [rows.length]);
 
-  return <section className="run-log-panel">
-    <header className="run-pane-heading"><h2>{labels.log}</h2><span>{messages.eventsCaptured(rows.length)}</span></header>
-    <div className="event-list" ref={log} role="log" aria-label={labels.log} aria-live="off" tabIndex={0} onScroll={event => {
-      const target = event.currentTarget;
-      following.current = target.scrollHeight - target.clientHeight - target.scrollTop <= 24;
-    }}>
-      {rows.length ? rows.map(row => <LogRow key={row.key} row={row} labels={labels} />) : <p className="run-log-empty">{labels.waiting}</p>}
-    </div>
-    {children}
-  </section>;
+  return (
+    <section className="run-log-panel">
+      <header className="run-pane-heading">
+        <h2>{labels.log}</h2>
+        <span>{messages.eventsCaptured(rows.length)}</span>
+      </header>
+      <div
+        className="event-list"
+        ref={log}
+        role="log"
+        aria-label={labels.log}
+        aria-live="off"
+        tabIndex={0}
+        onScroll={event => {
+          const target = event.currentTarget;
+          following.current = target.scrollHeight - target.clientHeight - target.scrollTop <= 24;
+        }}
+      >
+        {rows.length ? (
+          rows.map(row => <LogRow key={row.key} row={row} labels={labels} />)
+        ) : (
+          <p className="run-log-empty">{labels.waiting}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
 }

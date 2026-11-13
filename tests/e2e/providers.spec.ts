@@ -154,7 +154,9 @@ test.describe('provider settings', () => {
     expect((await card.boundingBox())?.y).toBe(originalCardY);
     // Add and save the provider list.
     await window.getByRole('button', { name: '添加', exact: true }).click();
-    await expect.poll(() => captured.some(request => request.method === 'POST' && request.url === '/api/v1/auth/keys')).toBe(true);
+    await expect
+      .poll(() => captured.some(request => request.method === 'POST' && request.url === '/api/v1/auth/keys'))
+      .toBe(true);
     const save = captured.find(request => request.method === 'POST' && request.url === '/api/v1/auth/keys');
     expect((save?.body.keys as Array<Record<string, unknown>>).length).toBe(2);
     expect((save?.body.keys as Array<Record<string, unknown>>)[1].key).toBe('sk-new-key');

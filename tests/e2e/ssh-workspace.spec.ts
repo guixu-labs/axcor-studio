@@ -19,7 +19,11 @@ test('opens an SSH workspace, saves and runs remotely, then reconnects with its 
   const insightPidFile = path.join(scratch, 'insight.pid');
   const insightImportFile = path.join(scratch, 'insight-import.json');
   const controllerPidFile = path.join(scratch, 'controller.pid');
-  await Promise.all([mkdir(workspace, { recursive: true }), mkdir(bin, { recursive: true }), mkdir(sshDir, { recursive: true })]);
+  await Promise.all([
+    mkdir(workspace, { recursive: true }),
+    mkdir(bin, { recursive: true }),
+    mkdir(sshDir, { recursive: true }),
+  ]);
   await symlink(python.stdout.trim(), path.join(bin, 'python3'));
   const installedHelpers = path.join(scratch, '.local', 'share', 'axcor-studio', 'helpers');
   const sshConfig = path.join(sshDir, 'config');
@@ -211,13 +215,18 @@ net.createServer(socket => {
       hasParent: Boolean(child.getParentWindow()), modal: child.isModal(), movable: child.isMovable(),
     }))).toEqual({ hasParent: true, modal: false, movable: true });
     if (process.platform === 'darwin') {
-      expect(await nativeWindow.evaluate((child: BrowserWindow) => {
-        const parent = child.getParentWindow()!;
-        const parentPosition = parent.getPosition();
-        const [x, y] = child.getPosition();
-        child.setPosition(x + 24, y);
-        return { offset: child.getPosition()[0] - x, parentMoved: parent.getPosition().some((value, index) => value !== parentPosition[index]) };
-      })).toEqual({ offset: 24, parentMoved: false });
+      expect(
+        await nativeWindow.evaluate((child: BrowserWindow) => {
+          const parent = child.getParentWindow()!;
+          const parentPosition = parent.getPosition();
+          const [x, y] = child.getPosition();
+          child.setPosition(x + 24, y);
+          return {
+            offset: child.getPosition()[0] - x,
+            parentMoved: parent.getPosition().some((value, index) => value !== parentPosition[index]),
+          };
+        }),
+      ).toEqual({ offset: 24, parentMoved: false });
     }
     const fitsWindow = () => form.locator('#root').evaluate(root => root.scrollHeight <= root.clientHeight);
     await expect.poll(fitsWindow).toBe(true);

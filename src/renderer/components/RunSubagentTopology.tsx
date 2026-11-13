@@ -27,7 +27,8 @@ function scopedKey(event: RunEvent, id: string): string {
 
 function stoppedStatus(value: unknown): RunStatus | undefined {
   if (value === 'failed' || value === 'error') return 'failed';
-  if (value === 'stopped' || value === 'cancelled' || value === 'canceled' || value === 'interrupted') return 'cancelled';
+  if (value === 'stopped' || value === 'cancelled' || value === 'canceled' || value === 'interrupted')
+    return 'cancelled';
   return value === 'completed' ? 'completed' : undefined;
 }
 
@@ -113,7 +114,15 @@ function buildTopology(events: RunEvent[]) {
   return { children, count: nodes.size };
 }
 
-function Branch({ children, parent, labels }: { children: Map<string | undefined, AgentNode[]>; parent?: string; labels: Labels }): JSX.Element | null {
+function Branch({
+  children,
+  parent,
+  labels,
+}: {
+  children: Map<string | undefined, AgentNode[]>;
+  parent?: string;
+  labels: Labels;
+}): JSX.Element | null {
   const nodes = children.get(parent);
   if (!nodes?.length) return null;
   return <ul className="run-agent-branches">{nodes.map(node => <li key={node.key}>

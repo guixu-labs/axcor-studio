@@ -4,7 +4,13 @@ import workspaceHelper from '../remote/axcor-workspace-helper?raw';
 import started from 'electron-squirrel-startup';
 import { stopAllExecutionPolls } from './executionBackend/events';
 import { registerExecutionBackendIpc } from './executionBackend/ipc';
-import { attachInsightViewTo, hideInsight, showInsight, updateInsightBounds, type InsightBounds } from './observability/insightView';
+import {
+  attachInsightViewTo,
+  hideInsight,
+  showInsight,
+  updateInsightBounds,
+  type InsightBounds,
+} from './observability/insightView';
 import { stopInsightIfStarted } from './observability/insightService';
 import { WorkspaceManager } from './workspaceManager';
 import { stopExecutionBackendIfStarted } from './executionBackend/lifecycle';
@@ -141,22 +147,37 @@ app.whenReady().then(() => {
     if (event.sender !== workbenchWindow?.webContents || event.senderFrame !== event.sender.mainFrame) return;
     if (scheme === 'light' || scheme === 'dark') nativeTheme.themeSource = scheme;
   });
-  const isStartup = (sender: WebContents): boolean => sender === splashWindow?.webContents && !workbenchWindow && !quitting;
-  const isRemoteChooser = (sender: WebContents): boolean => sender === remoteWorkspaceWindow?.webContents && !quitting;
+  const isStartup = (sender: WebContents): boolean =>
+    sender === splashWindow?.webContents && !workbenchWindow && !quitting;
+  const isRemoteChooser = (sender: WebContents): boolean =>
+    sender === remoteWorkspaceWindow?.webContents && !quitting;
   ipcMain.handle('startup:choose-remote', (event, english: boolean) => {
-    if (!splashWindow || !isStartup(event.sender) || event.senderFrame !== event.sender.mainFrame || remoteWorkspaceWindow) {
+    if (
+      !splashWindow ||
+      !isStartup(event.sender) ||
+      event.senderFrame !== event.sender.mainFrame ||
+      remoteWorkspaceWindow
+    ) {
       throw new Error('Invalid remote workspace request.');
     }
     return chooseRemoteWorkspace(splashWindow, english);
   });
   ipcMain.on('startup:remote-submit', (event, config: RemoteWorkspaceConfig) => {
-    if (!remoteWorkspaceWindow || !isRemoteChooser(event.sender) || event.senderFrame !== event.sender.mainFrame) return;
+    if (!remoteWorkspaceWindow || !isRemoteChooser(event.sender) || event.senderFrame !== event.sender.mainFrame)
+      return;
     selectedRemoteWorkspace = config;
     remoteWorkspaceWindow.close();
   });
   ipcMain.on('startup:remote-resize', (event, height: number) => {
     const window = remoteWorkspaceWindow;
-    if (!window || !isRemoteChooser(event.sender) || event.senderFrame !== event.sender.mainFrame || !Number.isFinite(height) || height <= 0) return;
+    if (
+      !window ||
+      !isRemoteChooser(event.sender) ||
+      event.senderFrame !== event.sender.mainFrame ||
+      !Number.isFinite(height) ||
+      height <= 0
+    )
+      return;
     const bounds = window.getBounds();
     const [width, contentHeight] = window.getContentSize();
     const { workArea } = screen.getDisplayMatching(bounds);

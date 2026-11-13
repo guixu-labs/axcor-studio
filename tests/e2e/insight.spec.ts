@@ -13,7 +13,14 @@ const runRecord = {
   finished_at: '2026-11-03T10:05:00+00:00', reopened_at: null, error: null, member_count: 1, running_count: 0,
 };
 const otherRunRecord = { ...runRecord, run_id: 'run-b', label: 'Second run' };
-const sessionRecord = { session_id: 'sess-1', role: 'executor', context: null, state: 'completed', stop_reason: null, in_flight: false };
+const sessionRecord = {
+  session_id: 'sess-1',
+  role: 'executor',
+  context: null,
+  state: 'completed',
+  stop_reason: null,
+  in_flight: false,
+};
 
 function startFixtureBackend(isReady = () => true): Promise<{ url: string; close: () => void }> {
   const server = http.createServer((req, res) => {
@@ -35,7 +42,9 @@ function startFixtureBackend(isReady = () => true): Promise<{ url: string; close
     }
     if (req.method === 'GET' && (req.url === '/api/v1/runs/run-a' || req.url === '/api/v1/runs/run-b')) {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ run: req.url.endsWith('run-b') ? otherRunRecord : runRecord, sessions: [sessionRecord] }));
+      res.end(
+        JSON.stringify({ run: req.url.endsWith('run-b') ? otherRunRecord : runRecord, sessions: [sessionRecord] }),
+      );
       return;
     }
     if (req.method === 'GET' && req.url?.match(/^\/api\/v1\/runs\/run-[ab]\/events/)) {
@@ -45,7 +54,14 @@ function startFixtureBackend(isReady = () => true): Promise<{ url: string; close
     }
     if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-1/transcript-source') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, source: 'claude-jsonl', sessionId: 'sdk-session', filePath: '/local/session.jsonl' }));
+      res.end(
+        JSON.stringify({
+          ok: true,
+          source: 'claude-jsonl',
+          sessionId: 'sdk-session',
+          filePath: '/local/session.jsonl',
+        }),
+      );
       return;
     }
     res.statusCode = 404;
@@ -85,7 +101,9 @@ test('reuses ready services and ignores old service preferences', async () => {
     app = await launchWorkbench({ args, executionUrl: backend.url, insightPort: port });
     const reopened = await workbenchPage(app);
     expect(await reopened.evaluate(() => window.executionBackend.insightStatus())).toEqual({ running: true, port });
-    expect((await reopened.evaluate(() => window.executionBackend.listRuns())).some(run => run.id === 'run-a')).toBe(true);
+    expect((await reopened.evaluate(() => window.executionBackend.listRuns())).some(run => run.id === 'run-a')).toBe(
+      true,
+    );
   } finally {
     await app?.close();
     backend.close();
@@ -211,8 +229,14 @@ http.createServer((req, res) => {
       BrowserWindow.getAllWindows()[0].getContentBounds().height);
     await page.getByRole('button', { name: '打开本地工作区' }).click();
     await expect(page.getByRole('heading', { name: 'Axcor Studio', exact: true })).toBeVisible();
-    await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute('data-phase', 'ready');
-    await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'starting');
+    await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute(
+      'data-phase',
+      'ready',
+    );
+    await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute(
+      'data-phase',
+      'starting',
+    );
     await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1');
     await expect(page.locator('.app-shell')).toHaveCount(0);
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map(window => ({
@@ -242,7 +266,10 @@ http.createServer((req, res) => {
       const failedService = page.locator('.startup-services li', { hasText: 'Workflow Controller' });
       await expect(failedService).toHaveAttribute('data-phase', 'failed');
       await expect(failedService).toContainText('进程在启动时退出 · exit 1');
-      await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute('data-phase', 'ready');
+      await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute(
+        'data-phase',
+        'ready',
+      );
       await expect(page.locator('.app-shell')).toHaveCount(0);
       await expect(page.locator('.startup-body').getByRole('button')).toHaveText(['重试']);
       await expect(page.locator('input')).toHaveCount(0);

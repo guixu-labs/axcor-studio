@@ -45,7 +45,9 @@ test.describe('run configuration', () => {
           }
           if (typeof body['label'] === 'string') postedLabel = body['label'];
           res.statusCode = 201;
-          res.end(JSON.stringify({ run_id: 'run-params-1', status: 'running', format: 'graph-yaml@1', kind: 'workflow' }));
+          res.end(
+            JSON.stringify({ run_id: 'run-params-1', status: 'running', format: 'graph-yaml@1', kind: 'workflow' }),
+          );
           return;
         }
         if (req.method === 'GET' && req.url === '/api/v1/runs') {
@@ -53,13 +55,23 @@ test.describe('run configuration', () => {
           return;
         }
         if (req.method === 'GET' && req.url === '/api/v1/auth/status') {
-          res.end(JSON.stringify({ providers: [
-            { index: 0, runtime: 'opencode', model: 'glm-4.7', status: 'active', is_active: true },
-            { index: 1, runtime: 'claude_sdk', model: 'claude-sonnet-4-6', status: 'unused' },
-            { index: 2, runtime: 'opencode', model: 'glm-4.7', status: 'unused' },
-            { index: 3, runtime: 'opencode', model: 'exhausted-model', status: 'exhausted' },
-            { index: 4, runtime: 'opencode', model: 'invalid-model', status: 'unused', worker_validation: { status: 'invalid' } },
-          ] }));
+          res.end(
+            JSON.stringify({
+              providers: [
+                { index: 0, runtime: 'opencode', model: 'glm-4.7', status: 'active', is_active: true },
+                { index: 1, runtime: 'claude_sdk', model: 'claude-sonnet-4-6', status: 'unused' },
+                { index: 2, runtime: 'opencode', model: 'glm-4.7', status: 'unused' },
+                { index: 3, runtime: 'opencode', model: 'exhausted-model', status: 'exhausted' },
+                {
+                  index: 4,
+                  runtime: 'opencode',
+                  model: 'invalid-model',
+                  status: 'unused',
+                  worker_validation: { status: 'invalid' },
+                },
+              ],
+            }),
+          );
           return;
         }
         if (req.method === 'POST' && req.url === '/api/v1/sessions/start') {
@@ -74,15 +86,56 @@ test.describe('run configuration', () => {
           return;
         }
         if (req.method === 'GET' && req.url === '/api/v1/sessions/sess-new') {
-          res.end(JSON.stringify({ id: 'sess-new', name: postedSessionPrompt.slice(0, 20), role: 'worker', state: 'running', created_at: '2026-11-03T12:10:00+00:00', stop_reason: null, loop_status: 'yes' }));
+          res.end(
+            JSON.stringify({
+              id: 'sess-new',
+              name: postedSessionPrompt.slice(0, 20),
+              role: 'worker',
+              state: 'running',
+              created_at: '2026-11-03T12:10:00+00:00',
+              stop_reason: null,
+              loop_status: 'yes',
+            }),
+          );
           return;
         }
         if (req.method === 'GET' && req.url?.startsWith('/api/v1/runs/run-params-1')) {
-          const record = { run_id: 'run-params-1', kind: 'workflow', format: 'graph-yaml@1', status: 'running', program_ref: 'workflow.yaml', params: {}, label: postedLabel, work_dir: workspaceDir, max_parallel: null, pause_reason: null, created_at: '2026-11-03T12:00:00+00:00', finished_at: null, reopened_at: null, error: null, member_count: 0, running_count: 0 };
+          const record = {
+            run_id: 'run-params-1',
+            kind: 'workflow',
+            format: 'graph-yaml@1',
+            status: 'running',
+            program_ref: 'workflow.yaml',
+            params: {},
+            label: postedLabel,
+            work_dir: workspaceDir,
+            max_parallel: null,
+            pause_reason: null,
+            created_at: '2026-11-03T12:00:00+00:00',
+            finished_at: null,
+            reopened_at: null,
+            error: null,
+            member_count: 0,
+            running_count: 0,
+          };
           if (req.url.includes('/events')) {
             res.end(JSON.stringify({ events: [], next_cursor: 'c', limit: 200 }));
           } else {
-            res.end(JSON.stringify({ run: record, sessions: [{ session_id: 'sess-exec', role: 'executor', context: null, state: 'running', stop_reason: null, in_flight: true }] }));
+            res.end(
+              JSON.stringify({
+                run: record,
+                sessions: [
+                  {
+                    session_id: 'sess-exec',
+                    role: 'executor',
+                    context: null,
+                    state: 'running',
+                    stop_reason: null,
+                    in_flight: true,
+                  },
+                ],
+              }),
+            );
           }
           return;
         }
@@ -124,7 +177,10 @@ test.describe('run configuration', () => {
     await window.locator('.rail-item', { hasText: '运行' }).click();
     await expect(window.getByLabel('运行时', { exact: true })).toHaveValue('workflow');
     await expect(window.getByLabel('运行文件', { exact: true })).toHaveValue('');
-    await expect(window.getByLabel('运行文件', { exact: true })).toHaveAttribute('placeholder', path.join(workspaceDir, 'workflow.yaml'));
+    await expect(window.getByLabel('运行文件', { exact: true })).toHaveAttribute(
+      'placeholder',
+      path.join(workspaceDir, 'workflow.yaml'),
+    );
     await expect(window.getByLabel('运行时', { exact: true }).locator('option:checked')).toHaveText('Graph');
     await window.getByLabel('运行名称').fill('release-check');
     await window.getByRole('button', { name: '添加变量' }).click();

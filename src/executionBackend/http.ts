@@ -44,7 +44,11 @@ export function isBackendDisconnected(): boolean {
   return remote !== undefined && remote.url === undefined;
 }
 
-export async function backendRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPath: string, body?: Record<string, unknown>): Promise<T> {
+export async function backendRequest<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  apiPath: string,
+  body?: Record<string, unknown>,
+): Promise<T> {
   const requestBaseUrl = remote ? remote.url : DEFAULT_EXECUTION_BACKEND_URL;
   if (!requestBaseUrl) throw new ExecutionBackendApiError(0, 'SSH workspace is disconnected. Reconnect and retry.');
   const context = requests.signal;
@@ -58,7 +62,10 @@ export async function backendRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPa
       signal,
     });
   } catch (error) {
-    throw new ExecutionBackendApiError(0, `无法连接 ${EXECUTION_BACKEND_NAME}（${requestBaseUrl}）：${error instanceof Error ? error.message : String(error)}`);
+    throw new ExecutionBackendApiError(
+      0,
+      `无法连接 ${EXECUTION_BACKEND_NAME}（${requestBaseUrl}）：${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   let text: string;
   try {
@@ -69,7 +76,10 @@ export async function backendRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPa
   }
   if (!response.ok) {
     if (response.status === 404 && method === 'GET' && apiPath === '/api/v1/runs') {
-      throw new ExecutionBackendApiError(404, `地址 ${requestBaseUrl} 未提供 GET /api/v1/runs，请确认该端口运行的是 ${EXECUTION_BACKEND_NAME}。`);
+      throw new ExecutionBackendApiError(
+        404,
+        `地址 ${requestBaseUrl} 未提供 GET /api/v1/runs，请确认该端口运行的是 ${EXECUTION_BACKEND_NAME}。`,
+      );
     }
     let detail = text;
     try {
@@ -78,7 +88,10 @@ export async function backendRequest<T>(method: 'GET' | 'POST' | 'DELETE', apiPa
     } catch {
       // Non-JSON error body; keep the raw text.
     }
-    throw new ExecutionBackendApiError(response.status, `${EXECUTION_BACKEND_NAME} API 错误（${response.status}）：${detail}`);
+    throw new ExecutionBackendApiError(
+      response.status,
+      `${EXECUTION_BACKEND_NAME} API 错误（${response.status}）：${detail}`,
+    );
   }
   return JSON.parse(text) as T;
 }
@@ -159,7 +172,10 @@ export async function getRun(runId: string): Promise<Run> {
     return mapRun(response.run);
   } catch (error) {
     if (error instanceof ExecutionBackendApiError && error.status === 404) {
-      const session = await backendRequest<BackendSessionRecord>('GET', `/api/v1/sessions/${encodeURIComponent(runId)}`);
+      const session = await backendRequest<BackendSessionRecord>(
+        'GET',
+        `/api/v1/sessions/${encodeURIComponent(runId)}`,
+      );
       sessionRunIds.add(runId);
       return mapSession(session);
     }
@@ -176,7 +192,10 @@ export async function stopRun(runId: string): Promise<Run> {
     context.throwIfAborted();
     return getRun(runId);
   }
-  await backendRequest<{ run_id: string; status: string; accepted: boolean }>('POST', `/api/v1/runs/${encodeURIComponent(runId)}/stop`);
+  await backendRequest<{ run_id: string; status: string; accepted: boolean }>(
+    'POST',
+    `/api/v1/runs/${encodeURIComponent(runId)}/stop`,
+  );
   context.throwIfAborted();
   return getRun(runId);
 }
@@ -282,7 +301,9 @@ export async function deleteProvider(providerIndex: number): Promise<void> {
 }
 
 export async function activateProvider(providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }> {
-  const result = await backendRequest<{ ok?: boolean; active_index?: number }>('POST', '/api/v1/auth/activate', { index: providerIndex });
+  const result = await backendRequest<{ ok?: boolean; active_index?: number }>('POST', '/api/v1/auth/activate', {
+    index: providerIndex,
+  });
   return { ok: result.ok === true, activeIndex: result.active_index };
 }
 
@@ -290,6 +311,16 @@ export async function testProvider(providerIndex: number): Promise<ProviderTestR
   return backendRequest<ProviderTestResult>('POST', `/api/v1/auth/keys/${providerIndex}/test`);
 }
 
-export async function testProviderKey(key: string, model: string, baseUrl: string, runtime?: string): Promise<ProviderTestResult> {
-  return backendRequest<ProviderTestResult>('POST', '/api/v1/auth/test-key', { key, model, base_url: baseUrl, ...(runtime ? { runtime } : {}) });
+export async function testProviderKey(
+  key: string,
+  model: string,
+  baseUrl: string,
+  runtime?: string,
+): Promise<ProviderTestResult> {
+  return backendRequest<ProviderTestResult>('POST', '/api/v1/auth/test-key', {
+    key,
+    model,
+    base_url: baseUrl,
+    ...(runtime ? { runtime } : {}),
+  });
 }

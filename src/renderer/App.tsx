@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchExecutionClient } from './services/executionClient';
 import type { SessionModelOption } from '../shared/executionBackendIpc';
-import { GRAPH_WORKFLOW_FORMAT, type GraphRunParams, type Run, type RunEvent, type RuntimeId } from '../shared/protocol';
+import {
+  GRAPH_WORKFLOW_FORMAT,
+  type GraphRunParams,
+  type Run,
+  type RunEvent,
+  type RuntimeId,
+} from '../shared/protocol';
 import { isTerminalRun, runEventKey } from '../shared/run';
 import type { GraphVariableRow } from './components/RunsPanel';
 import type { WorkspaceNode } from '../workspaceFiles';
@@ -30,7 +36,7 @@ type ContentTab = { kind: 'file' | 'run' | 'insight'; resource: string };
 
 const insightTab: ContentTab = { kind: 'insight', resource: '' };
 const tabKey = ({ kind, resource }: ContentTab): string => kind + ':' + resource;
-const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
+const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 const fileName = (path: string): string => path.split('/').at(-1) ?? path;
 
 export default function App(): JSX.Element {
@@ -80,7 +86,7 @@ export default function App(): JSX.Element {
     if (tab.kind === 'run') setSelectedRunId(tab.resource);
   };
   const openContentTab = (tab: ContentTab): void => {
-    setContentTabs(previous => previous.some(item => tabKey(item) === tabKey(tab)) ? previous : [...previous, tab]);
+    setContentTabs(previous => (previous.some(item => tabKey(item) === tabKey(tab)) ? previous : [...previous, tab]));
     activateTab(tab);
   };
   const closeContentTab = (tab: ContentTab): void => {
@@ -112,11 +118,15 @@ export default function App(): JSX.Element {
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [layout, setLayout] = useState(() => loadWorkbenchState('workbench.layout', createWorkbenchLayout()));
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [theme, setTheme] = useState<ThemeId>(() => migrateLegacyThemeId(loadWorkbenchState('workbench.theme', defaultTheme.id)));
+  const [theme, setTheme] = useState<ThemeId>(() =>
+    migrateLegacyThemeId(loadWorkbenchState('workbench.theme', defaultTheme.id)),
+  );
   const [font, setFont] = useState<FontId>(() => loadWorkbenchState('workbench.font', defaultFont.id));
   const [locale, setLocale] = useState<LocaleId>(() => loadWorkbenchState('workbench.locale', 'zh-CN'));
   const [backgroundImage, setBackgroundImage] = useState(() => loadWorkbenchState('workbench.backgroundImage', ''));
-  const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() => loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'));
+  const [backgroundFit, setBackgroundFit] = useState<'cover' | 'contain'>(() =>
+    loadWorkbenchState<'cover' | 'contain'>('workbench.backgroundFit', 'cover'),
+  );
   const [executionError, setExecutionError] = useState<string>();
   const [runtime, setRuntime] = useState<RuntimeId>(() => {
     const stored = loadWorkbenchState<string>('workbench.runtime', 'workflow');
@@ -149,11 +159,19 @@ export default function App(): JSX.Element {
   const remote = workspace?.kind === 'ssh';
   const disconnected = remote && !workspace.connected;
   const modelRuntime = runtime === 'workflow' ? graphOptions.runtime : sessionRuntime;
-  const sessionModelOptions = modelRuntime === loadedModelRuntime && Array.isArray(sessionModels) ? sessionModels : [];
-  const selectedModel = sessionModelOptions.find(option => option.model === (runtime === 'workflow' ? graphModel : sessionModel));
-  const sessionModelPlaceholder = sessionModels === 'loading' ? t.sessionModelsLoading
-    : sessionModels === 'unavailable' ? t.sessionModelsUnavailable
-    : sessionModelOptions.length ? t.sessionSelectModel : t.sessionModelsEmpty;
+  const sessionModelOptions =
+    modelRuntime === loadedModelRuntime && Array.isArray(sessionModels) ? sessionModels : [];
+  const selectedModel = sessionModelOptions.find(
+    option => option.model === (runtime === 'workflow' ? graphModel : sessionModel),
+  );
+  const sessionModelPlaceholder =
+    sessionModels === 'loading'
+      ? t.sessionModelsLoading
+      : sessionModels === 'unavailable'
+        ? t.sessionModelsUnavailable
+        : sessionModelOptions.length
+          ? t.sessionSelectModel
+          : t.sessionModelsEmpty;
   const selectedTheme = themes.find(item => item.id === theme) ?? defaultTheme;
   const selectedFont = fonts.find(item => item.id === font) ?? defaultFont;
   const services = useRef(createWorkbenchServices()).current;
@@ -188,14 +206,20 @@ export default function App(): JSX.Element {
       setWorkspace(next);
     });
     const scope = generation.current;
-    void window.workbench.getWorkspace().then(async current => {
-      if (scope !== generation.current) return;
-      currentWorkspace.current = current;
-      setWorkspace(current);
-      if (current) await loadWorkspaceTree(current, scope);
-    }).catch(error => setWorkspaceError(errorMessage(error)));
+    void window.workbench
+      .getWorkspace()
+      .then(async current => {
+        if (scope !== generation.current) return;
+        currentWorkspace.current = current;
+        setWorkspace(current);
+        if (current) await loadWorkspaceTree(current, scope);
+      })
+      .catch(error => setWorkspaceError(errorMessage(error)));
     void refreshRuns(6).catch(error => setExecutionError(errorMessage(error)));
-    return () => { generation.current += 1; unsubscribe(); };
+    return () => {
+      generation.current += 1;
+      unsubscribe();
+    };
   }, []);
   useEffect(() => {
     if (!modelRuntime || activeNavigation !== 'runs' || settingsOpen || disconnected) return;
@@ -208,14 +232,16 @@ export default function App(): JSX.Element {
         if (cancelled) return;
         setLoadedModelRuntime(modelRuntime);
         setSessionModels(options);
-        setModel(current => options.some(option => option.model === current) ? current : '');
+        setModel(current => (options.some(option => option.model === current) ? current : ''));
       } catch {
         if (cancelled) return;
         setSessionModels('unavailable');
         setModel('');
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [runtime, modelRuntime, activeNavigation, settingsOpen, workspace?.id, disconnected]);
   useEffect(() => {
     if (!selectedRunId) return;
@@ -233,31 +259,43 @@ export default function App(): JSX.Element {
         const combined = new Map(current.map(event => [runEventKey(event), event]));
         for (const event of batch) combined.set(runEventKey(event), event);
         if (combined.size === current.length) return previous;
-        return { ...previous, [selectedRunId]: [...combined.values()].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)) };
+        return {
+          ...previous,
+          [selectedRunId]: [...combined.values()].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)),
+        };
       });
     };
     const refreshRun = (): void => {
       const version = ++refreshVersion;
-      void client.getRun(selectedRunId).then(async latest => {
-        if (!active || version !== refreshVersion || scope !== generation.current) return;
-        setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
-        if (currentWorkspace.current?.kind !== 'ssh' && isTerminalRun(latest) && !importedToInsight.current.has(latest.id)) {
-          importedToInsight.current.add(latest.id);
-          try {
-            if (latest.runtimeId === 'session') {
-              await window.executionBackend.importToInsight(latest.id);
-            } else {
-              const sessions = await window.executionBackend.getRunSessions(latest.id);
-              for (const session of sessions) {
-                if (!active || scope !== generation.current) break;
-                await window.executionBackend.importToInsight(session.session_id);
+      void client
+        .getRun(selectedRunId)
+        .then(async latest => {
+          if (!active || version !== refreshVersion || scope !== generation.current) return;
+          setRuns(previous => previous.map(item => (item.id === latest.id ? latest : item)));
+          if (
+            currentWorkspace.current?.kind !== 'ssh' &&
+            isTerminalRun(latest) &&
+            !importedToInsight.current.has(latest.id)
+          ) {
+            importedToInsight.current.add(latest.id);
+            try {
+              if (latest.runtimeId === 'session') {
+                await window.executionBackend.importToInsight(latest.id);
+              } else {
+                const sessions = await window.executionBackend.getRunSessions(latest.id);
+                for (const session of sessions) {
+                  if (!active || scope !== generation.current) break;
+                  await window.executionBackend.importToInsight(session.session_id);
+                }
               }
+            } catch {
+              // Observability import is best-effort; the run view stays usable.
             }
-          } catch {
-            // Observability import is best-effort; the run view stays usable.
           }
-        }
-      }).catch(() => { /* A subsequent poll will retry. */ });
+        })
+        .catch(() => {
+          /* A subsequent poll will retry. */
+        });
     };
     const unsubscribe = client.subscribeRunEvents(selectedRunId, event => {
       if (scope !== generation.current) return;
@@ -276,7 +314,10 @@ export default function App(): JSX.Element {
     };
   }, [selectedRunId]);
   useEffect(() => {
-    if (disconnected || activeTab?.kind !== 'insight' || settingsOpen || pendingClosePath) { void window.insight.hide(); return; }
+    if (disconnected || activeTab?.kind !== 'insight' || settingsOpen || pendingClosePath) {
+      void window.insight.hide();
+      return;
+    }
     setInsightFailed(undefined);
     const node = appContent.current;
     if (!node) return;
@@ -285,18 +326,38 @@ export default function App(): JSX.Element {
       return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
     };
     let active = true;
-    void window.insight.show(insightPath, bounds(), selectedTheme.colorScheme === 'dark')
-      .catch(error => { if (active) setInsightFailed(errorMessage(error)); });
-    const observer = new ResizeObserver(() => { void window.insight.updateBounds(bounds()); });
+    void window.insight.show(insightPath, bounds(), selectedTheme.colorScheme === 'dark').catch(error => {
+      if (active) setInsightFailed(errorMessage(error));
+    });
+    const observer = new ResizeObserver(() => {
+      void window.insight.updateBounds(bounds());
+    });
     observer.observe(node);
-    return () => { active = false; observer.disconnect(); };
-  }, [activeTab?.kind, insightPath, selectedTheme.colorScheme, settingsOpen, pendingClosePath, disconnected, workspace, insightRetry]);
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [
+    activeTab?.kind,
+    insightPath,
+    selectedTheme.colorScheme,
+    settingsOpen,
+    pendingClosePath,
+    disconnected,
+    workspace,
+    insightRetry,
+  ]);
   useEffect(() => window.insight.onLoadFailed(setInsightFailed), []);
   useEffect(() => {
-    Object.entries(selectedTheme.tokens).forEach(([name, value]) => document.documentElement.style.setProperty('--theme-' + name, value));
+    Object.entries(selectedTheme.tokens).forEach(([name, value]) =>
+      document.documentElement.style.setProperty('--theme-' + name, value),
+    );
     document.documentElement.style.setProperty('--app-font', selectedFont.family);
     document.documentElement.style.setProperty('color-scheme', selectedTheme.colorScheme);
-    document.documentElement.style.setProperty('--empty-background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');
+    document.documentElement.style.setProperty(
+      '--empty-background-image',
+      backgroundImage ? `url("${backgroundImage}")` : 'none',
+    );
     document.documentElement.style.setProperty('--empty-background-size', backgroundFit);
   }, [backgroundFit, backgroundImage, selectedFont, selectedTheme]);
   useEffect(() => window.setNativeColorScheme(selectedTheme.colorScheme), [selectedTheme.colorScheme]);
@@ -309,18 +370,25 @@ export default function App(): JSX.Element {
         setLayout(previous => ({ ...previous, editorLayout: createEditorGroupLayout() }));
         return;
       }
-      setLayout(previous => ({ ...previous, editorLayout: splitEditorGroup(previous.editorLayout, direction as EditorGroupOrientation) }));
+      setLayout(previous => ({
+        ...previous,
+        editorLayout: splitEditorGroup(previous.editorLayout, direction as EditorGroupOrientation),
+      }));
     });
     commands.execute('workbench.splitEditor');
   };
   const navigate = (item: string): void => {
     commands.register('workbench.navigate', () => {
-      if (item === 'settings') { setSettingsOpen(true); return; }
+      if (item === 'settings') {
+        setSettingsOpen(true);
+        return;
+      }
       if (item === 'insight') {
         if (activeTab?.kind === 'insight') {
           setInsightFromRail(false);
-          const previousTab = contentTabs.find(tab => tabKey(tab) === lastRegularTabKey.current)
-            ?? contentTabs.filter(tab => tab.kind !== 'insight').at(-1);
+          const previousTab =
+            contentTabs.find(tab => tabKey(tab) === lastRegularTabKey.current) ??
+            contentTabs.filter(tab => tab.kind !== 'insight').at(-1);
           if (previousTab) activateTab(previousTab);
           else setActiveTabKey(undefined);
         } else {
@@ -344,14 +412,15 @@ export default function App(): JSX.Element {
     changedFiles.current.set(file, Symbol());
     setContents(previous => ({ ...previous, [file]: value }));
   };
-  const defaultProgramPath = workspace && file ? remote ? file : `${workspace.root}/${file}` : '';
+  const defaultProgramPath = workspace && file ? (remote ? file : `${workspace.root}/${file}`) : '';
   const readFile = async (target: Workspace, name: string, scope: number, keepDraft = false): Promise<void> => {
     const request = Symbol();
     const edit = changedFiles.current.get(name);
     fileRequests.current.set(name, request);
     try {
       const result = await window.workbench.readFile(target.id, name);
-      if (scope !== generation.current || fileRequests.current.get(name) !== request || savingFiles.current.has(name)) return;
+      if (scope !== generation.current || fileRequests.current.get(name) !== request || savingFiles.current.has(name))
+        return;
       if (keepDraft && changedFiles.current.get(name) !== edit) return;
       versions.current[name] = result.version;
       setContents(previous => ({ ...previous, [name]: result.content }));
@@ -360,11 +429,16 @@ export default function App(): JSX.Element {
       if (fileRequests.current.get(name) === request) fileRequests.current.delete(name);
     }
   };
-  const loadRemoteDirectory = async (target: Workspace, scope: number, path: string): Promise<WorkspaceNode[] | undefined> => {
+  const loadRemoteDirectory = async (
+    target: Workspace,
+    scope: number,
+    path: string,
+  ): Promise<WorkspaceNode[] | undefined> => {
     const entries = await window.workbench.listTree(target.id, path);
     if (scope !== generation.current) return;
     const directories = remoteDirectories.current;
-    if (path && !directories.get(parentDirectory(path))?.some(node => node.type === 'dir' && node.path === path)) return;
+    if (path && !directories.get(parentDirectory(path))?.some(node => node.type === 'dir' && node.path === path))
+      return;
     directories.set(path, entries);
     const prefix = path ? path + '/' : '';
     const children = new Set(entries.filter(node => node.type === 'dir').map(node => node.path));
@@ -376,14 +450,21 @@ export default function App(): JSX.Element {
     setTree([...directories.values()].flat());
     return entries;
   };
-  const refreshRemoteDirectories = async (target: Workspace, scope: number, paths: string[]): Promise<WorkspaceNode[]> => {
+  const refreshRemoteDirectories = async (
+    target: Workspace,
+    scope: number,
+    paths: string[],
+  ): Promise<WorkspaceNode[]> => {
     let failure: unknown;
     // Parents are cached first. Refreshing them can remove vanished children from the cache.
     for (const path of paths) {
       if (scope !== generation.current) break;
       if (!remoteDirectories.current.has(path)) continue;
-      try { await loadRemoteDirectory(target, scope, path); }
-      catch (error) { failure ??= error; }
+      try {
+        await loadRemoteDirectory(target, scope, path);
+      } catch (error) {
+        failure ??= error;
+      }
     }
     if (failure) throw failure;
     return [...remoteDirectories.current.values()].flat();
@@ -400,7 +481,8 @@ export default function App(): JSX.Element {
     const target = currentWorkspace.current;
     const draft = contents[name];
     if (!target || draft === undefined || !isFileDirty(name)) return;
-    if (savingFiles.current.has(name)) throw new Error(english ? 'This file is already being saved.' : '正在保存此文件。');
+    if (savingFiles.current.has(name))
+      throw new Error(english ? 'This file is already being saved.' : '正在保存此文件。');
     const scope = generation.current;
     savingFiles.current.add(name);
     fileRequests.current.delete(name);
@@ -415,8 +497,11 @@ export default function App(): JSX.Element {
   };
   const save = async (): Promise<void> => {
     setWorkspaceError(undefined);
-    try { await saveFile(file); }
-    catch (error) { setWorkspaceError(errorMessage(error)); }
+    try {
+      await saveFile(file);
+    } catch (error) {
+      setWorkspaceError(errorMessage(error));
+    }
   };
   const reportWorkspaceError = (error: unknown): void => setWorkspaceError(errorMessage(error));
   const reconnectWorkspace = async (): Promise<void> => {
@@ -430,7 +515,9 @@ export default function App(): JSX.Element {
       currentWorkspace.current = next;
       setWorkspace(next);
       await Promise.all([
-        refreshRuns().catch(error => { if (scope === generation.current) setExecutionError(errorMessage(error)); }),
+        refreshRuns().catch(error => {
+          if (scope === generation.current) setExecutionError(errorMessage(error));
+        }),
         (async () => {
           await loadWorkspaceTree(next, scope);
           await refreshRemoteDirectories(next, scope, [...remoteDirectories.current.keys()].filter(Boolean));
@@ -450,10 +537,14 @@ export default function App(): JSX.Element {
     selection.current = selected;
     setWorkspaceError(undefined);
     try {
-      if (!Object.prototype.hasOwnProperty.call(contents, nextFile) || (target.kind === 'ssh' && target.connected && !isFileDirty(nextFile))) {
+      if (
+        !Object.prototype.hasOwnProperty.call(contents, nextFile) ||
+        (target.kind === 'ssh' && target.connected && !isFileDirty(nextFile))
+      ) {
         await readFile(target, nextFile, scope, true);
       }
-      if (scope === generation.current && selection.current === selected) openContentTab({ kind: 'file', resource: nextFile });
+      if (scope === generation.current && selection.current === selected)
+        openContentTab({ kind: 'file', resource: nextFile });
     } catch (error) {
       if (scope === generation.current) reportWorkspaceError(error);
     }
@@ -471,16 +562,33 @@ export default function App(): JSX.Element {
     if (target?.kind !== 'ssh' || !target.connected || target.id !== id) return;
     const scope = generation.current;
     const candidates = (change.paths ?? Object.keys(contents))
-      .filter(name => Object.prototype.hasOwnProperty.call(contents, name) && !isFileDirty(name) && !savingFiles.current.has(name))
+      .filter(
+        name =>
+          Object.prototype.hasOwnProperty.call(contents, name) &&
+          !isFileDirty(name) &&
+          !savingFiles.current.has(name),
+      )
       .map(name => ({ name, edit: changedFiles.current.get(name) }));
     const changedDirectories = change.paths && new Set(change.paths.map(parentDirectory));
-    const nodes = change.tree ? await refreshRemoteDirectories(target, scope,
-      [...remoteDirectories.current.keys()].filter(path => !changedDirectories || changedDirectories.has(path))) : undefined;
+    const nodes = change.tree
+      ? await refreshRemoteDirectories(
+          target,
+          scope,
+          [...remoteDirectories.current.keys()].filter(path => !changedDirectories || changedDirectories.has(path)),
+        )
+      : undefined;
     if (scope !== generation.current) return;
     const existing = nodes && new Set(nodes.filter(node => node.type === 'file').map(node => node.path));
-    await Promise.all(candidates.filter(({ name, edit }) => (!existing || existing.has(name))
-      && changedFiles.current.get(name) === edit && !savingFiles.current.has(name))
-      .map(({ name }) => readFile(target, name, scope, true)));
+    await Promise.all(
+      candidates
+        .filter(
+          ({ name, edit }) =>
+            (!existing || existing.has(name)) &&
+            changedFiles.current.get(name) === edit &&
+            !savingFiles.current.has(name),
+        )
+        .map(({ name }) => readFile(target, name, scope, true)),
+    );
   };
   useEffect(() => {
     let pending: { id: string; tree: boolean; paths: Set<string> | null } | undefined;
@@ -495,9 +603,15 @@ export default function App(): JSX.Element {
         if (!batch) return;
         const scope = generation.current;
         running = true;
-        void syncRemoteFiles.current?.(batch.id, { tree: batch.tree, paths: batch.paths && [...batch.paths] })
-          .catch(error => { if (scope === generation.current) reportWorkspaceError(error); })
-          .finally(() => { running = false; schedule(); });
+        void syncRemoteFiles
+          .current?.(batch.id, { tree: batch.tree, paths: batch.paths && [...batch.paths] })
+          .catch(error => {
+            if (scope === generation.current) reportWorkspaceError(error);
+          })
+          .finally(() => {
+            running = false;
+            schedule();
+          });
       }, 150);
     };
     const enqueue = (id: string, change: WorkspaceFileChange): void => {
@@ -560,8 +674,14 @@ export default function App(): JSX.Element {
     let created: Run;
     try {
       if (runtime === 'session') {
-        if (!sessionPrompt.trim()) { setExecutionError('会话模式需要填写提示词'); return; }
-        if (!selectedModel) { setExecutionError(sessionModelPlaceholder); return; }
+        if (!sessionPrompt.trim()) {
+          setExecutionError('会话模式需要填写提示词');
+          return;
+        }
+        if (!selectedModel) {
+          setExecutionError(sessionModelPlaceholder);
+          return;
+        }
         const parsedMaxIterations = Number.parseInt(sessionMaxIterations, 10);
         submitted = true;
         created = await client.createRun({
@@ -574,16 +694,20 @@ export default function App(): JSX.Element {
           model: selectedModel.model,
           providerIndex: selectedModel.providerIndex,
           ...(sessionSystemPrompt.trim() ? { systemPrompt: sessionSystemPrompt.trim() } : {}),
-          ...(Number.isInteger(parsedMaxIterations) && parsedMaxIterations >= 1 ? { maxIterations: parsedMaxIterations } : {}),
+          ...(Number.isInteger(parsedMaxIterations) && parsedMaxIterations >= 1
+            ? { maxIterations: parsedMaxIterations }
+            : {}),
           reviewerEnabled: sessionReviewerEnabled,
         });
       } else {
         const programPath = runProgramPath.trim() || defaultProgramPath;
-        const relativeProgram = programPath.startsWith(workspace.root + '/') ? programPath.slice(workspace.root.length + 1) : programPath;
+        const relativeProgram = programPath.startsWith(workspace.root + '/')
+          ? programPath.slice(workspace.root.length + 1)
+          : programPath;
         if (relativeProgram) await saveFile(relativeProgram);
-        const variables = Object.fromEntries(graphVariables
-          .filter(row => row.key.trim())
-          .map(row => [row.key.trim(), row.value]));
+        const variables = Object.fromEntries(
+          graphVariables.filter(row => row.key.trim()).map(row => [row.key.trim(), row.value]),
+        );
         const params: GraphRunParams = { ...graphOptions };
         if (Object.keys(variables).length) params.variables = JSON.stringify(variables);
         if (runPrompt.trim()) params.starting_prompt = runPrompt.trim();
@@ -603,7 +727,9 @@ export default function App(): JSX.Element {
           runtime,
           label: runLabel.trim() || programPath.split('/').pop(),
           ...(Object.keys(params).length > 0 ? { params } : {}),
-          ...(Number.isInteger(parsedMaxParallel) && parsedMaxParallel >= 1 ? { maxParallel: parsedMaxParallel } : {}),
+          ...(Number.isInteger(parsedMaxParallel) && parsedMaxParallel >= 1
+            ? { maxParallel: parsedMaxParallel }
+            : {}),
         });
       }
     } catch (error) {
@@ -625,13 +751,14 @@ export default function App(): JSX.Element {
     setEventsByRun(previous => ({ ...previous, [created.id]: [] }));
     setActiveNavigation('runs');
     openContentTab({ kind: 'run', resource: created.id });
-    setLayout(previous => previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar'));
+    setLayout(previous => (previous.sidebarVisible ? previous : toggleWorkbenchPart(previous, 'sidebar')));
   };
   const refreshRunAfterAction = async (id: string, scope: number): Promise<void> => {
     // The event subscription can still refresh the run if this read fails.
     if (scope !== generation.current) return;
     const latest = await client.getRun(id).catch(() => undefined);
-    if (latest && scope === generation.current) setRuns(previous => previous.map(item => item.id === latest.id ? latest : item));
+    if (latest && scope === generation.current)
+      setRuns(previous => previous.map(item => (item.id === latest.id ? latest : item)));
   };
   const openInsightForRun = async (run: Run): Promise<void> => {
     if (disconnected || openingInsight || changingWorkspace.current) return;
@@ -644,16 +771,24 @@ export default function App(): JSX.Element {
         const sessions = await window.executionBackend.getRunSessions(run.id);
         if (scope !== generation.current) return;
         const target = sessions.find(session => session.role === 'executor') ?? sessions[0];
-        if (!target) { setExecutionError(t.noObservableSessions); return; }
+        if (!target) {
+          setExecutionError(t.noObservableSessions);
+          return;
+        }
         sessionId = target.session_id;
       }
       const result = await window.executionBackend.importToInsight(sessionId);
       if (scope !== generation.current) return;
-      if (!result.ok) { setExecutionError(result.error ?? t.insightLoadFailed); return; }
+      if (!result.ok) {
+        setExecutionError(result.error ?? t.insightLoadFailed);
+        return;
+      }
       const directPath = result.insightUrl?.replace(/^\/insight(?=\/)/, '');
-      setInsightPath(directPath && /^\/(run|session)\//.test(directPath)
-        ? directPath
-        : '/session/' + encodeURIComponent(result.sessionId ?? sessionId));
+      setInsightPath(
+        directPath && /^\/(run|session)\//.test(directPath)
+          ? directPath
+          : '/session/' + encodeURIComponent(result.sessionId ?? sessionId),
+      );
       openContentTab(insightTab);
     } catch (error) {
       if (scope === generation.current) setExecutionError(errorMessage(error));
@@ -669,113 +804,392 @@ export default function App(): JSX.Element {
   };
   const showSidebar = layout.sidebarVisible && !insightFromRail;
   const activeRail = settingsOpen ? 'settings' : insightFromRail ? 'insight' : showSidebar ? activeNavigation : '';
-  return <main className="app-shell" onKeyDownCapture={event => {
-    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return;
-    event.preventDefault();
-    if (activeTab?.kind !== 'file' || settingsOpen || pendingClosePath || event.repeat || savingFiles.current.has(file)) return;
-    void save();
-  }}>
+  return (
+    <main
+      className="app-shell"
+      onKeyDownCapture={event => {
+        if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's')
+          return;
+        event.preventDefault();
+        if (
+          activeTab?.kind !== 'file' ||
+          settingsOpen ||
+          pendingClosePath ||
+          event.repeat ||
+          savingFiles.current.has(file)
+        )
+          return;
+        void save();
+      }}
+    >
       <header className="topbar">
         <div className="topbar-navigation">
-          <button className="icon-button" type="button" aria-label={t.back} title={t.back}>‹</button>
-          <button className="icon-button" type="button" aria-label={t.forward} title={t.forward}>›</button>
-          <button className="quick-search" type="button">{t.search}</button>
+          <button className="icon-button" type="button" aria-label={t.back} title={t.back}>
+            ‹
+          </button>
+          <button className="icon-button" type="button" aria-label={t.forward} title={t.forward}>
+            ›
+          </button>
+          <button className="quick-search" type="button">
+            {t.search}
+          </button>
         </div>
         <div className="topbar-actions">
           <div className="workspace-remote-actions">
-            {disconnected && workspace.kind === 'ssh' && <button type="button" onClick={() => {
-              void reconnectWorkspace().catch(reportWorkspaceError);
-            }}>{remoteCopy.reconnect}</button>}
+            {disconnected && workspace.kind === 'ssh' && (
+              <button
+                type="button"
+                onClick={() => {
+                  void reconnectWorkspace().catch(reportWorkspaceError);
+                }}
+              >
+                {remoteCopy.reconnect}
+              </button>
+            )}
           </div>
-          <button className="icon-button" type="button" onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))} aria-label={t.toggleSidebar} title={t.toggleSidebar}><span className="sidebar-toggle-icon" aria-hidden="true" /></button>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => setLayout(previous => toggleWorkbenchPart(previous, 'sidebar'))}
+            aria-label={t.toggleSidebar}
+            title={t.toggleSidebar}
+          >
+            <span className="sidebar-toggle-icon" aria-hidden="true" />
+          </button>
         </div>
       </header>
-    <div className="left-workbench" data-sidebar-open={showSidebar}
-      style={showSidebar ? { gridTemplateColumns: `var(--rail-width) ${explorerWidth}px 4px` } : undefined}>
-      <NavigationRail active={activeRail} onSelect={navigate} messages={t} />
-      {showSidebar && activeNavigation === 'workbench' && <WorkspaceExplorer key={workspace?.id} hasWorkspace={Boolean(workspace)} workspacePath={remote ? undefined : workspace?.root} tree={tree} activeFile={file} onSelect={selectFile} messages={t}
-        onExpand={remote ? expandRemoteDirectory : undefined} syncLabel={remoteCopy.sync} onSync={remote && !disconnected ? () => {
-          setWorkspaceError(undefined);
-          queueFileSync.current?.(workspace.id, { tree: true, paths: null });
-        } : undefined} />}
-      {showSidebar && activeNavigation === 'runs' && <RunsList runs={runs} selectedRunId={selectedRunId} error={executionError} onSelectRun={id => openContentTab({ kind: 'run', resource: id })} onRun={startRun} runDisabled={!workspace || disconnected || startingRun || reviewRuns} runtime={runtime} onRuntimeChange={setRuntime} runLabel={runLabel} onRunLabelChange={setRunLabel} runProgramPath={runProgramPath} defaultProgramPath={defaultProgramPath} onRunProgramPathChange={setRunProgramPath} graphVariables={graphVariables} onGraphVariablesChange={setGraphVariables} graphOptions={graphOptions} onGraphOptionsChange={changeGraphOptions} maxParallel={maxParallel} onMaxParallelChange={setMaxParallel} runPrompt={runPrompt} onRunPromptChange={setRunPrompt} sessionPrompt={sessionPrompt} onSessionPromptChange={setSessionPrompt} sessionRuntime={sessionRuntime} onSessionRuntimeChange={changeSessionRuntime} sessionModel={selectedModel?.model ?? ''} sessionModels={sessionModelOptions} sessionModelPlaceholder={sessionModelPlaceholder} onSessionModelChange={runtime === 'workflow' ? setGraphModel : setSessionModel} sessionSystemPrompt={sessionSystemPrompt} onSessionSystemPromptChange={setSessionSystemPrompt} sessionMaxIterations={sessionMaxIterations} onSessionMaxIterationsChange={setSessionMaxIterations} sessionReviewerEnabled={sessionReviewerEnabled} onSessionReviewerEnabledChange={setSessionReviewerEnabled} messages={t} />}
-      {showSidebar && <ResizeHandle direction="horizontal" onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))} />}
-    </div>
-    <section className="app-content" aria-label={t.workbench}>
-      {workspaceError && <p className="workspace-error" role="alert">{workspaceError}</p>}
-      {reviewRuns && <button type="button" onClick={() => void reviewRunList().catch(error => setExecutionError(errorMessage(error)))}>{remoteCopy.reviewRuns}</button>}
-      {contentTabs.length > 0 && <div className="content-tabs" role="tablist" aria-label={t.openTabs}>
-        {contentTabs.map(tab => {
-          const key = tabKey(tab);
-          const run = tab.kind === 'run' ? runs.find(item => item.id === tab.resource) : undefined;
-          const label = tab.kind === 'file' ? fileName(tab.resource) : tab.kind === 'run' ? run?.workflowId ?? tab.resource : t.insight;
-          const title = tab.kind === 'file' ? tab.resource : run ? `${label} · ${run.id}` : label;
-          const selected = key === activeTabKey;
-          const dirty = tab.kind === 'file' && isFileDirty(tab.resource);
-          return <div className={'content-tab' + (selected ? ' active' : '')} key={key}>
-            <button className="content-tab-label" type="button" role="tab" aria-selected={selected} aria-description={dirty ? t.unsavedChanges : undefined} title={title} onClick={() => activateTab(tab)}>
-              <span className={`content-tab-icon icon-${tab.kind}`} aria-hidden="true">{tab.kind === 'file' ? '≡' : tab.kind === 'run' ? '▶' : '◉'}</span>
-              <span className="content-tab-name">{label}</span>
-            </button>
-            <button type="button" className="content-tab-close" data-dirty={dirty || undefined} aria-label={t.closeTab(label)} onClick={() => requestCloseTab(tab)}><span aria-hidden="true">×</span></button>
-          </div>;
-        })}
-      </div>}
-      <div className="content-panels">
-        {file && <section hidden={activeTab?.kind !== 'file'} className="workspace-grid" role="tabpanel" aria-label={fileName(file)}>
-          <div className={'editor-groups split-' + splitDirection}>
-            <MonacoEditor activeFile={file} content={content} onChange={updateEditorContent} splitDirection={splitDirection} onSplit={splitEditor} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />
-            {splitDirection !== 'none' && <MonacoEditor activeFile={file} content={content} onChange={updateEditorContent} splitDirection={splitDirection} onSplit={splitEditor} showSplitActions={false} colorScheme={selectedTheme.colorScheme} tokens={selectedTheme.tokens} fontFamily={selectedFont.family} messages={t} />}
-          </div>
-        </section>}
-        {contentTabs.filter(tab => tab.kind === 'run').map(tab => {
-          const run = runs.find(item => item.id === tab.resource);
-          if (!run) return null;
-          return <section key={tab.resource} hidden={activeTabKey !== tabKey(tab)} className="single-panel" role="tabpanel" aria-label={run.workflowId}>
-            <RunDetail offline={disconnected} openingInsight={openingInsight} run={run} events={eventsByRun[run.id] ?? []} onOpenInsight={disconnected ? undefined : () => openInsightForRun(run)}
-              onStop={async () => {
-                if (disconnected || changingWorkspace.current) return;
-                const scope = generation.current;
-                try { await client.stopRun(run.id); await refreshRunAfterAction(run.id, scope); }
-                catch (error) { if (scope === generation.current) reportWorkspaceError(error); }
-              }}
-              onSetPaused={async paused => {
-                if (changingWorkspace.current) throw new Error(english ? 'Workspace is changing.' : '正在切换工作区。');
-                const scope = generation.current;
-                await client.setSessionPaused(run.id, paused);
-                await refreshRunAfterAction(run.id, scope);
-              }}
-              onSendReply={text => {
-                if (changingWorkspace.current) return Promise.reject(new Error(english ? 'Workspace is changing.' : '正在切换工作区。'));
-                return client.sendSessionReply(run.id, text);
-              }} messages={t} />
-          </section>;
-        })}
-        {activeTab?.kind === 'insight' && <section ref={appContent} role="tabpanel" aria-label={t.insight} className="insight-pane"><span className="empty-icon">◉</span><strong>{t.insight}</strong><p>{disconnected ? remoteCopy.disconnected : insightFailed ? (remote ? insightFailed : t.insightLoadFailed) : t.insightHint}</p>
-          {insightFailed && !disconnected && <button type="button" onClick={() => setInsightRetry(value => value + 1)}>{remoteCopy.retryInsight}</button>}</section>}
-        {(!activeTab || (activeTab.kind === 'run' && !runs.some(run => run.id === activeTab.resource))) && <section className={activeNavigation === 'runs' ? 'single-panel' : 'workspace-grid'}>
-          <div className="empty-panel">
-            {activeNavigation === 'runs' && <div className="empty-state"><span className="empty-icon">▶</span><strong>{t.selectRun}</strong><p>{t.selectRunHint}</p></div>}
-            {activeNavigation === 'workbench' && showSidebar && tree.length > 0 && !backgroundImage && <div className="workspace-empty-hint">
-              <span className="workspace-glyph" aria-hidden="true">&#xea7b;</span>
-              <p>{t.openFileHint}</p>
-            </div>}
-          </div>
-        </section>}
+      <div
+        className="left-workbench"
+        data-sidebar-open={showSidebar}
+        style={showSidebar ? { gridTemplateColumns: `var(--rail-width) ${explorerWidth}px 4px` } : undefined}
+      >
+        <NavigationRail active={activeRail} onSelect={navigate} messages={t} />
+        {showSidebar && activeNavigation === 'workbench' && (
+          <WorkspaceExplorer
+            key={workspace?.id}
+            hasWorkspace={Boolean(workspace)}
+            workspacePath={remote ? undefined : workspace?.root}
+            tree={tree}
+            activeFile={file}
+            onSelect={selectFile}
+            messages={t}
+            onExpand={remote ? expandRemoteDirectory : undefined}
+            syncLabel={remoteCopy.sync}
+            onSync={
+              remote && !disconnected
+                ? () => {
+                    setWorkspaceError(undefined);
+                    queueFileSync.current?.(workspace.id, { tree: true, paths: null });
+                  }
+                : undefined
+            }
+          />
+        )}
+        {showSidebar && activeNavigation === 'runs' && (
+          <RunsList
+            runs={runs}
+            selectedRunId={selectedRunId}
+            error={executionError}
+            onSelectRun={id => openContentTab({ kind: 'run', resource: id })}
+            onRun={startRun}
+            runDisabled={!workspace || disconnected || startingRun || reviewRuns}
+            runtime={runtime}
+            onRuntimeChange={setRuntime}
+            runLabel={runLabel}
+            onRunLabelChange={setRunLabel}
+            runProgramPath={runProgramPath}
+            defaultProgramPath={defaultProgramPath}
+            onRunProgramPathChange={setRunProgramPath}
+            graphVariables={graphVariables}
+            onGraphVariablesChange={setGraphVariables}
+            graphOptions={graphOptions}
+            onGraphOptionsChange={changeGraphOptions}
+            maxParallel={maxParallel}
+            onMaxParallelChange={setMaxParallel}
+            runPrompt={runPrompt}
+            onRunPromptChange={setRunPrompt}
+            sessionPrompt={sessionPrompt}
+            onSessionPromptChange={setSessionPrompt}
+            sessionRuntime={sessionRuntime}
+            onSessionRuntimeChange={changeSessionRuntime}
+            sessionModel={selectedModel?.model ?? ''}
+            sessionModels={sessionModelOptions}
+            sessionModelPlaceholder={sessionModelPlaceholder}
+            onSessionModelChange={runtime === 'workflow' ? setGraphModel : setSessionModel}
+            sessionSystemPrompt={sessionSystemPrompt}
+            onSessionSystemPromptChange={setSessionSystemPrompt}
+            sessionMaxIterations={sessionMaxIterations}
+            onSessionMaxIterationsChange={setSessionMaxIterations}
+            sessionReviewerEnabled={sessionReviewerEnabled}
+            onSessionReviewerEnabledChange={setSessionReviewerEnabled}
+            messages={t}
+          />
+        )}
+        {showSidebar && (
+          <ResizeHandle
+            direction="horizontal"
+            onResize={delta => setExplorerWidth(Math.max(180, Math.min(360, explorerWidth + delta)))}
+          />
+        )}
       </div>
-    </section>
-    <footer className="status-bar"><span className="status-live"><i aria-hidden="true" />{workspace?.kind === 'ssh' ? (disconnected ? remoteCopy.disconnected : 'SSH') + ' · ' + workspace.config.host + ':' + workspace.root : workspace ? t.workspaceReady : t.noWorkspace}</span>{file && <><span>{file}</span><span>UTF-8</span><span>LF</span><span>{t.markdown}</span></>}</footer>
-    <dialog className="workbench-dialog" ref={saveChangesDialog} aria-labelledby="save-changes-title" aria-describedby="save-changes-message"
-      onClose={() => setPendingClosePath(undefined)} onCancel={event => { if (savingBeforeClose) event.preventDefault(); }}>
-      <h2 id="save-changes-title">{t.saveChangesTitle(fileName(pendingClosePath ?? ''))}</h2>
-      <p id="save-changes-message">{t.saveChangesMessage}</p>
-      {closeSaveError && <p role="alert">{t.saveFileFailed}</p>}
-      <div className="workbench-dialog-actions">
-        <button className="secondary-button" type="button" disabled={savingBeforeClose} onClick={() => saveChangesDialog.current?.close()}>{t.cancel}</button>
-        <button className="secondary-button" type="button" disabled={savingBeforeClose} onClick={() => void finishFileClose(false)}>{t.dontSave}</button>
-        <button className="primary-button" type="button" disabled={savingBeforeClose} onClick={() => void finishFileClose(true)}>{t.save}</button>
-      </div>
-    </dialog>
-    {settingsOpen && <SettingsModal theme={theme} font={font} locale={locale} backgroundImage={backgroundImage} backgroundFit={backgroundFit} onBackgroundImageChange={setBackgroundImage} onBackgroundFitChange={setBackgroundFit} onThemeChange={setTheme} onFontChange={setFont} onLocaleChange={setLocale} onClose={() => setSettingsOpen(false)} messages={t} />}
-  </main>;
+      <section className="app-content" aria-label={t.workbench}>
+        {workspaceError && (
+          <p className="workspace-error" role="alert">
+            {workspaceError}
+          </p>
+        )}
+        {reviewRuns && (
+          <button
+            type="button"
+            onClick={() => void reviewRunList().catch(error => setExecutionError(errorMessage(error)))}
+          >
+            {remoteCopy.reviewRuns}
+          </button>
+        )}
+        {contentTabs.length > 0 && (
+          <div className="content-tabs" role="tablist" aria-label={t.openTabs}>
+            {contentTabs.map(tab => {
+              const key = tabKey(tab);
+              const run = tab.kind === 'run' ? runs.find(item => item.id === tab.resource) : undefined;
+              const label =
+                tab.kind === 'file'
+                  ? fileName(tab.resource)
+                  : tab.kind === 'run'
+                    ? (run?.workflowId ?? tab.resource)
+                    : t.insight;
+              const title = tab.kind === 'file' ? tab.resource : run ? `${label} · ${run.id}` : label;
+              const selected = key === activeTabKey;
+              const dirty = tab.kind === 'file' && isFileDirty(tab.resource);
+              return (
+                <div className={'content-tab' + (selected ? ' active' : '')} key={key}>
+                  <button
+                    className="content-tab-label"
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-description={dirty ? t.unsavedChanges : undefined}
+                    title={title}
+                    onClick={() => activateTab(tab)}
+                  >
+                    <span className={`content-tab-icon icon-${tab.kind}`} aria-hidden="true">
+                      {tab.kind === 'file' ? '≡' : tab.kind === 'run' ? '▶' : '◉'}
+                    </span>
+                    <span className="content-tab-name">{label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="content-tab-close"
+                    data-dirty={dirty || undefined}
+                    aria-label={t.closeTab(label)}
+                    onClick={() => requestCloseTab(tab)}
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="content-panels">
+          {file && (
+            <section
+              hidden={activeTab?.kind !== 'file'}
+              className="workspace-grid"
+              role="tabpanel"
+              aria-label={fileName(file)}
+            >
+              <div className={'editor-groups split-' + splitDirection}>
+                <MonacoEditor
+                  activeFile={file}
+                  content={content}
+                  onChange={updateEditorContent}
+                  splitDirection={splitDirection}
+                  onSplit={splitEditor}
+                  colorScheme={selectedTheme.colorScheme}
+                  tokens={selectedTheme.tokens}
+                  fontFamily={selectedFont.family}
+                  messages={t}
+                />
+                {splitDirection !== 'none' && (
+                  <MonacoEditor
+                    activeFile={file}
+                    content={content}
+                    onChange={updateEditorContent}
+                    splitDirection={splitDirection}
+                    onSplit={splitEditor}
+                    showSplitActions={false}
+                    colorScheme={selectedTheme.colorScheme}
+                    tokens={selectedTheme.tokens}
+                    fontFamily={selectedFont.family}
+                    messages={t}
+                  />
+                )}
+              </div>
+            </section>
+          )}
+          {contentTabs
+            .filter(tab => tab.kind === 'run')
+            .map(tab => {
+              const run = runs.find(item => item.id === tab.resource);
+              if (!run) return null;
+              return (
+                <section
+                  key={tab.resource}
+                  hidden={activeTabKey !== tabKey(tab)}
+                  className="single-panel"
+                  role="tabpanel"
+                  aria-label={run.workflowId}
+                >
+                  <RunDetail
+                    offline={disconnected}
+                    openingInsight={openingInsight}
+                    run={run}
+                    events={eventsByRun[run.id] ?? []}
+                    onOpenInsight={disconnected ? undefined : () => openInsightForRun(run)}
+                    onStop={async () => {
+                      if (disconnected || changingWorkspace.current) return;
+                      const scope = generation.current;
+                      try {
+                        await client.stopRun(run.id);
+                        await refreshRunAfterAction(run.id, scope);
+                      } catch (error) {
+                        if (scope === generation.current) reportWorkspaceError(error);
+                      }
+                    }}
+                    onSetPaused={async paused => {
+                      if (changingWorkspace.current)
+                        throw new Error(english ? 'Workspace is changing.' : '正在切换工作区。');
+                      const scope = generation.current;
+                      await client.setSessionPaused(run.id, paused);
+                      await refreshRunAfterAction(run.id, scope);
+                    }}
+                    onSendReply={text => {
+                      if (changingWorkspace.current)
+                        return Promise.reject(new Error(english ? 'Workspace is changing.' : '正在切换工作区。'));
+                      return client.sendSessionReply(run.id, text);
+                    }}
+                    messages={t}
+                  />
+                </section>
+              );
+            })}
+          {activeTab?.kind === 'insight' && (
+            <section ref={appContent} role="tabpanel" aria-label={t.insight} className="insight-pane">
+              <span className="empty-icon">◉</span>
+              <strong>{t.insight}</strong>
+              <p>
+                {disconnected
+                  ? remoteCopy.disconnected
+                  : insightFailed
+                    ? remote
+                      ? insightFailed
+                      : t.insightLoadFailed
+                    : t.insightHint}
+              </p>
+              {insightFailed && !disconnected && (
+                <button type="button" onClick={() => setInsightRetry(value => value + 1)}>
+                  {remoteCopy.retryInsight}
+                </button>
+              )}
+            </section>
+          )}
+          {(!activeTab || (activeTab.kind === 'run' && !runs.some(run => run.id === activeTab.resource))) && (
+            <section className={activeNavigation === 'runs' ? 'single-panel' : 'workspace-grid'}>
+              <div className="empty-panel">
+                {activeNavigation === 'runs' && (
+                  <div className="empty-state">
+                    <span className="empty-icon">▶</span>
+                    <strong>{t.selectRun}</strong>
+                    <p>{t.selectRunHint}</p>
+                  </div>
+                )}
+                {activeNavigation === 'workbench' && showSidebar && tree.length > 0 && !backgroundImage && (
+                  <div className="workspace-empty-hint">
+                    <span className="workspace-glyph" aria-hidden="true">
+                      &#xea7b;
+                    </span>
+                    <p>{t.openFileHint}</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      </section>
+      <footer className="status-bar">
+        <span className="status-live">
+          <i aria-hidden="true" />
+          {workspace?.kind === 'ssh'
+            ? (disconnected ? remoteCopy.disconnected : 'SSH') + ' · ' + workspace.config.host + ':' + workspace.root
+            : workspace
+              ? t.workspaceReady
+              : t.noWorkspace}
+        </span>
+        {file && (
+          <>
+            <span>{file}</span>
+            <span>UTF-8</span>
+            <span>LF</span>
+            <span>{t.markdown}</span>
+          </>
+        )}
+      </footer>
+      <dialog
+        className="workbench-dialog"
+        ref={saveChangesDialog}
+        aria-labelledby="save-changes-title"
+        aria-describedby="save-changes-message"
+        onClose={() => setPendingClosePath(undefined)}
+        onCancel={event => {
+          if (savingBeforeClose) event.preventDefault();
+        }}
+      >
+        <h2 id="save-changes-title">{t.saveChangesTitle(fileName(pendingClosePath ?? ''))}</h2>
+        <p id="save-changes-message">{t.saveChangesMessage}</p>
+        {closeSaveError && <p role="alert">{t.saveFileFailed}</p>}
+        <div className="workbench-dialog-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={savingBeforeClose}
+            onClick={() => saveChangesDialog.current?.close()}
+          >
+            {t.cancel}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={savingBeforeClose}
+            onClick={() => void finishFileClose(false)}
+          >
+            {t.dontSave}
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={savingBeforeClose}
+            onClick={() => void finishFileClose(true)}
+          >
+            {t.save}
+          </button>
+        </div>
+      </dialog>
+      {settingsOpen && (
+        <SettingsModal
+          theme={theme}
+          font={font}
+          locale={locale}
+          backgroundImage={backgroundImage}
+          backgroundFit={backgroundFit}
+          onBackgroundImageChange={setBackgroundImage}
+          onBackgroundFitChange={setBackgroundFit}
+          onThemeChange={setTheme}
+          onFontChange={setFont}
+          onLocaleChange={setLocale}
+          onClose={() => setSettingsOpen(false)}
+          messages={t}
+        />
+      )}
+    </main>
+  );
 }

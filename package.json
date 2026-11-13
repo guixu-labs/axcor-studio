@@ -39,6 +39,7 @@
     "@electron/asar": "3.4.1",
     "@electron/fuses": "^1.8.0",
     "@playwright/test": "^1.56.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

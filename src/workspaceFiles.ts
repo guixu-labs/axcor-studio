@@ -7,7 +7,18 @@ export interface WorkspaceNode {
   type: 'dir' | 'file';
 }
 
-const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', '.vite', 'out', 'dist', '.next', '.opsbot', '.claude', '__pycache__', '.venv']);
+const SKIPPED_DIRECTORIES = new Set([
+  'node_modules',
+  '.git',
+  '.vite',
+  'out',
+  'dist',
+  '.next',
+  '.opsbot',
+  '.claude',
+  '__pycache__',
+  '.venv',
+]);
 const MAX_DEPTH = 16;
 const MAX_NODES = 10_000;
 

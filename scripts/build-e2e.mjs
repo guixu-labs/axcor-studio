@@ -40,5 +40,23 @@ await build({
     },
   }],
 });
-await build({ entryPoints: ['src/preload.ts'], outfile: path.join(output, 'build/preload.js'), bundle: true, platform: 'node', format: 'cjs', external: ['electron'] });
-execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--config', 'vite.renderer.config.ts', '--outDir', path.resolve(output, 'renderer/main_window')], { stdio: 'inherit' });
+await build({
+  entryPoints: ['src/preload.ts'],
+  outfile: path.join(output, 'build/preload.js'),
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  external: ['electron'],
+});
+execFileSync(
+  process.execPath,
+  [
+    'node_modules/vite/bin/vite.js',
+    'build',
+    '--config',
+    'vite.renderer.config.ts',
+    '--outDir',
+    path.resolve(output, 'renderer/main_window'),
+  ],
+  { stdio: 'inherit' },
+);

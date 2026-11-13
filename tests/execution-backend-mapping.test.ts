@@ -76,7 +76,14 @@ test('mapEvent parses JSON string payloads and maps fields', () => {
 });
 
 test('mapEvent keeps non-JSON payloads as-is', () => {
-  const event = mapEvent({ id: 1, run_id: 'r', timestamp: 't', event_type: 'notification', data: 'plain text', source: 'events' });
+  const event = mapEvent({
+    id: 1,
+    run_id: 'r',
+    timestamp: 't',
+    event_type: 'notification',
+    data: 'plain text',
+    source: 'events',
+  });
   assert.equal(event.payload, 'plain text');
   assert.equal(event.stepId, undefined);
 });

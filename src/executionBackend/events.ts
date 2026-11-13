@@ -42,7 +42,8 @@ class EventPoller {
       else await this.pollRunEvents();
     } catch (error) {
       // Keep the cursor and retry if the backend is down or restarting.
-      console.error(`[execution] event poll failed for run ${this.runId}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[execution] event poll failed for run ${this.runId}: ${message}`);
     } finally {
       this.running = false;
     }
@@ -53,7 +54,10 @@ class EventPoller {
     while (hasMore) {
       const params = new URLSearchParams({ limit: String(POLL_PAGE_SIZE) });
       if (this.cursor) params.set('cursor', this.cursor);
-      const page = await backendRequest<BackendEventPage>('GET', `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`);
+      const page = await backendRequest<BackendEventPage>(
+        'GET',
+        `/api/v1/runs/${encodeURIComponent(this.runId)}/events?${params.toString()}`,
+      );
       if (!this.timer) return;
       this.cursor = page.next_cursor;
       hasMore = page.events.length >= page.limit;
@@ -86,8 +90,16 @@ class EventPoller {
     for (const event of page.events) {
       if (isThinkingTokenNotification(event.event_type, event.data)) continue;
       // The session endpoint can replay the history/cursor boundary and returns rowid=0.
-      const id = createHash('sha256').update(JSON.stringify([event.timestamp, event.event_type, event.iteration, event.data])).digest('base64url');
-      emitExecutionEvent({ id, runId: this.runId, type: event.event_type, timestamp: event.timestamp, payload: event.data });
+      const id = createHash('sha256')
+        .update(JSON.stringify([event.timestamp, event.event_type, event.iteration, event.data]))
+        .digest('base64url');
+      emitExecutionEvent({
+        id,
+        runId: this.runId,
+        type: event.event_type,
+        timestamp: event.timestamp,
+        payload: event.data,
+      });
     }
   }
 }

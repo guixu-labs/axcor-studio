@@ -17,27 +17,53 @@ export function StartupScreen(): JSX.Element {
   const english = locale === 'en-US';
   const remoteCopy = remoteWorkspaceCopy(english);
   const localLabel = messages[locale].openLocalWorkspace;
-  const copy = english ? {
-    choose: 'Choose a workspace', localHint: 'Choose a folder on this device', remoteHint: 'Connect to a server over SSH', title: 'Starting workbench', blockedTitle: 'Workbench startup blocked', loadingTitle: 'Loading workbench',
-    checking: 'Checking', starting: 'Waiting for service', ready: 'Ready', failed: 'Failed', blocked: 'Waiting for Controller',
-    reasons: {
-      'missing-command': 'Command or interpreter not found. Check installation and PATH',
-      'launch-error': 'Could not start the process', exited: 'Process exited during startup',
-      timeout: 'Service did not become ready in time', unreachable: 'Configured service is unreachable',
-      occupied: 'Port is already in use',
-    },
-    retry: 'Retry', close: 'Close startup window',
-  } : {
-    choose: '选择工作区', localHint: '选择本机文件夹', remoteHint: '通过 SSH 连接服务器', title: '正在启动工作台', blockedTitle: '工作台启动失败', loadingTitle: '正在加载工作台',
-    checking: '正在检查', starting: '等待服务就绪', ready: '已就绪', failed: '启动失败', blocked: '等待 Controller',
-    reasons: {
-      'missing-command': '找不到启动命令或解释器，请检查安装和 PATH',
-      'launch-error': '无法启动进程', exited: '进程在启动时退出',
-      timeout: '服务未在规定时间内就绪', unreachable: '无法连接已配置的服务',
-      occupied: '端口已被占用',
-    },
-    retry: '重试', close: '关闭启动窗口',
-  };
+  const copy = english
+    ? {
+        choose: 'Choose a workspace',
+        localHint: 'Choose a folder on this device',
+        remoteHint: 'Connect to a server over SSH',
+        title: 'Starting workbench',
+        blockedTitle: 'Workbench startup blocked',
+        loadingTitle: 'Loading workbench',
+        checking: 'Checking',
+        starting: 'Waiting for service',
+        ready: 'Ready',
+        failed: 'Failed',
+        blocked: 'Waiting for Controller',
+        reasons: {
+          'missing-command': 'Command or interpreter not found. Check installation and PATH',
+          'launch-error': 'Could not start the process',
+          exited: 'Process exited during startup',
+          timeout: 'Service did not become ready in time',
+          unreachable: 'Configured service is unreachable',
+          occupied: 'Port is already in use',
+        },
+        retry: 'Retry',
+        close: 'Close startup window',
+      }
+    : {
+        choose: '选择工作区',
+        localHint: '选择本机文件夹',
+        remoteHint: '通过 SSH 连接服务器',
+        title: '正在启动工作台',
+        blockedTitle: '工作台启动失败',
+        loadingTitle: '正在加载工作台',
+        checking: '正在检查',
+        starting: '等待服务就绪',
+        ready: '已就绪',
+        failed: '启动失败',
+        blocked: '等待 Controller',
+        reasons: {
+          'missing-command': '找不到启动命令或解释器，请检查安装和 PATH',
+          'launch-error': '无法启动进程',
+          exited: '进程在启动时退出',
+          timeout: '服务未在规定时间内就绪',
+          unreachable: '无法连接已配置的服务',
+          occupied: '端口已被占用',
+        },
+        retry: '重试',
+        close: '关闭启动窗口',
+      };
 
   const run = async (selected: StartupChoice, retry?: StartupService): Promise<void> => {
     setChoice(selected);
@@ -108,41 +134,107 @@ export function StartupScreen(): JSX.Element {
         <h1 id="startup-title">Axcor Studio</h1>
       </div>
       <div className="startup-body">
-        <div className="startup-heading"><h2>{title}</h2>{choice && <span>{readyCount} / {services.length}</span>}</div>
-        {workspaceLabel && <p className="startup-workspace-path" title={workspaceLabel}>{workspaceLabel}</p>}
-        {!choice && <div className="startup-workspace-actions">
-          <button className="startup-workspace-card" type="button" aria-label={localLabel} disabled={busy} onClick={() => void chooseLocal()}>
-            <span className="startup-workspace-icon" data-icon="folder" aria-hidden="true"><i /></span>
-            <span className="startup-workspace-copy"><strong>{localLabel}</strong><small>{copy.localHint}</small></span>
-            <span className="startup-workspace-arrow" aria-hidden="true">›</span>
-          </button>
-          <button className="startup-workspace-card" type="button" aria-label={remoteCopy.open} disabled={busy} onClick={() => void chooseRemote()}>
-            <span className="startup-workspace-icon" data-icon="terminal" aria-hidden="true"><i /></span>
-            <span className="startup-workspace-copy"><strong>{remoteCopy.open}</strong><small>{copy.remoteHint}</small></span>
-            <span className="startup-workspace-arrow" aria-hidden="true">›</span>
-          </button>
-        </div>}
-        {choice && <ul className="startup-services" aria-live="polite">
-          {services.map(([service, name]) => {
-            const status = state[service];
-            return <li key={service} data-phase={status.phase}>
-              <span className="startup-indicator" aria-hidden="true" />
-              <span>{name}</span>
-              <span className="startup-service-actions">
-                <span className="startup-phase">{copy[status.phase]}</span>
-                {status.phase === 'failed' && <button className="startup-retry" type="button"
-                  aria-label={`${copy.retry} ${name}`} disabled={busy} onClick={() => void run(choice, service)}>{copy.retry}</button>}
+        <div className="startup-heading">
+          <h2>{title}</h2>
+          {choice && (
+            <span>
+              {readyCount} / {services.length}
+            </span>
+          )}
+        </div>
+        {workspaceLabel && (
+          <p className="startup-workspace-path" title={workspaceLabel}>
+            {workspaceLabel}
+          </p>
+        )}
+        {!choice && (
+          <div className="startup-workspace-actions">
+            <button
+              className="startup-workspace-card"
+              type="button"
+              aria-label={localLabel}
+              disabled={busy}
+              onClick={() => void chooseLocal()}
+            >
+              <span className="startup-workspace-icon" data-icon="folder" aria-hidden="true">
+                <i />
               </span>
-              {(status.reason || status.detail) && <small>{[status.reason && copy.reasons[status.reason], status.detail].filter(Boolean).join(' · ')}</small>}
-            </li>;
-          })}
-        </ul>}
-        {requestError && <div className="startup-request-error">
-          <p className="startup-error" role="alert">{requestError}</p>
-          {choice && <button className="startup-retry" type="button" disabled={busy} onClick={() => void run(choice)}>{copy.retry}</button>}
-        </div>}
+              <span className="startup-workspace-copy">
+                <strong>{localLabel}</strong>
+                <small>{copy.localHint}</small>
+              </span>
+              <span className="startup-workspace-arrow" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            <button
+              className="startup-workspace-card"
+              type="button"
+              aria-label={remoteCopy.open}
+              disabled={busy}
+              onClick={() => void chooseRemote()}
+            >
+              <span className="startup-workspace-icon" data-icon="terminal" aria-hidden="true">
+                <i />
+              </span>
+              <span className="startup-workspace-copy">
+                <strong>{remoteCopy.open}</strong>
+                <small>{copy.remoteHint}</small>
+              </span>
+              <span className="startup-workspace-arrow" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          </div>
+        )}
+        {choice && (
+          <ul className="startup-services" aria-live="polite">
+            {services.map(([service, name]) => {
+              const status = state[service];
+              return (
+                <li key={service} data-phase={status.phase}>
+                  <span className="startup-indicator" aria-hidden="true" />
+                  <span>{name}</span>
+                  <span className="startup-service-actions">
+                    <span className="startup-phase">{copy[status.phase]}</span>
+                    {status.phase === 'failed' && (
+                      <button
+                        className="startup-retry"
+                        type="button"
+                        aria-label={`${copy.retry} ${name}`}
+                        disabled={busy}
+                        onClick={() => void run(choice, service)}
+                      >
+                        {copy.retry}
+                      </button>
+                    )}
+                  </span>
+                  {(status.reason || status.detail) && (
+                    <small>
+                      {[status.reason && copy.reasons[status.reason], status.detail].filter(Boolean).join(' · ')}
+                    </small>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {requestError && (
+          <div className="startup-request-error">
+            <p className="startup-error" role="alert">
+              {requestError}
+            </p>
+            {choice && (
+              <button className="startup-retry" type="button" disabled={busy} onClick={() => void run(choice)}>
+                {copy.retry}
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      {choice && <progress className="startup-progress" max={services.length} value={readyCount} aria-label={copy.title} />}
+      {choice && (
+        <progress className="startup-progress" max={services.length} value={readyCount} aria-label={copy.title} />
+      )}
     </main>
   );
 }

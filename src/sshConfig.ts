@@ -82,7 +82,10 @@ export async function listSshHosts(home = os.homedir()): Promise<string[]> {
         }
       } else {
         for (const arg of entry.args) {
-          const expanded = arg.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (token, key: string) => process.env[key] ?? token);
+          const expanded = arg.replace(
+            /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g,
+            (token, key: string) => process.env[key] ?? token,
+          );
           const pattern = expanded.replace(/^~(?=\/)/, home).replace(/%d/g, home);
           if (/^~|\$\{|%[A-Za-z]/.test(pattern)) continue;
           for (const include of await expandInclude(path.resolve(sshDir, pattern))) await scan(include, depth + 1);
@@ -99,15 +102,18 @@ export async function saveSshHost(input: SshHostEntry, home = os.homedir()): Pro
   const alias = input.alias.trim();
   const { hostname, user } = splitSshDestination(input.destination);
   const port = input.port;
-  if (!HOST_NAME.test(alias)) throw new Error('Enter an SSH alias with letters, numbers, dots, dashes or underscores.');
-  if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) throw new Error('Enter a valid SSH port.');
+  if (!HOST_NAME.test(alias))
+    throw new Error('Enter an SSH alias with letters, numbers, dots, dashes or underscores.');
+  if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535))
+    throw new Error('Enter a valid SSH port.');
 
   const sshDir = path.join(home, '.ssh');
   await fs.mkdir(sshDir, { recursive: true, mode: 0o700 });
   const config = path.join(sshDir, 'config');
   const lockPath = path.join(sshDir, 'config.axcor.lock');
   const lock = await fs.open(lockPath, 'wx', 0o600).catch(error => {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('SSH config is being updated. Retry shortly.');
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+      throw new Error('SSH config is being updated. Retry shortly.');
     throw error;
   });
   try {

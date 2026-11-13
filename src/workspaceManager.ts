@@ -4,7 +4,14 @@ import fs from 'node:fs/promises';
 import { stopAllExecutionPolls } from './executionBackend/events';
 import { setRemoteBackend } from './executionBackend/http';
 import type { CreateRunInput } from './shared/protocol';
-import { DEFAULT_REMOTE_INSIGHT_PORT, type RemoteWorkspaceConfig, type SshHostEntry, type Workspace, type WorkspaceFile, type WorkspaceFileChange } from './shared/workspace';
+import {
+  DEFAULT_REMOTE_INSIGHT_PORT,
+  type RemoteWorkspaceConfig,
+  type SshHostEntry,
+  type Workspace,
+  type WorkspaceFile,
+  type WorkspaceFileChange,
+} from './shared/workspace';
 import { hideInsight, localInsightTarget, type InsightTarget } from './observability/insightView';
 import { listSshHosts, saveSshHost } from './sshConfig';
 import { SshWorkspace, validateRemoteConfig } from './sshWorkspace';
@@ -76,7 +83,15 @@ export class WorkspaceManager {
     return this.change(async () => {
       const attempt = ++this.connectionAttempt;
       const config = validateRemoteConfig(input);
-      const id = 'ssh:' + JSON.stringify([config.host, config.root, config.controllerPort, config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT, config.sshPort]);
+      const id =
+        'ssh:' +
+        JSON.stringify([
+          config.host,
+          config.root,
+          config.controllerPort,
+          config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT,
+          config.sshPort,
+        ]);
       if (this.locked && this.current?.id !== id) throw new Error('The workspace is fixed for this window.');
       const session = await SshWorkspace.connect(config, this.workspaceHelper, disconnected => {
         if (this.ssh !== disconnected) return;
@@ -130,7 +145,8 @@ export class WorkspaceManager {
     const workspace = this.assertCurrent(id);
     if (workspace.kind === 'ssh') {
       if (!version) throw new Error('Read the remote file before saving it.');
-      if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) throw new Error('File exceeds the 2 MiB editing limit.');
+      if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024)
+        throw new Error('File exceeds the 2 MiB editing limit.');
       return this.remote(id, 'write', { path: file, content, version });
     }
     await fs.writeFile(this.localPath(workspace.root, file), content, 'utf8');
@@ -185,22 +201,39 @@ export class WorkspaceManager {
 
   register(isWorkbench: (sender: WebContents) => boolean, isStartup: (sender: WebContents) => boolean): void {
     const guard = (event: Electron.IpcMainInvokeEvent): void => {
-      if (!isWorkbench(event.sender) || event.senderFrame !== event.sender.mainFrame) throw new Error('Invalid workspace caller.');
+      if (!isWorkbench(event.sender) || event.senderFrame !== event.sender.mainFrame)
+        throw new Error('Invalid workspace caller.');
     };
     const guardStartup = (event: Electron.IpcMainInvokeEvent): void => {
-      if (!isStartup(event.sender) || event.senderFrame !== event.sender.mainFrame) throw new Error('Invalid startup caller.');
+      if (!isStartup(event.sender) || event.senderFrame !== event.sender.mainFrame)
+        throw new Error('Invalid startup caller.');
     };
-    ipcMain.handle('workspace:ssh-hosts', event => { guardStartup(event); return listSshHosts(); });
-    ipcMain.handle('workspace:ssh-host-save', (event, entry: SshHostEntry) => { guardStartup(event); return saveSshHost(entry); });
+    ipcMain.handle('workspace:ssh-hosts', event => {
+      guardStartup(event);
+      return listSshHosts();
+    });
+    ipcMain.handle('workspace:ssh-host-save', (event, entry: SshHostEntry) => {
+      guardStartup(event);
+      return saveSshHost(entry);
+    });
     ipcMain.handle('workspace:reconnect', event => {
       guard(event);
       const current = this.current;
       if (current?.kind !== 'ssh' || current.connected) throw new Error('The SSH workspace is not disconnected.');
       return this.connect(current.config);
     });
-    ipcMain.handle('workspace:get', event => { guard(event); return this.workspace; });
-    ipcMain.handle('workspace:list-tree', (event, id: string, directory?: string) => { guard(event); return this.list(id, directory); });
-    ipcMain.handle('workspace:read-file', (event, id: string, file: string) => { guard(event); return this.read(id, file); });
+    ipcMain.handle('workspace:get', event => {
+      guard(event);
+      return this.workspace;
+    });
+    ipcMain.handle('workspace:list-tree', (event, id: string, directory?: string) => {
+      guard(event);
+      return this.list(id, directory);
+    });
+    ipcMain.handle('workspace:read-file', (event, id: string, file: string) => {
+      guard(event);
+      return this.read(id, file);
+    });
     ipcMain.handle('workspace:write-file', (event, id: string, file: string, content: string, version?: string) => {
       guard(event);
       return this.write(id, file, content, version);

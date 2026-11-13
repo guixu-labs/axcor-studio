@@ -48,7 +48,12 @@ export function registerStartupIpc(
       } catch (error) {
         state[service] = {
           phase: 'failed',
-          detail: error instanceof ServiceStartupError ? error.detail : error instanceof Error ? error.message : String(error),
+          detail:
+            error instanceof ServiceStartupError
+              ? error.detail
+              : error instanceof Error
+                ? error.message
+                : String(error),
           reason: error instanceof ServiceStartupError ? error.reason : undefined,
         };
       }

@@ -42,7 +42,8 @@ const workbench: WorkspaceBridge = {
     return () => { ipcRenderer.removeListener('workspace:disconnected', handler); };
   },
   onFilesChanged: listener => {
-    const handler = (_event: Electron.IpcRendererEvent, id: string, change: WorkspaceFileChange): void => listener(id, change);
+    const handler = (_event: Electron.IpcRendererEvent, id: string, change: WorkspaceFileChange): void =>
+      listener(id, change);
     ipcRenderer.on('workspace:files-changed', handler);
     return () => { ipcRenderer.removeListener('workspace:files-changed', handler); };
   },
@@ -66,7 +67,8 @@ const executionBackend: ExecutionBackendBridge = {
   deleteProvider: providerIndex => ipcRenderer.invoke('execution:delete-provider', providerIndex),
   activateProvider: providerIndex => ipcRenderer.invoke('execution:activate-provider', providerIndex),
   testProvider: providerIndex => ipcRenderer.invoke('execution:test-provider', providerIndex),
-  testProviderKey: (key, model, baseUrl, runtime) => ipcRenderer.invoke('execution:test-provider-key', key, model, baseUrl, runtime),
+  testProviderKey: (key, model, baseUrl, runtime) =>
+    ipcRenderer.invoke('execution:test-provider-key', key, model, baseUrl, runtime),
   subscribeRunEvents: (runId, listener) => {
     const handler = (_event: Electron.IpcRendererEvent, runEvent: RunEvent): void => {
       if (runEvent.runId === runId) listener(runEvent);
@@ -82,8 +84,13 @@ const executionBackend: ExecutionBackendBridge = {
 contextBridge.exposeInMainWorld('executionBackend', executionBackend);
 
 contextBridge.exposeInMainWorld('insight', {
-  show: (path: string, bounds: { x: number; y: number; width: number; height: number }, isDark: boolean): Promise<void> => ipcRenderer.invoke('insight:show', path, bounds, isDark),
-  updateBounds: (bounds: { x: number; y: number; width: number; height: number }): Promise<void> => ipcRenderer.invoke('insight:update-bounds', bounds),
+  show: (
+    path: string,
+    bounds: { x: number; y: number; width: number; height: number },
+    isDark: boolean,
+  ): Promise<void> => ipcRenderer.invoke('insight:show', path, bounds, isDark),
+  updateBounds: (bounds: { x: number; y: number; width: number; height: number }): Promise<void> =>
+    ipcRenderer.invoke('insight:update-bounds', bounds),
   hide: (): Promise<void> => ipcRenderer.invoke('insight:hide'),
   onLoadFailed: (listener: (description: string) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, description: string): void => listener(description);

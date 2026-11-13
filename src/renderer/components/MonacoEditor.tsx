@@ -64,7 +64,18 @@ function defineWorkbenchTheme(tokens: Record<string, string>, colorScheme: 'ligh
   monaco.editor.setTheme('workbench');
 }
 
-export function MonacoEditor({ activeFile, content, onChange, splitDirection, onSplit, showSplitActions = true, colorScheme, tokens, fontFamily, messages }: MonacoEditorProps): JSX.Element {
+export function MonacoEditor({
+  activeFile,
+  content,
+  onChange,
+  splitDirection,
+  onSplit,
+  showSplitActions = true,
+  colorScheme,
+  tokens,
+  fontFamily,
+  messages,
+}: MonacoEditorProps): JSX.Element {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor>();
   const changeContent = useRef(onChange);
@@ -111,8 +122,34 @@ export function MonacoEditor({ activeFile, content, onChange, splitDirection, on
     editor.current?.updateOptions({ fontFamily });
   }, [fontFamily]);
 
-  return <section className="editor-pane">
-    <div className="editor-toolbar"><h2>{activeFile}</h2>{showSplitActions && <div className="editor-actions"><button className="icon-button" type="button" title={messages.splitVertical} aria-label={messages.splitVertical} onClick={() => onSplit(splitDirection === 'vertical' ? 'none' : 'vertical')}><span className="split-vertical-icon" aria-hidden="true" /></button><button className="icon-button" type="button" title={messages.splitHorizontal} aria-label={messages.splitHorizontal} onClick={() => onSplit(splitDirection === 'horizontal' ? 'none' : 'horizontal')}><span className="split-horizontal-icon" aria-hidden="true" /></button></div>}</div>
-    <div className="monaco-host" ref={host} />
-  </section>;
+  return (
+    <section className="editor-pane">
+      <div className="editor-toolbar">
+        <h2>{activeFile}</h2>
+        {showSplitActions && (
+          <div className="editor-actions">
+            <button
+              className="icon-button"
+              type="button"
+              title={messages.splitVertical}
+              aria-label={messages.splitVertical}
+              onClick={() => onSplit(splitDirection === 'vertical' ? 'none' : 'vertical')}
+            >
+              <span className="split-vertical-icon" aria-hidden="true" />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              title={messages.splitHorizontal}
+              aria-label={messages.splitHorizontal}
+              onClick={() => onSplit(splitDirection === 'horizontal' ? 'none' : 'horizontal')}
+            >
+              <span className="split-horizontal-icon" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="monaco-host" ref={host} />
+    </section>
+  );
 }
