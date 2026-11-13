@@ -25,9 +25,20 @@ interface MonacoEditorProps {
 }
 
 const LANGUAGE_BY_EXTENSION: Record<string, string> = {
-  md: 'markdown', ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
-  json: 'json', py: 'python', css: 'css', html: 'html', yml: 'yaml', yaml: 'yaml',
-  sh: 'shell', toml: 'ini', xml: 'xml',
+  md: 'markdown',
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  json: 'json',
+  py: 'python',
+  css: 'css',
+  html: 'html',
+  yml: 'yaml',
+  yaml: 'yaml',
+  sh: 'shell',
+  toml: 'ini',
+  xml: 'xml',
 };
 
 function languageForFile(name: string): string {
@@ -57,7 +68,7 @@ function defineWorkbenchTheme(tokens: Record<string, string>, colorScheme: 'ligh
       'editorSuggestWidget.selectedBackground': tokens['accent-soft'],
       'scrollbarSlider.background': colorScheme === 'dark' ? '#ffffff22' : '#00000022',
       'scrollbarSlider.hoverBackground': colorScheme === 'dark' ? '#ffffff33' : '#00000033',
-      'focusBorder': tokens['accent'],
+      focusBorder: tokens['accent'],
       'minimap.background': tokens['surface-0'],
     },
   });
@@ -80,7 +91,9 @@ export function MonacoEditor({
   const editor = useRef<monaco.editor.IStandaloneCodeEditor>();
   const changeContent = useRef(onChange);
 
-  useEffect(() => { changeContent.current = onChange; }, [onChange]);
+  useEffect(() => {
+    changeContent.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     if (!host.current) return;
@@ -96,7 +109,10 @@ export function MonacoEditor({
     editor.current.onDidChangeModelContent(event => {
       if (!event.isFlush) changeContent.current(editor.current?.getValue() ?? '');
     });
-    return () => { editor.current?.dispose(); editor.current = undefined; };
+    return () => {
+      editor.current?.dispose();
+      editor.current = undefined;
+    };
   }, []);
 
   useEffect(() => {

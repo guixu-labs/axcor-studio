@@ -19,7 +19,7 @@ export async function probeInsight(url: string): Promise<boolean> {
       redirect: 'error',
     });
     if (response.ok) {
-      const data = await response.json() as { items?: unknown } | null;
+      const data = (await response.json()) as { items?: unknown } | null;
       return Array.isArray(data?.items);
     }
   } catch {
@@ -33,19 +33,28 @@ export async function getInsightStatus(): Promise<{ running: boolean; port: numb
 }
 
 export async function importInsightTranscript(
-  url: string, transcript: { source: string; sessionId: string; filePath: string }, workspaceSignal: AbortSignal,
+  url: string,
+  transcript: { source: string; sessionId: string; filePath: string },
+  workspaceSignal: AbortSignal,
 ): Promise<InsightImportResult> {
   const signal = AbortSignal.any([workspaceSignal, AbortSignal.timeout(30_000)]);
   const response = await fetch(new URL('/api/ingest/import-file', url), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(transcript), redirect: 'error', signal,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(transcript),
+    redirect: 'error',
+    signal,
   });
-  const result = await response.json().catch(() => null) as {
-    imported?: boolean; reason?: string; taskId?: string; error?: string;
+  const result = (await response.json().catch(() => null)) as {
+    imported?: boolean;
+    reason?: string;
+    taskId?: string;
+    error?: string;
   } | null;
   signal.throwIfAborted();
   if (!response.ok) return { ok: false, error: result?.error ?? `Context Insight API 错误（${response.status}）` };
-  if (result?.reason === 'no-interactions') return { ok: false, error: 'Context Insight 未从转录文件中读到会话内容。' };
+  if (result?.reason === 'no-interactions')
+    return { ok: false, error: 'Context Insight 未从转录文件中读到会话内容。' };
   if (typeof result?.imported !== 'boolean') return { ok: false, error: 'Context Insight 未返回有效的导入结果。' };
   const sessionId = result.taskId || transcript.sessionId;
   return { ok: true, sessionId, imported: result.imported, insightUrl: `/run/solo:${encodeURIComponent(sessionId)}` };
@@ -72,7 +81,9 @@ async function startInsight(onStarting?: () => void): Promise<void> {
     });
     child = instance;
     let stderr = '';
-    instance.stderr?.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-2000); });
+    instance.stderr?.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-2000);
+    });
     instance.once('error', error => {
       startupError = serviceSpawnError('context-insight', error);
       if (child === instance) child = undefined;
@@ -96,7 +107,9 @@ async function startInsight(onStarting?: () => void): Promise<void> {
 }
 
 export function ensureInsightRunning(onStarting?: () => void): Promise<void> {
-  starting ??= startInsight(onStarting).finally(() => { starting = undefined; });
+  starting ??= startInsight(onStarting).finally(() => {
+    starting = undefined;
+  });
   return starting;
 }
 

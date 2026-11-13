@@ -12,8 +12,11 @@ export function splitSshDestination(value: string): { hostname: string; user?: s
   const [first, second, ...extra] = value.trim().split('@');
   const hostname = (second ?? first).replace(/^\[([^\]]+)\]$/, '$1');
   const user = second === undefined ? undefined : first;
-  if (extra.length || (user !== undefined && !HOST_NAME.test(user))
-    || (!HOST_NAME.test(hostname) && isIP(hostname) !== 6)) {
+  if (
+    extra.length ||
+    (user !== undefined && !HOST_NAME.test(user)) ||
+    (!HOST_NAME.test(hostname) && isIP(hostname) !== 6)
+  ) {
     throw new Error('Enter an SSH host alias or user@host.');
   }
   return { hostname, ...(user === undefined ? {} : { user }) };
@@ -142,7 +145,7 @@ export async function saveSshHost(input: SshHostEntry, home = os.homedir()): Pro
       await fs.writeFile(temporary, Buffer.concat([Buffer.from(prefix), original]), { flag: 'wx', mode });
       await fs.chmod(temporary, mode);
       if (metadata) {
-        if (await fs.realpath(config) !== target || !(await fs.readFile(target)).equals(original)) {
+        if ((await fs.realpath(config)) !== target || !(await fs.readFile(target)).equals(original)) {
           throw new Error('SSH config changed while saving. Try again.');
         }
         await fs.rename(temporary, target);

@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  mapEvent,
-  mapRun,
-  mapRunStatus,
-  type BackendEvent,
-  type BackendRun,
-} from '../src/executionBackend/api';
+import { mapEvent, mapRun, mapRunStatus, type BackendEvent, type BackendRun } from '../src/executionBackend/api';
 
 const baseRecord: BackendRun = {
   run_id: 'run-1',

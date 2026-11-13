@@ -21,8 +21,11 @@ export function registerStartupIpc(
   ipcMain.handle('startup:choose-local', async event => {
     guard(event);
     running = true;
-    try { return (await workspaces.choose())?.root; }
-    finally { running = false; }
+    try {
+      return (await workspaces.choose())?.root;
+    } finally {
+      running = false;
+    }
   });
   ipcMain.handle('startup:run', async (event, selected: StartupChoice, retry?: StartupService) => {
     guard(event);
@@ -30,7 +33,8 @@ export function registerStartupIpc(
     const prior = previous?.sender === sender ? previous : undefined;
     if (retry && prior?.state[retry]?.phase !== 'failed') throw new Error('This service is not awaiting retry.');
     const choice = retry && prior ? prior.choice : selected;
-    const state = retry && prior ? { ...prior.state, [retry]: { phase: 'checking' as const } } : initialStartupState();
+    const state =
+      retry && prior ? { ...prior.state, [retry]: { phase: 'checking' as const } } : initialStartupState();
     previous = { sender, choice, state };
     running = true;
     const publish = (): void => {
@@ -38,7 +42,10 @@ export function registerStartupIpc(
       sender.send('startup:progress', state);
       onState(sender, state);
     };
-    const check = async (service: StartupService, start: (onStarting: () => void) => Promise<void>): Promise<void> => {
+    const check = async (
+      service: StartupService,
+      start: (onStarting: () => void) => Promise<void>,
+    ): Promise<void> => {
       try {
         await start(() => {
           state[service] = { phase: 'starting' };
@@ -64,7 +71,9 @@ export function registerStartupIpc(
       if (choice.kind === 'ssh') {
         const workspace = workspaces.workspace;
         if (retry !== 'insight' || workspace?.kind !== 'ssh' || !workspace.connected) {
-          await check('execution', async onStarting => { await workspaces.connect(choice.config, onStarting); });
+          await check('execution', async onStarting => {
+            await workspaces.connect(choice.config, onStarting);
+          });
         }
         if (state.execution.phase === 'ready') {
           await check('insight', onStarting => workspaces.insightTarget().ensureReady(onStarting));
@@ -74,11 +83,13 @@ export function registerStartupIpc(
         }
       } else if (choice.kind === 'local' && workspaces.workspace?.kind === 'local') {
         await Promise.all([
-          retry === 'insight' ? undefined : check('execution', async onStarting => {
-            if (!await ensureExecutionBackendRunning(onStarting)) {
-              throw new ServiceStartupError('unreachable', DEFAULT_EXECUTION_BACKEND_URL);
-            }
-          }),
+          retry === 'insight'
+            ? undefined
+            : check('execution', async onStarting => {
+                if (!(await ensureExecutionBackendRunning(onStarting))) {
+                  throw new ServiceStartupError('unreachable', DEFAULT_EXECUTION_BACKEND_URL);
+                }
+              }),
           retry === 'execution' ? undefined : check('insight', ensureInsightRunning),
         ]);
       } else {

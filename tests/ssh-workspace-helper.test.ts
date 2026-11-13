@@ -9,12 +9,17 @@ import { test } from 'node:test';
 import { validateRemoteConfig } from '../src/sshWorkspace';
 
 test('validates SSH config without allowing option injection or ambiguous paths', () => {
-  assert.deepEqual(validateRemoteConfig({ host: 'me@dev-server', root: '/home/me/my project/', controllerPort: 18600 }),
-    { host: 'me@dev-server', root: '/home/me/my project', controllerPort: 18600 });
+  assert.deepEqual(
+    validateRemoteConfig({ host: 'me@dev-server', root: '/home/me/my project/', controllerPort: 18600 }),
+    { host: 'me@dev-server', root: '/home/me/my project', controllerPort: 18600 },
+  );
   for (const host of ['-F', 'dev;echo bad', '']) {
     assert.throws(() => validateRemoteConfig({ host, root: '/workspace', controllerPort: 18600 }), /SSH host/);
   }
-  assert.throws(() => validateRemoteConfig({ host: 'dev', root: '/home/../etc', controllerPort: 18600 }), /directory/);
+  assert.throws(
+    () => validateRemoteConfig({ host: 'dev', root: '/home/../etc', controllerPort: 18600 }),
+    /directory/,
+  );
   assert.throws(() => validateRemoteConfig({ host: 'dev', root: '/workspace', controllerPort: 70000 }), /port/);
 });
 

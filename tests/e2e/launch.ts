@@ -12,21 +12,30 @@ export async function workbenchPage(app: ElectronApplication, chooseLocal = true
     const local = startup.getByRole('button', { name: '打开本地工作区', exact: true });
     await startup.waitForLoadState('domcontentloaded').catch(() => {});
     if (!startup.isClosed() && new URL(startup.url()).searchParams.has('startup')) {
-      await startup.locator('.startup-heading').waitFor({ state: 'visible' }).catch(() => {});
-      if (!startup.isClosed() && await startup.getByRole('heading', { name: '选择工作区' }).isVisible()) await local.click();
+      await startup
+        .locator('.startup-heading')
+        .waitFor({ state: 'visible' })
+        .catch(() => {});
+      if (!startup.isClosed() && (await startup.getByRole('heading', { name: '选择工作区' }).isVisible()))
+        await local.click();
     }
   }
   let page: Page | undefined;
-  await expect.poll(async () => {
-    const url = await app.evaluate(({ BrowserWindow }) => {
-      const windows = BrowserWindow.getAllWindows();
-      if (windows.length !== 1 || !windows[0].isVisible()) return undefined;
-      const current = windows[0].webContents.getURL();
-      return new URL(current).searchParams.has('startup') ? undefined : current;
-    });
-    page = url ? app.windows().find(candidate => !candidate.isClosed() && candidate.url() === url) : undefined;
-    return Boolean(page);
-  }, { timeout: 10_000 }).toBe(true);
+  await expect
+    .poll(
+      async () => {
+        const url = await app.evaluate(({ BrowserWindow }) => {
+          const windows = BrowserWindow.getAllWindows();
+          if (windows.length !== 1 || !windows[0].isVisible()) return undefined;
+          const current = windows[0].webContents.getURL();
+          return new URL(current).searchParams.has('startup') ? undefined : current;
+        });
+        page = url ? app.windows().find(candidate => !candidate.isClosed() && candidate.url() === url) : undefined;
+        return Boolean(page);
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
   if (!page) throw new Error('Workbench page did not open');
   return page;
 }
@@ -38,7 +47,11 @@ type LaunchOptions = NonNullable<Parameters<typeof electron.launch>[0]> & {
 };
 
 export async function launchWorkbench({
-  executionUrl, insightPort, workspace, args = [], ...options
+  executionUrl,
+  insightPort,
+  workspace,
+  args = [],
+  ...options
 }: LaunchOptions = {}): Promise<ElectronApplication> {
   const server = http.createServer((request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -63,7 +76,8 @@ export async function launchWorkbench({
     app = await electron.launch({
       ...options,
       args: [
-        ...args, path.resolve('dist/e2e/build/main.js'),
+        ...args,
+        path.resolve('dist/e2e/build/main.js'),
         `--fixture-controller-port=${executionUrl ? new URL(executionUrl).port : port}`,
         `--fixture-insight-port=${insightPort ?? port}`,
       ],

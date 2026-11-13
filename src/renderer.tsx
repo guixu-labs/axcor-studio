@@ -20,19 +20,25 @@ if (query.has('remote')) {
   document.body.classList.add('startup-window');
   renderer.render(<StartupScreen />);
 } else {
-  void import('./renderer/App').then(({ default: App }) => {
-    function Workbench(): JSX.Element {
-      useEffect(() => {
-        // Give the hidden window a frame to paint the mounted workbench.
-        let frame = requestAnimationFrame(() => {
-          frame = requestAnimationFrame(() => window.startup.workbenchLoaded());
-        });
-        return () => cancelAnimationFrame(frame);
-      }, []);
-      return <App />;
-    }
-    renderer.render(<React.StrictMode><Workbench /></React.StrictMode>);
-  }).catch(error => {
-    window.startup.workbenchLoaded(String(error));
-  });
+  void import('./renderer/App')
+    .then(({ default: App }) => {
+      function Workbench(): JSX.Element {
+        useEffect(() => {
+          // Give the hidden window a frame to paint the mounted workbench.
+          let frame = requestAnimationFrame(() => {
+            frame = requestAnimationFrame(() => window.startup.workbenchLoaded());
+          });
+          return () => cancelAnimationFrame(frame);
+        }, []);
+        return <App />;
+      }
+      renderer.render(
+        <React.StrictMode>
+          <Workbench />
+        </React.StrictMode>,
+      );
+    })
+    .catch(error => {
+      window.startup.workbenchLoaded(String(error));
+    });
 }

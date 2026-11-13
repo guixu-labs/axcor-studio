@@ -1,7 +1,10 @@
 import type { StartupFailure } from './shared/startup';
 
 export class ServiceStartupError extends Error {
-  constructor(readonly reason: StartupFailure, readonly detail: string) {
+  constructor(
+    readonly reason: StartupFailure,
+    readonly detail: string,
+  ) {
     super([reason.replaceAll('-', ' '), detail].filter(Boolean).join(' · '));
     this.name = 'ServiceStartupError';
   }

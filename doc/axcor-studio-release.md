@@ -10,11 +10,11 @@
 
 ## 发布流程
 
-| 流水线 | 触发方式与产物 |
-| --- | --- |
-| [CI](../.github/workflows/ci.yml) | PR 指向 `main`，或由 CD 调用。在 macOS 26 arm64 上检查版本元数据、lint、类型、单元测试和 Electron E2E。 |
+| 流水线                                              | 触发方式与产物                                                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| [CI](../.github/workflows/ci.yml)                   | PR 指向 `main`，或由 CD 调用。在 macOS 26 arm64 上检查版本元数据、Prettier 格式、lint、类型、单元测试和 Electron E2E。              |
 | [Tag Release](../.github/workflows/tag-release.yml) | 更新 `main` 且改动 `package.json` 时，对比本次推送前后的版本。版本变化时在推送后的提交创建 `vX.Y.Z` 标签，并显式在该标签上触发 CD。 |
-| [CD](../.github/workflows/cd.yml) | 由 Tag Release 调用或手动运行。先复用 CI，再在 macOS 26 上构建 arm64 ZIP，检查 ASAR 内容，并解压 ZIP 验证签名和启动。 |
+| [CD](../.github/workflows/cd.yml)                   | 由 Tag Release 调用或手动运行。先复用 CI，再在 macOS 26 上构建 arm64 ZIP，检查 ASAR 内容，并解压 ZIP 验证签名和启动。               |
 
 发布时运行 `npm version <版本> --no-git-tag-version`，将 `package.json` 和 `package-lock.json` 一起提交并合入 `main`。CI、打包、签名和启动检查通过后，CD 自动发布 GitHub Release，附上 macOS arm64 ZIP、`SHA256SUMS.txt` 和自动生成的发布说明。
 

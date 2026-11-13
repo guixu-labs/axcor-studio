@@ -1,9 +1,15 @@
 import type { Artifact, CreateRunInput, ExecutionClient, Run, RunEvent } from '../../shared/protocol';
 
 export class WorkbenchExecutionClient implements ExecutionClient {
-  createRun(input: CreateRunInput): Promise<Run> { return window.executionBackend.startRun(input); }
-  getRun(runId: string): Promise<Run> { return window.executionBackend.getRun(runId); }
-  stopRun(runId: string): Promise<void> { return window.executionBackend.stopRun(runId); }
+  createRun(input: CreateRunInput): Promise<Run> {
+    return window.executionBackend.startRun(input);
+  }
+  getRun(runId: string): Promise<Run> {
+    return window.executionBackend.getRun(runId);
+  }
+  stopRun(runId: string): Promise<void> {
+    return window.executionBackend.stopRun(runId);
+  }
   setSessionPaused(sessionId: string, paused: boolean): Promise<void> {
     return window.executionBackend.setSessionPaused(sessionId, paused);
   }

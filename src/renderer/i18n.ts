@@ -202,7 +202,7 @@ export const messages: Record<LocaleId, Messages> = {
         paused: '已暂停',
         failed: '失败',
         completed: '已完成',
-        cancelled: '已停止'
+        cancelled: '已停止',
       },
       subagents: '子代理',
       mainAgent: '主代理',
@@ -219,7 +219,7 @@ export const messages: Record<LocaleId, Messages> = {
         subagent_start: '子代理启动',
         subagent_progress: '子代理进度',
         subagent_stop: '子代理结束',
-        subagent_context: '子代理上下文'
+        subagent_context: '子代理上下文',
       },
     },
     graphAdvanced: '高级参数',
@@ -376,7 +376,7 @@ export const messages: Record<LocaleId, Messages> = {
         paused: 'Paused',
         failed: 'Failed',
         completed: 'Completed',
-        cancelled: 'Stopped'
+        cancelled: 'Stopped',
       },
       subagents: 'Subagents',
       mainAgent: 'Main agent',
@@ -393,7 +393,7 @@ export const messages: Record<LocaleId, Messages> = {
         subagent_start: 'Subagent started',
         subagent_progress: 'Subagent progress',
         subagent_stop: 'Subagent stopped',
-        subagent_context: 'Subagent context'
+        subagent_context: 'Subagent context',
       },
     },
     graphAdvanced: 'Advanced parameters',
@@ -494,7 +494,7 @@ export const messages: Record<LocaleId, Messages> = {
     promptPlaceholder: 'Optional initial prompt for the workflow',
     providers: 'Providers',
     providersDescription:
-      `Configure the ${EXECUTION_BACKEND_NAME} model provider keys and endpoints used by session runs.`,
+      `Configure the ${EXECUTION_BACKEND_NAME} model provider keys and endpoints ` + 'used by session runs.',
     providerKey: 'API key',
     providerModel: 'Model',
     providerBaseUrl: 'Base URL',
@@ -518,5 +518,5 @@ export const messages: Record<LocaleId, Messages> = {
 
 export const localeOptions: Array<{ id: LocaleId; label: string }> = [
   { id: 'zh-CN', label: '中文' },
-  { id: 'en-US', label: 'English' }
+  { id: 'en-US', label: 'English' },
 ];

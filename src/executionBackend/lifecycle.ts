@@ -29,7 +29,7 @@ export async function isExecutionBackendReachable(baseUrl = DEFAULT_EXECUTION_BA
   try {
     const response = await fetch(baseUrl + '/api/v1/runs', { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     if (!response.ok) return false;
-    const payload = await response.json() as { runs?: unknown } | null;
+    const payload = (await response.json()) as { runs?: unknown } | null;
     return Array.isArray(payload?.runs);
   } catch {
     return false;
@@ -47,12 +47,17 @@ function spawnExecutionBackend(port: string): Promise<BackendProcess> {
   };
   return new Promise((resolve, reject) => {
     const child = spawn(EXECUTION_BACKEND_COMMAND, ['web', '--port', port, '--no-open'], {
-      env, cwd: os.homedir(), detached: true, stdio: ['ignore', 'ignore', 'pipe'],
+      env,
+      cwd: os.homedir(),
+      detached: true,
+      stdio: ['ignore', 'ignore', 'pipe'],
     });
     const instance: BackendProcess = { child, port };
     spawnedBackend = instance;
     let stderr = '';
-    child.stderr?.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-2000); });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-2000);
+    });
     child.once('close', (code, signal) => {
       instance.failure ??= serviceExitError(code, signal, stderr);
       if (spawnedBackend === instance) spawnedBackend = undefined;
@@ -82,7 +87,7 @@ export async function ensureExecutionBackendRunning(
   try {
     onStarting?.();
     if (spawnedBackend && spawnedBackend.port !== port) stopExecutionBackendIfStarted();
-    const instance = spawnedBackend ?? await spawnExecutionBackend(port);
+    const instance = spawnedBackend ?? (await spawnExecutionBackend(port));
     const deadline = Date.now() + STARTUP_WAIT_MS;
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));

@@ -24,15 +24,19 @@ let remoteWorkspaceWindow: BrowserWindow | undefined;
 let selectedRemoteWorkspace: RemoteWorkspaceConfig | undefined;
 let workbenchWindow: BrowserWindow | undefined;
 let quitting = false;
-const workspaces = new WorkspaceManager(workspaceHelper, id => {
-  if (workbenchWindow && !workbenchWindow.isDestroyed()) {
-    workbenchWindow.webContents.send('workspace:disconnected', id);
-  }
-}, (id, change) => {
-  if (workbenchWindow && !workbenchWindow.isDestroyed()) {
-    workbenchWindow.webContents.send('workspace:files-changed', id, change);
-  }
-});
+const workspaces = new WorkspaceManager(
+  workspaceHelper,
+  id => {
+    if (workbenchWindow && !workbenchWindow.isDestroyed()) {
+      workbenchWindow.webContents.send('workspace:disconnected', id);
+    }
+  },
+  (id, change) => {
+    if (workbenchWindow && !workbenchWindow.isDestroyed()) {
+      workbenchWindow.webContents.send('workspace:files-changed', id, change);
+    }
+  },
+);
 const SPLASH_WIDTH = 640;
 const SPLASH_HEIGHT = 390;
 const webPreferences = {
@@ -131,7 +135,9 @@ function createWorkbench(sender: WebContents): void {
   });
   workbenchWindow = window;
   workspaces.lock();
-  window.on('closed', () => { workbenchWindow = undefined; });
+  window.on('closed', () => {
+    workbenchWindow = undefined;
+  });
   window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     console.error(`[renderer] failed to load ${validatedURL}: ${errorCode} ${errorDescription}`);
   });
@@ -207,14 +213,23 @@ app.whenReady().then(() => {
     splashWindow.destroy();
   });
   workspaces.register(sender => sender === workbenchWindow?.webContents, isRemoteChooser);
-  registerExecutionBackendIpc(input => workspaces.prepareRun(input), () => workspaces.insightTarget());
+  registerExecutionBackendIpc(
+    input => workspaces.prepareRun(input),
+    () => workspaces.insightTarget(),
+  );
   ipcMain.handle('insight:show', (_event, path: string, bounds: InsightBounds, isDark: boolean) => {
     return showInsight(path, bounds, isDark, workspaces.insightTarget());
   });
-  ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => { updateInsightBounds(bounds); });
-  ipcMain.handle('insight:hide', () => { hideInsight(); });
+  ipcMain.handle('insight:update-bounds', (_event, bounds: InsightBounds) => {
+    updateInsightBounds(bounds);
+  });
+  ipcMain.handle('insight:hide', () => {
+    hideInsight();
+  });
   createSplash();
-  app.on('activate', () => { if (!quitting && !splashWindow && !workbenchWindow) createSplash(); });
+  app.on('activate', () => {
+    if (!quitting && !splashWindow && !workbenchWindow) createSplash();
+  });
 });
 
 app.on('before-quit', () => {

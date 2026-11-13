@@ -29,9 +29,13 @@ server.listen(port, '127.0.0.1');
 
 async function freePort(): Promise<number> {
   const probe = http.createServer(() => {});
-  await new Promise<void>(resolve => { probe.listen(0, '127.0.0.1', () => resolve()); });
+  await new Promise<void>(resolve => {
+    probe.listen(0, '127.0.0.1', () => resolve());
+  });
   const port = (probe.address() as AddressInfo).port;
-  await new Promise<void>(resolve => { probe.close(() => resolve()); });
+  await new Promise<void>(resolve => {
+    probe.close(() => resolve());
+  });
   return port;
 }
 
@@ -53,7 +57,9 @@ test('isExecutionBackendReachable', async t => {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ runs: [] }));
   });
-  await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', () => resolve()); });
+  await new Promise<void>(resolve => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   t.after(() => server.close());
 
@@ -100,13 +106,17 @@ test('execution backend lifecycle', async t => {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ runs: [] }));
     });
-    await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', () => resolve()); });
+    await new Promise<void>(resolve => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
     const port = String((server.address() as AddressInfo).port);
     const url = `http://127.0.0.1:${port}`;
     assert.equal(await ensureExecutionBackendRunning(undefined, port), true);
     stopExecutionBackendIfStarted();
     assert.equal(await isExecutionBackendReachable(url), true);
-    await new Promise<void>(resolve => { server.close(() => resolve()); });
+    await new Promise<void>(resolve => {
+      server.close(() => resolve());
+    });
   });
 
   await t.test('distinguishes a missing interpreter from a process that exits during startup', async () => {
@@ -128,8 +138,10 @@ test('execution backend lifecycle', async t => {
   await t.test('reports a readiness timeout while the service process stays alive', async t => {
     const port = String(await freePort());
     const url = `http://127.0.0.1:${port}`;
-    await fs.writeFile(path.join(binDir, 'workflow-controller'),
-      `#!/bin/sh\nexec "${process.execPath}" -e 'setInterval(() => {}, 1000)'\n`);
+    await fs.writeFile(
+      path.join(binDir, 'workflow-controller'),
+      `#!/bin/sh\nexec "${process.execPath}" -e 'setInterval(() => {}, 1000)'\n`,
+    );
     const start = Date.now();
     let reads = 0;
     t.mock.method(Date, 'now', () => start + reads++ * 11_000);

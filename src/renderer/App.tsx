@@ -182,35 +182,37 @@ export default function App(): JSX.Element {
   useEffect(() => saveWorkbenchState('workbench.theme', theme), [theme]);
   useEffect(() => saveWorkbenchState('workbench.font', font), [font]);
   useEffect(() => saveWorkbenchState('workbench.locale', locale), [locale]);
-  const loadRemoteDirectory = useCallback(async (
-    target: Workspace,
-    scope: number,
-    path: string,
-  ): Promise<WorkspaceNode[] | undefined> => {
-    const entries = await window.workbench.listTree(target.id, path);
-    if (scope !== generation.current) return;
-    const directories = remoteDirectories.current;
-    if (path && !directories.get(parentDirectory(path))?.some(node => node.type === 'dir' && node.path === path))
-      return;
-    directories.set(path, entries);
-    const prefix = path ? path + '/' : '';
-    const children = new Set(entries.filter(node => node.type === 'dir').map(node => node.path));
-    for (const cached of directories.keys()) {
-      if (cached === path || !cached.startsWith(prefix)) continue;
-      const child = cached.slice(prefix.length).split('/', 1)[0];
-      if (!children.has(prefix + child)) directories.delete(cached);
-    }
-    setTree([...directories.values()].flat());
-    return entries;
-  }, []);
-  const loadWorkspaceTree = useCallback(async (target: Workspace, scope: number): Promise<void> => {
-    if (target.kind === 'ssh') {
-      await loadRemoteDirectory(target, scope, '');
-      return;
-    }
-    const workspaceTree = await window.workbench.listTree(target.id);
-    if (scope === generation.current) setTree(workspaceTree);
-  }, [loadRemoteDirectory]);
+  const loadRemoteDirectory = useCallback(
+    async (target: Workspace, scope: number, path: string): Promise<WorkspaceNode[] | undefined> => {
+      const entries = await window.workbench.listTree(target.id, path);
+      if (scope !== generation.current) return;
+      const directories = remoteDirectories.current;
+      if (path && !directories.get(parentDirectory(path))?.some(node => node.type === 'dir' && node.path === path))
+        return;
+      directories.set(path, entries);
+      const prefix = path ? path + '/' : '';
+      const children = new Set(entries.filter(node => node.type === 'dir').map(node => node.path));
+      for (const cached of directories.keys()) {
+        if (cached === path || !cached.startsWith(prefix)) continue;
+        const child = cached.slice(prefix.length).split('/', 1)[0];
+        if (!children.has(prefix + child)) directories.delete(cached);
+      }
+      setTree([...directories.values()].flat());
+      return entries;
+    },
+    [],
+  );
+  const loadWorkspaceTree = useCallback(
+    async (target: Workspace, scope: number): Promise<void> => {
+      if (target.kind === 'ssh') {
+        await loadRemoteDirectory(target, scope, '');
+        return;
+      }
+      const workspaceTree = await window.workbench.listTree(target.id);
+      if (scope === generation.current) setTree(workspaceTree);
+    },
+    [loadRemoteDirectory],
+  );
   const refreshRuns = async (attempts = 1): Promise<void> => {
     const scope = generation.current;
     for (let attempt = 0; attempt < attempts && scope === generation.current; attempt += 1) {

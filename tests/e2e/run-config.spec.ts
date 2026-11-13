@@ -19,23 +19,32 @@ test.describe('run configuration', () => {
 
   test.beforeAll(async () => {
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-run-params-'));
-    await fs.writeFile(path.join(workspaceDir, 'workflow.yaml'), [
-      'workflow: run-smoke',
-      'nodes:',
-      '  - id: smoke',
-      '    task_type: bash',
-      '    command: echo run-ok',
-      '    depends_on: []',
-      '',
-    ].join('\n'));
+    await fs.writeFile(
+      path.join(workspaceDir, 'workflow.yaml'),
+      [
+        'workflow: run-smoke',
+        'nodes:',
+        '  - id: smoke',
+        '    task_type: bash',
+        '    command: echo run-ok',
+        '    depends_on: []',
+        '',
+      ].join('\n'),
+    );
     await fs.writeFile(path.join(workspaceDir, 'notes.md'), '# Not a workflow\n');
     backendServer = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
       let raw = '';
-      req.on('data', chunk => { raw += chunk; });
+      req.on('data', chunk => {
+        raw += chunk;
+      });
       req.on('end', () => {
         let body: Record<string, unknown> = {};
-        try { body = raw ? JSON.parse(raw) as Record<string, unknown> : {}; } catch { /* keep empty */ }
+        try {
+          body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+        } catch {
+          /* keep empty */
+        }
         if (req.method === 'POST' && req.url === '/api/v1/runs') {
           capturedBodies.push(body);
           if (body['program_path'] === path.join(workspaceDir, 'notes.md')) {
@@ -143,7 +152,9 @@ test.describe('run configuration', () => {
         res.end(JSON.stringify({ detail: `unexpected ${req.method} ${req.url}` }));
       });
     });
-    await new Promise<void>(resolve => { backendServer.listen(0, '127.0.0.1', () => resolve()); });
+    await new Promise<void>(resolve => {
+      backendServer.listen(0, '127.0.0.1', () => resolve());
+    });
     executionBackendUrl = `http://127.0.0.1:${(backendServer.address() as AddressInfo).port}`;
   });
 
@@ -156,7 +167,8 @@ test.describe('run configuration', () => {
     capturedBodies = [];
     app = await launchWorkbench({
       args: ['--no-sandbox', `--user-data-dir=${test.info().outputPath('profile')}`],
-      workspace: workspaceDir, executionUrl: executionBackendUrl,
+      workspace: workspaceDir,
+      executionUrl: executionBackendUrl,
     });
     window = await workbenchPage(app);
     window.on('pageerror', error => console.error(`[renderer:error] ${error.message}`));
@@ -172,7 +184,10 @@ test.describe('run configuration', () => {
   });
 
   test('starts Graph with fixed parameters, variables and max parallel', async () => {
-    await window.locator('.file-list').getByRole('button', { name: /workflow\.yaml/ }).click();
+    await window
+      .locator('.file-list')
+      .getByRole('button', { name: /workflow\.yaml/ })
+      .click();
     await expect(window.getByRole('heading', { name: 'workflow.yaml', exact: true })).toBeVisible();
     await window.locator('.rail-item', { hasText: '运行' }).click();
     await expect(window.getByLabel('运行时', { exact: true })).toHaveValue('workflow');
@@ -240,7 +255,10 @@ test.describe('run configuration', () => {
   });
 
   test('displays the backend error for a file that is not a workflow', async () => {
-    await window.locator('.file-list').getByRole('button', { name: /notes\.md/ }).click();
+    await window
+      .locator('.file-list')
+      .getByRole('button', { name: /notes\.md/ })
+      .click();
     await window.getByRole('button', { name: '运行', exact: true }).click();
     await window.getByRole('button', { name: '运行工作流' }).click();
     await expect(window.locator('.run-list-error')).toContainText('工作流文件缺少节点定义');

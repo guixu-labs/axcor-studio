@@ -37,7 +37,9 @@ test('opens an SSH workspace, saves and runs remotely, then reconnects with its 
   // Exercise the desktop SSH process boundary with the real file helper and a
   // TCP forwarder. A real host and SSH credentials are not required in CI.
   const ssh = path.join(bin, 'ssh');
-  await writeFile(ssh, `#!${process.execPath}
+  await writeFile(
+    ssh,
+    `#!${process.execPath}
 const { spawn } = require('node:child_process');
 const { writeFileSync } = require('node:fs');
 const net = require('node:net');
@@ -64,11 +66,18 @@ Promise.all(forwards.map(forward => new Promise(resolve => {
   });
   helper.on('exit', code => process.exit(code ?? 1));
 });
-`);
+`,
+  );
   await chmod(ssh, 0o755);
   const insight = path.join(bin, 'context-insight');
-  const transcript = { source: 'claude-jsonl', sessionId: 'sdk-remote', filePath: '/remote/.claude/sdk-remote.jsonl' };
-  await writeFile(insight, `#!${process.execPath}
+  const transcript = {
+    source: 'claude-jsonl',
+    sessionId: 'sdk-remote',
+    filePath: '/remote/.claude/sdk-remote.jsonl',
+  };
+  await writeFile(
+    insight,
+    `#!${process.execPath}
 const http = require('node:http');
 const { writeFileSync } = require('node:fs');
 if (process.env.CONTEXT_NO_BROWSER !== '1') process.exit(2);
@@ -93,7 +102,8 @@ http.createServer((request, response) => {
 }).listen(Number(process.env.CONTEXT_INSIGHT_PORT), '127.0.0.1', () => {
   writeFileSync(${JSON.stringify(insightPidFile)}, String(process.pid));
 });
-`);
+`,
+  );
   await chmod(insight, 0o755);
   const insightReservation = net.createServer();
   await new Promise<void>(resolve => insightReservation.listen(0, '127.0.0.1', resolve));
@@ -112,16 +122,29 @@ http.createServer((request, response) => {
   let stopped = false;
   let sessionStarted = false;
   const run = {
-    run_id: 'graph-remote', kind: 'workflow', format: 'graph-yaml@1', status: 'running',
-    program_ref: 'workflow.yaml', label: 'Remote Graph', work_dir: workspace, params: {},
-    created_at: '2026-11-12T01:00:00Z', member_count: 1, running_count: 1,
+    run_id: 'graph-remote',
+    kind: 'workflow',
+    format: 'graph-yaml@1',
+    status: 'running',
+    program_ref: 'workflow.yaml',
+    label: 'Remote Graph',
+    work_dir: workspace,
+    params: {},
+    created_at: '2026-11-12T01:00:00Z',
+    member_count: 1,
+    running_count: 1,
   };
   const session = {
-    id: 'session-remote', name: 'Remote session', state: 'running', created_at_iso: run.created_at,
+    id: 'session-remote',
+    name: 'Remote session',
+    state: 'running',
+    created_at_iso: run.created_at,
   };
   const server = http.createServer(async (request, response) => {
     response.setHeader('content-type', 'application/json');
-    const reply = (value: unknown): void => { response.end(JSON.stringify(value)); };
+    const reply = (value: unknown): void => {
+      response.end(JSON.stringify(value));
+    };
     const url = new URL(request.url ?? '/', 'http://fixture');
     const current = stopped ? { ...run, status: 'stopped' } : run;
     if (request.method === 'POST') {
@@ -144,24 +167,51 @@ http.createServer((request, response) => {
         return;
       }
     } else {
-      if (url.pathname === '/api/v1/runs') { reply({ runs: posts.length ? [current] : [] }); return; }
-      if (url.pathname === '/api/v1/runs/graph-remote') { reply({ run: current, sessions: [] }); return; }
+      if (url.pathname === '/api/v1/runs') {
+        reply({ runs: posts.length ? [current] : [] });
+        return;
+      }
+      if (url.pathname === '/api/v1/runs/graph-remote') {
+        reply({ run: current, sessions: [] });
+        return;
+      }
       if (url.pathname === '/api/v1/runs/graph-remote/events') {
         const cursor = url.searchParams.get('cursor');
         cursors.push(cursor);
-        reply({ next_cursor: 'first-event', limit: 200, events: cursor ? [] : [{
-          id: 1, run_id: run.run_id, timestamp: run.created_at, event_type: 'process_output',
-          data: { message: 'server-log' }, source: 'run_events',
-        }] });
+        reply({
+          next_cursor: 'first-event',
+          limit: 200,
+          events: cursor
+            ? []
+            : [
+                {
+                  id: 1,
+                  run_id: run.run_id,
+                  timestamp: run.created_at,
+                  event_type: 'process_output',
+                  data: { message: 'server-log' },
+                  source: 'run_events',
+                },
+              ],
+        });
         return;
       }
-      if (url.pathname === '/api/v1/sessions') { reply(sessionStarted ? [session] : []); return; }
-      if (url.pathname === '/api/v1/sessions/session-remote') { reply(session); return; }
+      if (url.pathname === '/api/v1/sessions') {
+        reply(sessionStarted ? [session] : []);
+        return;
+      }
+      if (url.pathname === '/api/v1/sessions/session-remote') {
+        reply(session);
+        return;
+      }
       if (url.pathname === '/api/v1/sessions/session-remote/transcript-source') {
         reply({ ok: true, ...transcript });
         return;
       }
-      if (url.pathname === '/api/v1/events') { reply({ cursor: 'session-event', events: [] }); return; }
+      if (url.pathname === '/api/v1/events') {
+        reply({ cursor: 'session-event', events: [] });
+        return;
+      }
       if (url.pathname === '/api/v1/auth/status') {
         reply({ providers: [{ index: 1, status: 'active', runtime: 'claude_sdk', model: 'fixture-model' }] });
         return;
@@ -175,7 +225,9 @@ http.createServer((request, response) => {
   });
   const controller = path.join(bin, 'workflow-controller');
   const healthyController = path.join(bin, 'workflow-controller-ready');
-  await writeFile(healthyController, `#!${process.execPath}
+  await writeFile(
+    healthyController,
+    `#!${process.execPath}
 const net = require('node:net');
 const { writeFileSync } = require('node:fs');
 const args = process.argv.slice(2);
@@ -191,15 +243,18 @@ net.createServer(socket => {
   socket.on('close', () => target.destroy());
   target.on('close', () => socket.destroy());
 }).listen(port, '127.0.0.1', () => writeFileSync(${JSON.stringify(controllerPidFile)}, String(process.pid)));
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const env = { ...process.env, HOME: scratch, PATH: bin + path.delimiter + (process.env.PATH ?? '') };
   Reflect.deleteProperty(env, 'WORKFLOW_CONTROLLER_INSIGHT_PORT');
-  const launch = () => launchWorkbench({
-    args: ['--no-sandbox', `--user-data-dir=${path.join(scratch, 'profile')}`],
-    executionUrl: 'http://127.0.0.1:1',
-    insightPort: 1,
-    env,
-  });
+  const launch = () =>
+    launchWorkbench({
+      args: ['--no-sandbox', `--user-data-dir=${path.join(scratch, 'profile')}`],
+      executionUrl: 'http://127.0.0.1:1',
+      insightPort: 1,
+      env,
+    });
   let app: ElectronApplication | undefined;
   try {
     app = await launch();
@@ -211,9 +266,13 @@ net.createServer(socket => {
     expect(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe('dark');
     await expect(form).toHaveTitle('打开远程工作区');
     const nativeWindow = await app.browserWindow(form);
-    expect(await nativeWindow.evaluate((child: BrowserWindow) => ({
-      hasParent: Boolean(child.getParentWindow()), modal: child.isModal(), movable: child.isMovable(),
-    }))).toEqual({ hasParent: true, modal: false, movable: true });
+    expect(
+      await nativeWindow.evaluate((child: BrowserWindow) => ({
+        hasParent: Boolean(child.getParentWindow()),
+        modal: child.isModal(),
+        movable: child.isMovable(),
+      })),
+    ).toEqual({ hasParent: true, modal: false, movable: true });
     if (process.platform === 'darwin') {
       expect(
         await nativeWindow.evaluate((child: BrowserWindow) => {
@@ -291,9 +350,12 @@ net.createServer(socket => {
       // The fixture runs the helper on macOS too, where Linux inotify is unavailable.
       const id = await page.evaluate(async () => (await window.workbench.getWorkspace())?.id);
       const native = await app!.browserWindow(page);
-      await native.evaluate((window: BrowserWindow, args) => {
-        window.webContents.send('workspace:files-changed', args.id, { paths: args.paths, tree: args.tree });
-      }, { id, paths, tree });
+      await native.evaluate(
+        (window: BrowserWindow, args) => {
+          window.webContents.send('workspace:files-changed', args.id, { paths: args.paths, tree: args.tree });
+        },
+        { id, paths, tree },
+      );
     };
     await writeFile(file, 'name: updated by watcher');
     await writeFile(path.join(workspace, 'nested', 'watch-added.txt'), 'new');
@@ -306,7 +368,10 @@ net.createServer(socket => {
       await page.locator('.monaco-editor').click();
       await page.keyboard.press('ControlOrMeta+a');
       await page.keyboard.type(value);
-      await expect(page.getByRole('tab', { name: 'workflow.yaml' })).toHaveAttribute('aria-description', '有未保存的修改');
+      await expect(page.getByRole('tab', { name: 'workflow.yaml' })).toHaveAttribute(
+        'aria-description',
+        '有未保存的修改',
+      );
     };
     await edit('name: saved before graph');
     await page.getByRole('button', { name: '运行', exact: true }).click();
@@ -345,8 +410,11 @@ net.createServer(socket => {
     await expect.poll(() => posts[1]).toMatchObject({ project_dir: workspace, prompt: 'Run on the server' });
     await expect(page.getByRole('tab', { name: 'Remote session' })).toBeVisible();
     const remoteInsightLoaded = async (route: string): Promise<boolean> =>
-      app!.evaluate(({ webContents }, target) => webContents.getAllWebContents().some(web =>
-        web.getURL().endsWith(target) && !web.isLoadingMainFrame()), route);
+      app!.evaluate(
+        ({ webContents }, target) =>
+          webContents.getAllWebContents().some(web => web.getURL().endsWith(target) && !web.isLoadingMainFrame()),
+        route,
+      );
     await page.getByRole('button', { name: '在 Insight 中查看' }).click();
     await expect.poll(() => remoteInsightLoaded('/run/solo:sdk-remote')).toBe(true);
     expect(JSON.parse(await readFile(insightImportFile, 'utf8'))).toEqual(transcript);

@@ -79,7 +79,8 @@ function buildTopology(events: RunEvent[]) {
     if (!id) continue;
     const eventKey = scopedKey(event, id);
     const key = aliases.get(eventKey) ?? eventKey;
-    if (isTask && (data.task_type === 'local_bash' || (data.task_type !== 'local_agent' && !nodes.has(key)))) continue;
+    if (isTask && (data.task_type === 'local_bash' || (data.task_type !== 'local_agent' && !nodes.has(key))))
+      continue;
 
     const node = getNode(key, id);
     node.id = id;
@@ -104,7 +105,10 @@ function buildTopology(events: RunEvent[]) {
     let parent = node.parent && nodes.has(node.parent) ? node.parent : undefined;
     const seen = new Set([node.key]);
     for (let ancestor = parent; ancestor; ancestor = nodes.get(ancestor)?.parent) {
-      if (seen.has(ancestor)) { parent = undefined; break; }
+      if (seen.has(ancestor)) {
+        parent = undefined;
+        break;
+      }
       seen.add(ancestor);
     }
     const branch = children.get(parent) ?? [];
@@ -125,28 +129,43 @@ function Branch({
 }): JSX.Element | null {
   const nodes = children.get(parent);
   if (!nodes?.length) return null;
-  return <ul className="run-agent-branches">{nodes.map(node => <li key={node.key}>
-    <div className="run-agent-node">
-      <div className="run-agent-name">
-        <strong title={node.name || node.type || node.id}>{node.name || node.type || labels.subagentCall}</strong>
-        <small title={node.id}>{node.name && node.type ? node.type : node.id}</small>
-      </div>
-      <span className={'status-badge' + (node.status ? ' status-' + node.status : '')}>
-        <i aria-hidden="true" />{node.status ? labels.status[node.status] : labels.subagentDispatched}
-      </span>
-    </div>
-    <Branch children={children} parent={node.key} labels={labels} />
-  </li>)}</ul>;
+  return (
+    <ul className="run-agent-branches">
+      {nodes.map(node => (
+        <li key={node.key}>
+          <div className="run-agent-node">
+            <div className="run-agent-name">
+              <strong title={node.name || node.type || node.id}>
+                {node.name || node.type || labels.subagentCall}
+              </strong>
+              <small title={node.id}>{node.name && node.type ? node.type : node.id}</small>
+            </div>
+            <span className={'status-badge' + (node.status ? ' status-' + node.status : '')}>
+              <i aria-hidden="true" />
+              {node.status ? labels.status[node.status] : labels.subagentDispatched}
+            </span>
+          </div>
+          <Branch children={children} parent={node.key} labels={labels} />
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function RunSubagentTopology({ events, labels }: { events: RunEvent[]; labels: Labels }): JSX.Element | null {
   const { children, count } = useMemo(() => buildTopology(events), [events]);
   if (!count) return null;
-  return <section className="run-subagents" aria-labelledby="run-agent-topology-title">
-    <h3 id="run-agent-topology-title">{labels.subagents} <span>{count}</span></h3>
-    <div className="run-agent-tree">
-      <div className="run-agent-node run-agent-root"><strong>{labels.mainAgent}</strong></div>
-      <Branch children={children} labels={labels} />
-    </div>
-  </section>;
+  return (
+    <section className="run-subagents" aria-labelledby="run-agent-topology-title">
+      <h3 id="run-agent-topology-title">
+        {labels.subagents} <span>{count}</span>
+      </h3>
+      <div className="run-agent-tree">
+        <div className="run-agent-node run-agent-root">
+          <strong>{labels.mainAgent}</strong>
+        </div>
+        <Branch children={children} labels={labels} />
+      </div>
+    </section>
+  );
 }

@@ -8,8 +8,13 @@ const POLL_INTERVAL_MS = 1_000;
 const POLL_PAGE_SIZE = 200;
 
 function isThinkingTokenNotification(type: string, payload: unknown): boolean {
-  return type === 'notification' && typeof payload === 'object' && payload !== null
-    && 'subtype' in payload && payload.subtype === 'thinking_tokens';
+  return (
+    type === 'notification' &&
+    typeof payload === 'object' &&
+    payload !== null &&
+    'subtype' in payload &&
+    payload.subtype === 'thinking_tokens'
+  );
 }
 
 class EventPoller {
@@ -25,7 +30,9 @@ class EventPoller {
 
   start(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => { void this.poll(); }, POLL_INTERVAL_MS);
+    this.timer = setInterval(() => {
+      void this.poll();
+    }, POLL_INTERVAL_MS);
     void this.poll();
   }
 

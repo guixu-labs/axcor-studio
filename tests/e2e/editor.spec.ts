@@ -45,7 +45,10 @@ test.describe('monaco editor', () => {
     await window.getByRole('button', { name: '关闭 workflow.md', exact: true }).click();
     await expect(window.locator('.workspace-grid .empty-panel')).toBeVisible();
     await expect(window.getByRole('tab')).toHaveCount(0);
-    await window.locator('.file-list').getByRole('button', { name: /workflow\.md/ }).click();
+    await window
+      .locator('.file-list')
+      .getByRole('button', { name: /workflow\.md/ })
+      .click();
     await expect(window.locator('.view-lines', { hasText: 'New workflow' })).toBeVisible();
   });
 
@@ -61,7 +64,9 @@ test.describe('monaco editor', () => {
     const iconX = await workspace.evaluate(node => node.getBoundingClientRect().left);
     await workspace.click();
     await expect(explorer).toBeHidden();
-    const collapsedEdge = await window.locator('.left-workbench').evaluate(node => node.getBoundingClientRect().right);
+    const collapsedEdge = await window
+      .locator('.left-workbench')
+      .evaluate(node => node.getBoundingClientRect().right);
     expect(collapsedEdge).toBe(dividerX);
     expect(await workspace.evaluate(node => node.getBoundingClientRect().left)).toBe(iconX);
     await expect(workspace).not.toHaveAttribute('aria-current', 'page');
@@ -106,7 +111,10 @@ test.describe('monaco editor', () => {
     await close.click();
     await dialog.getByRole('button', { name: '不保存', exact: true }).click();
     await expect(tab).toHaveCount(0);
-    await window.locator('.file-list').getByRole('button', { name: /workflow\.md/ }).click();
+    await window
+      .locator('.file-list')
+      .getByRole('button', { name: /workflow\.md/ })
+      .click();
     await expect(window.locator('.view-lines')).toContainText(original.trim());
 
     await edit('# Save this draft');
@@ -123,7 +131,10 @@ test.describe('monaco editor', () => {
     await window.keyboard.press('ControlOrMeta+a');
     await window.keyboard.insertText('# Hello workflow');
     await expect(window.locator('.view-lines', { hasText: '# Hello workflow' })).toBeVisible();
-    await window.locator('.file-list').getByRole('button', { name: /z-notes\.md/ }).click();
+    await window
+      .locator('.file-list')
+      .getByRole('button', { name: /z-notes\.md/ })
+      .click();
     await expect(window.locator('.view-lines', { hasText: '# Notes' })).toBeVisible();
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');

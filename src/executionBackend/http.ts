@@ -164,11 +164,17 @@ export async function listRuns(): Promise<Run[]> {
 
 export async function getRun(runId: string): Promise<Run> {
   if (sessionRunIds.has(runId)) {
-    const session = await backendRequest<BackendSessionRecord>('GET', `/api/v1/sessions/${encodeURIComponent(runId)}`);
+    const session = await backendRequest<BackendSessionRecord>(
+      'GET',
+      `/api/v1/sessions/${encodeURIComponent(runId)}`,
+    );
     return mapSession(session);
   }
   try {
-    const response = await backendRequest<BackendRunDetailResponse>('GET', `/api/v1/runs/${encodeURIComponent(runId)}`);
+    const response = await backendRequest<BackendRunDetailResponse>(
+      'GET',
+      `/api/v1/runs/${encodeURIComponent(runId)}`,
+    );
     return mapRun(response.run);
   } catch (error) {
     if (error instanceof ExecutionBackendApiError && error.status === 404) {
@@ -249,7 +255,11 @@ export async function injectSessionPrompt(runId: string, sessionId: string, prom
 export async function importSessionToInsight(sessionId: string, insightUrl: string): Promise<InsightImportResult> {
   const signal = requests.signal;
   const transcript = await backendRequest<{
-    ok: boolean; source?: string; sessionId?: string; filePath?: string; error?: string;
+    ok: boolean;
+    source?: string;
+    sessionId?: string;
+    filePath?: string;
+    error?: string;
   }>('GET', `/api/v1/sessions/${encodeURIComponent(sessionId)}/transcript-source`).catch(error => {
     if (error instanceof ExecutionBackendApiError && error.status === 404) {
       throw new Error('升级 Workflow Controller 后重试。当前版本缺少会话转录源接口。');
@@ -261,9 +271,15 @@ export async function importSessionToInsight(sessionId: string, insightUrl: stri
   if (!transcript?.ok || !transcript.source || !transcript.sessionId || !transcript.filePath) {
     throw new Error('Workflow Controller 未返回有效的会话转录源。');
   }
-  return importInsightTranscript(insightUrl, {
-    source: transcript.source, sessionId: transcript.sessionId, filePath: transcript.filePath,
-  }, signal);
+  return importInsightTranscript(
+    insightUrl,
+    {
+      source: transcript.source,
+      sessionId: transcript.sessionId,
+      filePath: transcript.filePath,
+    },
+    signal,
+  );
 }
 
 export async function listProviders(): Promise<ProviderKey[]> {
@@ -272,14 +288,16 @@ export async function listProviders(): Promise<ProviderKey[]> {
 }
 
 export async function listSessionModels(runtime: string): Promise<SessionModelOption[]> {
-  const result = await backendRequest<{ providers?: Array<{
-    index: number;
-    runtime?: string;
-    model?: string;
-    status: string;
-    is_active?: boolean;
-    worker_validation?: ProviderValidation;
-  }> }>('GET', '/api/v1/auth/status');
+  const result = await backendRequest<{
+    providers?: Array<{
+      index: number;
+      runtime?: string;
+      model?: string;
+      status: string;
+      is_active?: boolean;
+      worker_validation?: ProviderValidation;
+    }>;
+  }>('GET', '/api/v1/auth/status');
   const models = new Map<string, SessionModelOption>();
   for (const provider of result.providers ?? []) {
     const model = provider.model?.trim();

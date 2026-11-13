@@ -13,10 +13,17 @@ test('lists named SSH hosts from the user config and nested Include files', asyn
   const includes = path.join(sshDir, 'team configs');
   assert.deepEqual(await listSshHosts(home), []);
   await fs.mkdir(includes, { recursive: true });
-  await fs.writeFile(path.join(sshDir, 'config'), [
-    '# Host comment', 'Host * !excluded test-??', 'Host = "dev-box" another # ignored',
-    'Include "team configs/*.conf" missing.conf', 'Match all', '  ServerAliveInterval 10',
-  ].join('\n'));
+  await fs.writeFile(
+    path.join(sshDir, 'config'),
+    [
+      '# Host comment',
+      'Host * !excluded test-??',
+      'Host = "dev-box" another # ignored',
+      'Include "team configs/*.conf" missing.conf',
+      'Match all',
+      '  ServerAliveInterval 10',
+    ].join('\n'),
+  );
   await fs.writeFile(path.join(includes, 'staging.conf'), 'host Staging DEV-BOX\nInclude config\n');
   await fs.writeFile(path.join(includes, 'ignored.txt'), 'Host ignored-file\n');
   assert.deepEqual(await listSshHosts(home), ['another', 'dev-box', 'Staging']);

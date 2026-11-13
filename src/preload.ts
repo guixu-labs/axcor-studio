@@ -7,19 +7,29 @@ import type { StartupBridge, StartupState } from './shared/startup';
 const startup: StartupBridge = {
   chooseLocal: () => ipcRenderer.invoke('startup:choose-local'),
   chooseRemote: english => ipcRenderer.invoke('startup:choose-remote', english),
-  submitRemote: config => { ipcRenderer.send('startup:remote-submit', config); },
-  resizeRemote: height => { ipcRenderer.send('startup:remote-resize', height); },
+  submitRemote: config => {
+    ipcRenderer.send('startup:remote-submit', config);
+  },
+  resizeRemote: height => {
+    ipcRenderer.send('startup:remote-resize', height);
+  },
   run: (choice, retry) => ipcRenderer.invoke('startup:run', choice, retry),
   onProgress: listener => {
     const handler = (_event: Electron.IpcRendererEvent, state: StartupState): void => listener(state);
     ipcRenderer.on('startup:progress', handler);
-    return () => { ipcRenderer.removeListener('startup:progress', handler); };
+    return () => {
+      ipcRenderer.removeListener('startup:progress', handler);
+    };
   },
-  workbenchLoaded: error => { ipcRenderer.send('startup:workbench-loaded', error); },
+  workbenchLoaded: error => {
+    ipcRenderer.send('startup:workbench-loaded', error);
+  },
   onWorkbenchFailed: listener => {
     const handler = (_event: Electron.IpcRendererEvent, message: string): void => listener(message);
     ipcRenderer.on('startup:workbench-failed', handler);
-    return () => { ipcRenderer.removeListener('startup:workbench-failed', handler); };
+    return () => {
+      ipcRenderer.removeListener('startup:workbench-failed', handler);
+    };
   },
 };
 contextBridge.exposeInMainWorld('startup', startup);
@@ -39,13 +49,17 @@ const workbench: WorkspaceBridge = {
   onDisconnected: listener => {
     const handler = (_event: Electron.IpcRendererEvent, id: string): void => listener(id);
     ipcRenderer.on('workspace:disconnected', handler);
-    return () => { ipcRenderer.removeListener('workspace:disconnected', handler); };
+    return () => {
+      ipcRenderer.removeListener('workspace:disconnected', handler);
+    };
   },
   onFilesChanged: listener => {
     const handler = (_event: Electron.IpcRendererEvent, id: string, change: WorkspaceFileChange): void =>
       listener(id, change);
     ipcRenderer.on('workspace:files-changed', handler);
-    return () => { ipcRenderer.removeListener('workspace:files-changed', handler); };
+    return () => {
+      ipcRenderer.removeListener('workspace:files-changed', handler);
+    };
   },
 };
 contextBridge.exposeInMainWorld('workbench', workbench);
@@ -95,6 +109,8 @@ contextBridge.exposeInMainWorld('insight', {
   onLoadFailed: (listener: (description: string) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, description: string): void => listener(description);
     ipcRenderer.on('insight:load-failed', handler);
-    return () => { ipcRenderer.removeListener('insight:load-failed', handler); };
+    return () => {
+      ipcRenderer.removeListener('insight:load-failed', handler);
+    };
   },
 });

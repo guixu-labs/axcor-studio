@@ -9,7 +9,11 @@ interface Window {
   workbench: import('./shared/workspace').WorkspaceBridge;
   executionBackend: import('./shared/executionBackendIpc').ExecutionBackendBridge;
   insight: {
-    show(path: string, bounds: { x: number; y: number; width: number; height: number }, isDark: boolean): Promise<void>;
+    show(
+      path: string,
+      bounds: { x: number; y: number; width: number; height: number },
+      isDark: boolean,
+    ): Promise<void>;
     updateBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<void>;
     hide(): Promise<void>;
     onLoadFailed(listener: (description: string) => void): () => void;

@@ -69,7 +69,7 @@ export function StartupScreen(): JSX.Element {
     setChoice(selected);
     setBusy(true);
     setRequestError('');
-    setState(previous => retry ? { ...previous, [retry]: { phase: 'checking' } } : initialStartupState());
+    setState(previous => (retry ? { ...previous, [retry]: { phase: 'checking' } } : initialStartupState()));
     try {
       const result = await window.startup.run(selected, retry);
       setState(result);
@@ -129,7 +129,9 @@ export function StartupScreen(): JSX.Element {
   const title = !choice ? copy.choose : failed ? copy.blockedTitle : ready ? copy.loadingTitle : copy.title;
   return (
     <main className="startup-screen" aria-labelledby="startup-title">
-      <button className="startup-close" type="button" aria-label={copy.close} onClick={() => window.close()}>×</button>
+      <button className="startup-close" type="button" aria-label={copy.close} onClick={() => window.close()}>
+        ×
+      </button>
       <div className="startup-brand">
         <h1 id="startup-title">Axcor Studio</h1>
       </div>
@@ -249,15 +251,24 @@ export function RemoteWorkspaceScreen(): JSX.Element {
     if (!element) return;
     const observer = new ResizeObserver(() => window.startup.resizeRemote(element.getBoundingClientRect().height));
     observer.observe(element);
-    const cancel = (event: KeyboardEvent): void => { if (event.key === 'Escape') window.close(); };
+    const cancel = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') window.close();
+    };
     window.addEventListener('keydown', cancel);
     return () => {
       observer.disconnect();
       window.removeEventListener('keydown', cancel);
     };
   }, [open]);
-  return <main ref={content} className="startup-remote-workspace" aria-label={open}>
-    <RemoteWorkspaceForm english={english} onCancel={() => window.close()}
-      onConnect={async config => { window.startup.submitRemote(config); }} />
-  </main>;
+  return (
+    <main ref={content} className="startup-remote-workspace" aria-label={open}>
+      <RemoteWorkspaceForm
+        english={english}
+        onCancel={() => window.close()}
+        onConnect={async config => {
+          window.startup.submitRemote(config);
+        }}
+      />
+    </main>
+  );
 }

@@ -4,7 +4,6 @@
 
 Axcor Studio 是面向工作流开发者的桌面工作台，贯通了工作流的编写、执行、观测、评测、（自）进化，支持团队间协作开发，为用户提供统一的工作环境。
 
-
 ## 当前功能
 
 - **编写**：打开本地或 SSH 远程工作区，从文件树浏览文件，在标签页中编辑和保存 Markdown、YAML 等文本文件。编辑器支持左右或上下分屏，关闭含有未保存改动的文件时会提示确认。
@@ -71,10 +70,10 @@ HTTP 和 Electron E2E 测试使用本地 fixture，`MockExecutionClient` 用于�
 
 ### 开发者本地打包
 
-| 命令 | 产物 |
-| --- | --- |
-| `npm run package` | 在 `out/` 下生成对应平台的应用目录。 |
-| `npm run make` | 先打包应用，再在 `out/make/` 下生成分发包。 |
+| 命令              | 产物                                        |
+| ----------------- | ------------------------------------------- |
+| `npm run package` | 在 `out/` 下生成对应平台的应用目录。        |
+| `npm run make`    | 先打包应用，再在 `out/make/` 下生成分发包。 |
 
 [Forge 配置](forge.config.ts)启用了 macOS ZIP、Windows Squirrel 和 ZIP，以及 Linux DEB、RPM 和 ZIP。平台配置表示可生成的目标格式，实际分发前需要在目标系统上验证启动。
 
@@ -82,13 +81,13 @@ HTTP 和 Electron E2E 测试使用本地 fixture，`MockExecutionClient` 用于�
 
 ## 技术栈
 
-| 用途 | 技术 |
-| --- | --- |
-| 桌面应用 | Electron、Node.js、TypeScript |
-| 用户界面 | React、CSS |
-| 文件编辑 | Monaco Editor |
-| 服务集成 | Electron IPC、HTTP API、WebContentsView |
-| 构建与分发 | Vite、Electron Forge、npm |
+| 用途           | 技术                                        |
+| -------------- | ------------------------------------------- |
+| 桌面应用       | Electron、Node.js、TypeScript               |
+| 用户界面       | React、CSS                                  |
+| 文件编辑       | Monaco Editor                               |
+| 服务集成       | Electron IPC、HTTP API、WebContentsView     |
+| 构建与分发     | Vite、Electron Forge、npm                   |
 | 测试与代码检查 | Node.js 测试运行器、tsx、Playwright、ESLint |
 
 ## 许可证

@@ -61,9 +61,13 @@ test.describe('execution backend auto-start', () => {
     );
     // Find a free port for the fake backend.
     const probe = http.createServer(() => {});
-    await new Promise<void>(resolve => { probe.listen(0, '127.0.0.1', () => resolve()); });
+    await new Promise<void>(resolve => {
+      probe.listen(0, '127.0.0.1', () => resolve());
+    });
     backendPort = (probe.address() as AddressInfo).port;
-    await new Promise<void>(resolve => { probe.close(() => resolve()); });
+    await new Promise<void>(resolve => {
+      probe.close(() => resolve());
+    });
   });
 
   test.afterAll(async () => {
@@ -101,7 +105,12 @@ test.describe('execution backend auto-start', () => {
     const url = `http://127.0.0.1:${backendPort}/api/v1/runs`;
     let stopped = false;
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      try { await fetch(url, { signal: AbortSignal.timeout(500) }); } catch { stopped = true; break; }
+      try {
+        await fetch(url, { signal: AbortSignal.timeout(500) });
+      } catch {
+        stopped = true;
+        break;
+      }
       await new Promise(resolve => setTimeout(resolve, 200));
     }
     expect(stopped).toBe(true);

@@ -21,13 +21,40 @@ test.describe('provider settings', () => {
     backendServer = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
       let raw = '';
-      req.on('data', chunk => { raw += chunk; });
+      req.on('data', chunk => {
+        raw += chunk;
+      });
       req.on('end', () => {
         let body: Record<string, unknown> = {};
-        try { body = raw ? JSON.parse(raw) as Record<string, unknown> : {}; } catch { /* keep empty */ }
-        const record = (): void => { captured.push({ method: req.method ?? '', url: req.url ?? '', body }); };
+        try {
+          body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+        } catch {
+          /* keep empty */
+        }
+        const record = (): void => {
+          captured.push({ method: req.method ?? '', url: req.url ?? '', body });
+        };
         if (req.method === 'GET' && req.url === '/api/v1/auth/keys') {
-          res.end(JSON.stringify({ keys: [{ key: 'sk-abc123', masked: 'sk-a*****3', provider_index: 0, model: 'claude-sonnet-4-6', base_url: 'https://api.example.com', runtime: 'claude_sdk', worker_validation: { capability: 'worker/claude_sdk', status: 'valid', checked_at: '2026-11-04T20:00:00', error: '' } }] }));
+          res.end(
+            JSON.stringify({
+              keys: [
+                {
+                  key: 'sk-abc123',
+                  masked: 'sk-a*****3',
+                  provider_index: 0,
+                  model: 'claude-sonnet-4-6',
+                  base_url: 'https://api.example.com',
+                  runtime: 'claude_sdk',
+                  worker_validation: {
+                    capability: 'worker/claude_sdk',
+                    status: 'valid',
+                    checked_at: '2026-11-04T20:00:00',
+                    error: '',
+                  },
+                },
+              ],
+            }),
+          );
           return;
         }
         if (req.method === 'POST' && req.url === '/api/v1/auth/keys') {
@@ -67,7 +94,9 @@ test.describe('provider settings', () => {
         res.end(JSON.stringify({ detail: `unexpected ${req.method} ${req.url}` }));
       });
     });
-    await new Promise<void>(resolve => { backendServer.listen(0, '127.0.0.1', () => resolve()); });
+    await new Promise<void>(resolve => {
+      backendServer.listen(0, '127.0.0.1', () => resolve());
+    });
     executionBackendUrl = `http://127.0.0.1:${(backendServer.address() as AddressInfo).port}`;
   });
 
@@ -106,7 +135,10 @@ test.describe('provider settings', () => {
     await expect(cardHead).toContainText('校验通过');
     await expect(card).not.toContainText('sk-a*****3');
     await cardHead.click();
-    await expect(card.locator('.provider-meta > span')).toHaveText(['地址：https://api.example.com', 'API 密钥：sk-a*****3']);
+    await expect(card.locator('.provider-meta > span')).toHaveText([
+      '地址：https://api.example.com',
+      'API 密钥：sk-a*****3',
+    ]);
     await card.getByLabel('显示名称').fill('常用供应商');
     await card.getByRole('button', { name: '保存', exact: true }).click();
     await expect(cardHead).toContainText('常用供应商');

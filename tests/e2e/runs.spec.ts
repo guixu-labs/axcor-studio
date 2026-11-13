@@ -5,10 +5,22 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 const runRecord = {
-  run_id: 'run-a', kind: 'workflow', format: 'markdown', status: 'running',
-  program_ref: 'workflow.md', params: {}, label: 'workflow.md', work_dir: '/tmp/ws',
-  max_parallel: null, pause_reason: null, created_at: '2026-11-03T10:00:00+00:00',
-  finished_at: null, reopened_at: null, error: null, member_count: 1, running_count: 1,
+  run_id: 'run-a',
+  kind: 'workflow',
+  format: 'markdown',
+  status: 'running',
+  program_ref: 'workflow.md',
+  params: {},
+  label: 'workflow.md',
+  work_dir: '/tmp/ws',
+  max_parallel: null,
+  pause_reason: null,
+  created_at: '2026-11-03T10:00:00+00:00',
+  finished_at: null,
+  reopened_at: null,
+  error: null,
+  member_count: 1,
+  running_count: 1,
 };
 
 const sessionRecord = {
@@ -24,10 +36,17 @@ const sessionRecord = {
 };
 
 const assistantEvent = {
-  rowid: 0, session_id: sessionRecord.id, iteration: 2, timestamp: '2026-11-03T10:00:01+00:00',
-  event_type: 'assistant_message', data: { content: [
-    { type: 'thinking', thinking: '先检查入口文件。' }, { type: 'text', text: '已读完工作区文件。' },
-  ] },
+  rowid: 0,
+  session_id: sessionRecord.id,
+  iteration: 2,
+  timestamp: '2026-11-03T10:00:01+00:00',
+  event_type: 'assistant_message',
+  data: {
+    content: [
+      { type: 'thinking', thinking: '先检查入口文件。' },
+      { type: 'text', text: '已读完工作区文件。' },
+    ],
+  },
 };
 
 function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
@@ -53,7 +72,9 @@ function startFixtureBackend(): Promise<{ url: string; close: () => void }> {
     if (req.method === 'GET' && req.url?.startsWith('/api/v1/events?session_id=session-interactive')) {
       const cursor = Number(new URL(req.url, 'http://localhost').searchParams.get('cursor'));
       const events = replies.slice(cursor).map(prompt => ({
-        timestamp: new Date().toISOString(), event_type: 'log_manual', data: { prompt },
+        timestamp: new Date().toISOString(),
+        event_type: 'log_manual',
+        data: { prompt },
       }));
       res.end(JSON.stringify({ cursor: String(replies.length), events }));
       return;
@@ -424,7 +445,9 @@ test.describe('execution runs', () => {
     expect(gap).toBeGreaterThanOrEqual(8);
     await failedTool.locator('summary').click();
     await expect(failedTool.getByText(/检查示例/)).toBeVisible();
-    const dispatch = log.locator('.event').filter({ has: window.locator('.event-content', { hasText: '查询北京天气' }) });
+    const dispatch = log
+      .locator('.event')
+      .filter({ has: window.locator('.event-content', { hasText: '查询北京天气' }) });
     await expect(dispatch.locator('.event-kind')).toHaveText('子代理调用');
     await expect(dispatch.locator('summary')).toHaveText('Agent');
     await expect(dispatch.locator('.event-content')).toBeHidden();
@@ -476,7 +499,9 @@ test.describe('execution runs', () => {
     const logBounds = await log.boundingBox();
     const overviewBounds = await overview.boundingBox();
     expect(logBounds!.x + logBounds!.width).toBeLessThan(overviewBounds!.x);
-    await log.evaluate(node => { node.scrollTop = 0; });
+    await log.evaluate(node => {
+      node.scrollTop = 0;
+    });
     await log.hover();
     await window.mouse.wheel(0, 450);
     await expect.poll(() => log.evaluate(node => node.scrollTop)).toBeGreaterThan(0);

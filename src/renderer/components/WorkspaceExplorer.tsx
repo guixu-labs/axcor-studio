@@ -66,13 +66,14 @@ export function WorkspaceExplorer({
 }: WorkspaceExplorerProps): JSX.Element {
   const roots = useMemo(() => buildTree(tree), [tree]);
   const topLevelDirs = new Set(roots.filter(node => node.type === 'dir').map(node => node.path));
-  const [expanded, setExpanded] = useState<Set<string>>(() => onExpand ? new Set() : topLevelDirs);
+  const [expanded, setExpanded] = useState<Set<string>>(() => (onExpand ? new Set() : topLevelDirs));
 
   const toggle = (path: string): void => {
     if (!expanded.has(path)) onExpand?.(path);
     setExpanded(previous => {
       const next = new Set(previous);
-      if (next.has(path)) next.delete(path); else next.add(path);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
       return next;
     });
   };

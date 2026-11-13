@@ -2,7 +2,11 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
-import { DEFAULT_REMOTE_INSIGHT_PORT, type RemoteWorkspaceConfig, type WorkspaceFileChange } from './shared/workspace';
+import {
+  DEFAULT_REMOTE_INSIGHT_PORT,
+  type RemoteWorkspaceConfig,
+  type WorkspaceFileChange,
+} from './shared/workspace';
 import { ServiceStartupError } from './serviceStartupError';
 import { splitSshDestination } from './sshConfig';
 import { probeInsight } from './observability/insightService';
@@ -83,7 +87,7 @@ async function availablePort(): Promise<number> {
     socket.once('error', reject);
     socket.listen(0, '127.0.0.1', () => {
       const port = (socket.address() as net.AddressInfo).port;
-      socket.close(error => error ? reject(error) : resolve(port));
+      socket.close(error => (error ? reject(error) : resolve(port)));
     });
   });
 }
@@ -102,22 +106,51 @@ export class SshWorkspace {
   private readonly remoteInsightPort: number;
 
   private constructor(
-    config: RemoteWorkspaceConfig, helper: string, port: number, insightPort: number,
+    config: RemoteWorkspaceConfig,
+    helper: string,
+    port: number,
+    insightPort: number,
     private readonly onClose: (session: SshWorkspace) => void,
   ) {
     this.url = `http://127.0.0.1:${port}`;
     this.insightUrl = `http://127.0.0.1:${insightPort}`;
     this.remoteInsightPort = config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT;
-    this.child = spawn('ssh', [
-      '-T', '-S', 'none', '-o', 'ForkAfterAuthentication=no', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
-      '-o', 'ForwardAgent=no', '-o', 'ExitOnForwardFailure=yes', '-o', 'ConnectTimeout=8',
-      '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=2',
-      '-L', `127.0.0.1:${port}:127.0.0.1:${config.controllerPort}`,
-      '-L', `127.0.0.1:${insightPort}:127.0.0.1:${this.remoteInsightPort}`,
-      ...(config.sshPort === undefined ? [] : ['-p', String(config.sshPort)]),
-      '--', config.host, HELPER_COMMAND,
-    ], { stdio: ['pipe', 'pipe', 'pipe'] });
-    this.child.stderr.on('data', (chunk: Buffer) => { this.stderr = (this.stderr + chunk.toString()).slice(-2000); });
+    this.child = spawn(
+      'ssh',
+      [
+        '-T',
+        '-S',
+        'none',
+        '-o',
+        'ForkAfterAuthentication=no',
+        '-o',
+        'BatchMode=yes',
+        '-o',
+        'StrictHostKeyChecking=yes',
+        '-o',
+        'ForwardAgent=no',
+        '-o',
+        'ExitOnForwardFailure=yes',
+        '-o',
+        'ConnectTimeout=8',
+        '-o',
+        'ServerAliveInterval=5',
+        '-o',
+        'ServerAliveCountMax=2',
+        '-L',
+        `127.0.0.1:${port}:127.0.0.1:${config.controllerPort}`,
+        '-L',
+        `127.0.0.1:${insightPort}:127.0.0.1:${this.remoteInsightPort}`,
+        ...(config.sshPort === undefined ? [] : ['-p', String(config.sshPort)]),
+        '--',
+        config.host,
+        HELPER_COMMAND,
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    this.child.stderr.on('data', (chunk: Buffer) => {
+      this.stderr = (this.stderr + chunk.toString()).slice(-2000);
+    });
     this.child.stdin.on('error', () => this.finish());
     this.child.once('error', error => this.finish(error));
     this.child.once('close', () => this.finish());
@@ -148,10 +181,15 @@ export class SshWorkspace {
 
   readonly url: string;
   readonly insightUrl: string;
-  get connected(): boolean { return !this.closed; }
+  get connected(): boolean {
+    return !this.closed;
+  }
 
   static async connect(
-    config: RemoteWorkspaceConfig, helper: string, onClose: (session: SshWorkspace) => void, onStarting?: () => void,
+    config: RemoteWorkspaceConfig,
+    helper: string,
+    onClose: (session: SshWorkspace) => void,
+    onStarting?: () => void,
   ): Promise<SshWorkspace> {
     const port = await availablePort();
     let insightPort = await availablePort();
@@ -193,7 +231,10 @@ export class SshWorkspace {
   }
 
   private async ensureService(
-    service: 'controller' | 'insight', port: number, probe: () => Promise<boolean>, onStarting?: () => void,
+    service: 'controller' | 'insight',
+    port: number,
+    probe: () => Promise<boolean>,
+    onStarting?: () => void,
   ): Promise<void> {
     const signal = this.lifetime.signal;
     const ready = async (): Promise<boolean> => {
@@ -265,5 +306,7 @@ export class SshWorkspace {
     this.onClose(this);
   }
 
-  close(): void { this.finish(); }
+  close(): void {
+    this.finish();
+  }
 }

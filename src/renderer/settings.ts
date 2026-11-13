@@ -6,7 +6,11 @@ export interface ThemeDefinition {
   tokens: Record<string, string>;
 }
 
-export interface FontDefinition { id: string; label: string; family: string; }
+export interface FontDefinition {
+  id: string;
+  label: string;
+  family: string;
+}
 
 // Palettes aligned with the opsbot reference frontend (feat/reasoning-0day-adaptation,
 // src/opsbot/web/frontend/src/composables/useAppearance.ts): same theme ids, labels
@@ -217,7 +221,11 @@ export const fonts: FontDefinition[] = [
   { id: 'source-han-sans', label: '思源黑体', family: '"Source Han Sans SC", "Noto Sans CJK SC", sans-serif' },
   { id: 'pingfang', label: '苹方', family: 'PingFang SC, sans-serif' },
   { id: 'microsoft-yahei', label: '微软雅黑', family: 'Microsoft YaHei, sans-serif' },
-  { id: 'jetbrains-mono', label: 'JetBrains Mono', family: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace' },
+  {
+    id: 'jetbrains-mono',
+    label: 'JetBrains Mono',
+    family: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
+  },
 ];
 
 export const defaultTheme = themes.find(theme => theme.id === 'github-dark') ?? themes[0];

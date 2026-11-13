@@ -33,10 +33,16 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
   const requests: CapturedRequest[] = [];
   const server = http.createServer((req, res) => {
     let raw = '';
-    req.on('data', chunk => { raw += chunk; });
+    req.on('data', chunk => {
+      raw += chunk;
+    });
     req.on('end', () => {
       let body: Record<string, unknown> = {};
-      try { body = raw ? JSON.parse(raw) as Record<string, unknown> : {}; } catch { /* keep empty */ }
+      try {
+        body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      } catch {
+        /* keep empty */
+      }
       requests.push({ method: req.method ?? '', url: req.url ?? '', body });
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'POST' && req.url === '/api/v1/runs') {
@@ -161,7 +167,21 @@ function createFixtureServer(): { server: http.Server; baseUrl: string; requests
         return;
       }
       if (req.method === 'GET' && req.url === '/api/v1/auth/keys') {
-        res.end(JSON.stringify({ keys: [{ key: 'sk-abc123', masked: 'sk-a*****3', provider_index: 0, model: 'claude-sonnet-4-6', base_url: 'https://api.example.com', runtime: 'claude_sdk', worker_validation: { success: true } }] }));
+        res.end(
+          JSON.stringify({
+            keys: [
+              {
+                key: 'sk-abc123',
+                masked: 'sk-a*****3',
+                provider_index: 0,
+                model: 'claude-sonnet-4-6',
+                base_url: 'https://api.example.com',
+                runtime: 'claude_sdk',
+                worker_validation: { success: true },
+              },
+            ],
+          }),
+        );
         return;
       }
       if (req.method === 'POST' && req.url === '/api/v1/auth/keys') {
@@ -451,12 +471,15 @@ test('execution backend HTTP client', async t => {
     await sendSessionReply('sess-1', ' 请继续检查 ');
     await stopRun('sess-1');
     const posts = fixture.requests.slice(before).filter(request => request.method === 'POST');
-    assert.deepEqual(posts.map(request => [request.url, request.body]), [
-      ['/api/v1/runs/run-1/sessions/sess-1/pause', {}],
-      ['/api/v1/runs/run-1/sessions/sess-1/resume', {}],
-      ['/api/v1/runs/run-1/sessions/sess-1/send', { prompt: '请继续检查' }],
-      ['/api/v1/runs/run-1/sessions/sess-1/stop', {}],
-    ]);
+    assert.deepEqual(
+      posts.map(request => [request.url, request.body]),
+      [
+        ['/api/v1/runs/run-1/sessions/sess-1/pause', {}],
+        ['/api/v1/runs/run-1/sessions/sess-1/resume', {}],
+        ['/api/v1/runs/run-1/sessions/sess-1/send', { prompt: '请继续检查' }],
+        ['/api/v1/runs/run-1/sessions/sess-1/stop', {}],
+      ],
+    );
   });
 
   await t.test('listProviders maps the provider rows', async () => {
@@ -468,7 +491,9 @@ test('execution backend HTTP client', async t => {
   });
 
   await t.test('saveProviders posts the full key list', async () => {
-    const result = await saveProviders([{ key: 'sk-new', model: 'claude-opus', base_url: 'https://x', runtime: 'opencode' }]);
+    const result = await saveProviders([
+      { key: 'sk-new', model: 'claude-opus', base_url: 'https://x', runtime: 'opencode' },
+    ]);
     assert.equal(result.ok, true);
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/auth/keys');
     assert.ok(post);
@@ -517,13 +542,18 @@ test('execution backend HTTP client', async t => {
     subtest.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
     await assert.rejects(
       () => listRuns(),
-      (error: ExecutionBackendApiError) => error instanceof ExecutionBackendApiError && error.status === 404 &&
-        error.message.includes(DEFAULT_EXECUTION_BACKEND_URL) && error.message.includes('GET /api/v1/runs'),
+      (error: ExecutionBackendApiError) =>
+        error instanceof ExecutionBackendApiError &&
+        error.status === 404 &&
+        error.message.includes(DEFAULT_EXECUTION_BACKEND_URL) &&
+        error.message.includes('GET /api/v1/runs'),
     );
   });
 
   await t.test('unreachable backend reports a connection error', async subtest => {
-    subtest.mock.method(globalThis, 'fetch', async () => { throw new Error('Connection refused'); });
+    subtest.mock.method(globalThis, 'fetch', async () => {
+      throw new Error('Connection refused');
+    });
     await assert.rejects(
       () => listRuns(),
       (error: ExecutionBackendApiError) =>

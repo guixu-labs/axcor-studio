@@ -6,7 +6,11 @@ import type { Messages } from '../i18n';
 type Labels = Messages['runDetail'];
 type Payload = Record<string, unknown>;
 
-interface Block { text: string; label?: 'thinking' | 'toolInput' | 'toolResult'; code?: boolean; }
+interface Block {
+  text: string;
+  label?: 'thinking' | 'toolInput' | 'toolResult';
+  code?: boolean;
+}
 interface ToolCall {
   event: RunEvent;
   name?: string;
@@ -48,7 +52,10 @@ function payloadText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value == null) return '';
   if (Array.isArray(value)) {
-    const text = value.map(item => nonempty(record(item)?.text)).filter(Boolean).join('\n');
+    const text = value
+      .map(item => nonempty(record(item)?.text))
+      .filter(Boolean)
+      .join('\n');
     if (text) return text;
   }
   return JSON.stringify(value, null, 2) ?? '';
@@ -216,9 +223,14 @@ function buildLog(events: RunEvent[], labels: Labels): LogEntry[] {
 const LogRow = memo(function LogRow({ row, labels }: { row: LogEntry; labels: Labels }): JSX.Element {
   const { event } = row;
   const timestamp = new Date(event.timestamp);
-  const time = Number.isNaN(timestamp.getTime()) ? event.timestamp : timestamp.toLocaleTimeString(undefined, {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  });
+  const time = Number.isNaN(timestamp.getTime())
+    ? event.timestamp
+    : timestamp.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+      });
   const preview = row.preview.trim().split(/\r?\n/, 1)[0].slice(0, 240);
   const singleBlock = row.blocks.length === 1 ? row.blocks[0] : undefined;
   const expandable =

@@ -35,7 +35,9 @@ export class WorkspaceManager {
     private readonly notifyFilesChanged: (id: string, change: WorkspaceFileChange) => void,
   ) {}
 
-  get workspace(): Workspace | undefined { return this.current; }
+  get workspace(): Workspace | undefined {
+    return this.current;
+  }
 
   private assertCurrent(id: string): Workspace {
     if (this.current?.id !== id) throw new Error('The active workspace changed.');
@@ -54,8 +56,11 @@ export class WorkspaceManager {
   private async change<T>(action: () => Promise<T>): Promise<T> {
     if (this.changing || this.closed) throw new Error('Workspace connection is busy.');
     this.changing = true;
-    try { return await action(); }
-    finally { this.changing = false; }
+    try {
+      return await action();
+    } finally {
+      this.changing = false;
+    }
   }
 
   choose(): Promise<Workspace | undefined> {
@@ -93,14 +98,19 @@ export class WorkspaceManager {
           config.sshPort,
         ]);
       if (this.locked && this.current?.id !== id) throw new Error('The workspace is fixed for this window.');
-      const session = await SshWorkspace.connect(config, this.workspaceHelper, disconnected => {
-        if (this.ssh !== disconnected) return;
-        this.ssh = undefined;
-        this.current = { kind: 'ssh', id, root: config.root, config, connected: false };
-        setRemoteBackend(true);
-        hideInsight();
-        this.notifyDisconnect(id);
-      }, onStarting);
+      const session = await SshWorkspace.connect(
+        config,
+        this.workspaceHelper,
+        disconnected => {
+          if (this.ssh !== disconnected) return;
+          this.ssh = undefined;
+          this.current = { kind: 'ssh', id, root: config.root, config, connected: false };
+          setRemoteBackend(true);
+          hideInsight();
+          this.notifyDisconnect(id);
+        },
+        onStarting,
+      );
       if (this.closed || attempt !== this.connectionAttempt) {
         session.close();
         throw new Error('Workbench is closing.');
@@ -157,9 +167,10 @@ export class WorkspaceManager {
     const workspace = input.workspaceId ? this.assertCurrent(input.workspaceId) : this.current;
     if (workspace?.kind !== 'ssh') return input;
     if (!input.workspaceId) throw new Error('A remote workspace ID is required.');
-    const programPath = input.runtime === 'workflow'
-      ? await this.remote<string>(workspace.id, 'program', { path: input.programPath })
-      : undefined;
+    const programPath =
+      input.runtime === 'workflow'
+        ? await this.remote<string>(workspace.id, 'program', { path: input.programPath })
+        : undefined;
     const root = await this.remote<string>(workspace.id, 'root');
     return { ...input, workspacePath: root, programPath };
   }
@@ -180,8 +191,12 @@ export class WorkspaceManager {
     };
   }
 
-  lock(): void { this.locked = true; }
-  unlock(): void { this.locked = false; }
+  lock(): void {
+    this.locked = true;
+  }
+  unlock(): void {
+    this.locked = false;
+  }
 
   release(): void {
     this.locked = false;

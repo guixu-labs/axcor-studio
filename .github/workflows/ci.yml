@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   checks:
-    name: Lint, types, tests and Electron E2E
+    name: Format, lint, types, tests and Electron E2E
     runs-on: macos-26
     timeout-minutes: 25
     steps:
@@ -24,6 +24,7 @@ jobs:
       - name: Check package and lockfile versions
         run: node scripts/release-version.mjs
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

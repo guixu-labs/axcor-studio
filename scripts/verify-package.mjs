@@ -21,7 +21,10 @@ for (const entry of ['.vite/build/main.js', '.vite/build/preload.js']) {
 const renderer = '.vite/renderer/main_window';
 const html = asar.extractFile(archive, path.join(renderer, 'index.html')).toString('utf8');
 const assets = [...html.matchAll(/(?:src|href)="(\.\/assets\/[^"]+)"/g)].map(match => match[1]);
-assert.ok(assets.some(asset => asset.endsWith('.js')), 'Renderer JavaScript is missing from index.html');
+assert.ok(
+  assets.some(asset => asset.endsWith('.js')),
+  'Renderer JavaScript is missing from index.html',
+);
 for (const asset of assets) {
   assert.ok(asar.extractFile(archive, path.join(renderer, asset)).length, `Empty asset: ${asset}`);
 }
