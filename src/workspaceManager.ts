@@ -13,8 +13,8 @@ import {
   type WorkspaceFileChange,
 } from './shared/workspace';
 import { hideInsight, localInsightTarget, type InsightTarget } from './observability/insightView';
-import { listSshHosts, saveSshHost } from './sshConfig';
-import { SshWorkspace, validateRemoteConfig } from './sshWorkspace';
+import { listSshHosts, saveSshHost } from './remoteWorkspace/sshConfig';
+import { SshWorkspace, validateRemoteConfig } from './remoteWorkspace/sshWorkspace';
 import { walkWorkspace, type WorkspaceNode } from './workspaceFiles';
 
 function localWorkspace(root: string): Workspace {

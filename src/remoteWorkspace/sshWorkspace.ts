@@ -6,10 +6,10 @@ import {
   DEFAULT_REMOTE_INSIGHT_PORT,
   type RemoteWorkspaceConfig,
   type WorkspaceFileChange,
-} from './shared/workspace';
-import { ServiceStartupError } from './serviceStartupError';
+} from '../shared/workspace';
+import { ServiceStartupError } from '../serviceStartupError';
 import { splitSshDestination } from './sshConfig';
-import { probeInsight } from './observability/insightService';
+import { probeInsight } from '../observability/insightService';
 
 const REQUEST_TIMEOUT = 20_000;
 

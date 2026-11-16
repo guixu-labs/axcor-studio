@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { test } from 'node:test';
-import { validateRemoteConfig } from '../src/sshWorkspace';
+import { validateRemoteConfig } from '../src/remoteWorkspace/sshWorkspace';
 
 test('validates SSH config without allowing option injection or ambiguous paths', () => {
   assert.deepEqual(
