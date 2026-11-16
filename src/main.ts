@@ -157,6 +157,12 @@ app.whenReady().then(() => {
     sender === splashWindow?.webContents && !workbenchWindow && !quitting;
   const isRemoteChooser = (sender: WebContents): boolean =>
     sender === remoteWorkspaceWindow?.webContents && !quitting;
+  ipcMain.on('startup:close', event => {
+    const window = splashWindow;
+    if (!window || quitting || event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame)
+      return;
+    window.close();
+  });
   ipcMain.handle('startup:choose-remote', (event, english: boolean) => {
     if (
       !splashWindow ||
