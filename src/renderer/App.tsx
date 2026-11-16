@@ -11,7 +11,7 @@ import {
 import { isTerminalRun, runEventKey } from '../shared/run';
 import type { GraphVariableRow } from './components/RunsPanel';
 import type { WorkspaceNode } from '../workspaceFiles';
-import type { Workspace, WorkspaceFileChange } from '../shared/workspace';
+import { remoteWorkspaceLabel, type Workspace, type WorkspaceFileChange } from '../shared/workspace';
 import { remoteWorkspaceCopy } from './components/RemoteWorkspaceForm';
 import './remote-workspace.css';
 import { NavigationRail } from './components/NavigationRail';
@@ -1122,7 +1122,9 @@ export default function App(): JSX.Element {
         <span className="status-live">
           <i aria-hidden="true" />
           {workspace?.kind === 'ssh'
-            ? (disconnected ? remoteCopy.disconnected : 'SSH') + ' · ' + workspace.config.host + ':' + workspace.root
+            ? (disconnected ? remoteCopy.disconnected : 'SSH') +
+              ' · ' +
+              remoteWorkspaceLabel(workspace.config, workspace.root)
             : workspace
               ? t.workspaceReady
               : t.noWorkspace}

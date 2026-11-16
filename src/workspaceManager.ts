@@ -14,7 +14,9 @@ import {
 } from './shared/workspace';
 import { hideInsight, localInsightTarget, type InsightTarget } from './observability/insightView';
 import { listSshHosts, saveSshHost } from './remoteWorkspace/sshConfig';
-import { SshWorkspace, validateRemoteConfig } from './remoteWorkspace/sshWorkspace';
+import { listDockerContainers } from './remoteWorkspace/dockerWorkspace';
+import type { SshTarget } from './remoteWorkspace/sshTransport';
+import { SshWorkspace, validateRemoteConfig, type RemoteWorkspaceScripts } from './remoteWorkspace/sshWorkspace';
 import { walkWorkspace, type WorkspaceNode } from './workspaceFiles';
 
 function localWorkspace(root: string): Workspace {
@@ -28,9 +30,10 @@ export class WorkspaceManager {
   private changing = false;
   private closed = false;
   private connectionAttempt = 0;
+  private connecting?: AbortController;
 
   constructor(
-    private readonly workspaceHelper: string,
+    private readonly remoteScripts: RemoteWorkspaceScripts,
     private readonly notifyDisconnect: (id: string) => void,
     private readonly notifyFilesChanged: (id: string, change: WorkspaceFileChange) => void,
   ) {}
@@ -96,11 +99,14 @@ export class WorkspaceManager {
           config.controllerPort,
           config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT,
           config.sshPort,
+          ...(config.container ? [config.container.id] : []),
         ]);
       if (this.locked && this.current?.id !== id) throw new Error('The workspace is fixed for this window.');
+      const connecting = new AbortController();
+      this.connecting = connecting;
       const session = await SshWorkspace.connect(
         config,
-        this.workspaceHelper,
+        this.remoteScripts,
         disconnected => {
           if (this.ssh !== disconnected) return;
           this.ssh = undefined;
@@ -110,7 +116,10 @@ export class WorkspaceManager {
           this.notifyDisconnect(id);
         },
         onStarting,
-      );
+        connecting.signal,
+      ).finally(() => {
+        this.connecting = undefined;
+      });
       if (this.closed || attempt !== this.connectionAttempt) {
         session.close();
         throw new Error('Workbench is closing.');
@@ -201,6 +210,7 @@ export class WorkspaceManager {
   release(): void {
     this.locked = false;
     this.connectionAttempt += 1;
+    this.connecting?.abort(new Error('Workbench is closing.'));
     this.current = undefined;
     hideInsight();
     setRemoteBackend(false, undefined, true);
@@ -226,6 +236,17 @@ export class WorkspaceManager {
     ipcMain.handle('workspace:ssh-hosts', event => {
       guardStartup(event);
       return listSshHosts();
+    });
+    ipcMain.handle('workspace:docker-containers', async (event, target: SshTarget) => {
+      guardStartup(event);
+      const cancel = new AbortController();
+      const abort = (): void => cancel.abort();
+      event.sender.once('destroyed', abort);
+      try {
+        return await listDockerContainers(target, cancel.signal);
+      } finally {
+        event.sender.off('destroyed', abort);
+      }
     });
     ipcMain.handle('workspace:ssh-host-save', (event, entry: SshHostEntry) => {
       guardStartup(event);

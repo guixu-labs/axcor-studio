@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EXECUTION_BACKEND_NAME } from '../shared/executionBackendConfig';
 import { initialStartupState, type StartupChoice, type StartupService } from '../shared/startup';
+import { remoteWorkspaceLabel } from '../shared/workspace';
 import { messages, type LocaleId } from './i18n';
 import { REMOTE_WORKSPACE_KEY, RemoteWorkspaceForm, remoteWorkspaceCopy } from './components/RemoteWorkspaceForm';
 import './remote-workspace.css';
@@ -99,7 +100,7 @@ export function StartupScreen(): JSX.Element {
     try {
       const config = await window.startup.chooseRemote(english);
       if (config) {
-        setWorkspaceLabel(config.host + ':' + config.root);
+        setWorkspaceLabel((config.container ? 'SSH · ' : '') + remoteWorkspaceLabel(config));
         saveWorkbenchState(REMOTE_WORKSPACE_KEY, config);
         await run({ kind: 'ssh', config });
       }
@@ -188,6 +189,11 @@ export function StartupScreen(): JSX.Element {
               </span>
             </button>
           </div>
+        )}
+        {failed && choice?.kind === 'ssh' && choice.config.container && (
+          <button className="startup-retry" type="button" disabled={busy} onClick={() => void chooseRemote()}>
+            {remoteCopy.open}
+          </button>
         )}
         {choice && (
           <ul className="startup-services" aria-live="polite">

@@ -8,52 +8,16 @@ import {
   type WorkspaceFileChange,
 } from '../shared/workspace';
 import { ServiceStartupError } from '../serviceStartupError';
-import { splitSshDestination } from './sshConfig';
+import { shellQuote, sshArgs, validateSshTarget } from './sshTransport';
+import { dockerExec, openDockerForward, validateContainerId } from './dockerWorkspace';
 import { probeInsight } from '../observability/insightService';
 
 const REQUEST_TIMEOUT = 20_000;
 
-const HELPER_BOOTSTRAP = `
-import hashlib
-import json
-import os
-from pathlib import Path
-import runpy
-import sys
-import tempfile
-
-try:
-    source = json.loads(sys.stdin.buffer.readline()).encode('utf-8')
-    directory = Path.home() / '.local' / 'share' / 'axcor-studio' / 'helpers'
-    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-    helper = directory / (hashlib.sha256(source).hexdigest() + '.py')
-    if helper.is_symlink() or not helper.is_file() or helper.read_bytes() != source:
-        staging = tempfile.NamedTemporaryFile(dir=directory, delete=False)
-        temporary = Path(staging.name)
-        try:
-            with staging:
-                staging.write(source)
-            os.replace(temporary, helper)
-        finally:
-            temporary.unlink(missing_ok=True)
-except (OSError, ValueError, AttributeError) as error:
-    sys.exit(f'Could not install axcor-workspace-helper: {error}')
-
-# Run in this interpreter so any buffered SSH input remains available.
-sys.argv = [str(helper), '--stdio']
-runpy.run_path(str(helper), run_name='__main__')
-`;
-const HELPER_COMMAND = "python3 -c '" + HELPER_BOOTSTRAP.replaceAll("'", "'\\''") + "'";
-
 export function validateRemoteConfig(input: RemoteWorkspaceConfig): RemoteWorkspaceConfig {
-  const { hostname, user } = splitSshDestination(input.host);
-  const host = user ? user + '@' + hostname : hostname;
+  const target = validateSshTarget(input);
   const root = input.root.trim().replace(/\/+$/, '');
   const controllerPort = input.controllerPort;
-  const sshPort = input.sshPort;
-  if (sshPort !== undefined && (!Number.isInteger(sshPort) || sshPort < 1 || sshPort > 65535)) {
-    throw new Error('Enter a valid SSH port.');
-  }
   if (
     !root.startsWith('/') ||
     root
@@ -73,10 +37,17 @@ export function validateRemoteConfig(input: RemoteWorkspaceConfig): RemoteWorksp
   if ((insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT) === controllerPort)
     throw new Error('Controller and Context Insight require different ports.');
   return {
-    host,
+    ...target,
     root,
     controllerPort,
-    ...(sshPort === undefined ? {} : { sshPort }),
+    ...(input.container === undefined
+      ? {}
+      : {
+          container: {
+            id: validateContainerId(input.container.id),
+            name: typeof input.container.name === 'string' ? input.container.name.trim().slice(0, 255) : '',
+          },
+        }),
     ...(insightPort === undefined ? {} : { insightPort }),
   };
 }
@@ -92,6 +63,12 @@ async function availablePort(): Promise<number> {
   });
 }
 
+export interface RemoteWorkspaceScripts {
+  helper: string;
+  helperBootstrap: string;
+  dockerRelay: string;
+}
+
 type Reply = { value?: unknown; error?: string };
 
 export class SshWorkspace {
@@ -101,59 +78,46 @@ export class SshWorkspace {
   private pending?: (error?: Error, reply?: Reply) => void;
   private stderr = '';
   private closed = false;
-  private readonly lifetime = new AbortController();
+  private readonly probeTimeout: number;
   private startingInsight?: Promise<void>;
   private readonly remoteInsightPort: number;
 
   private constructor(
     config: RemoteWorkspaceConfig,
-    helper: string,
+    scripts: RemoteWorkspaceScripts,
     port: number,
     insightPort: number,
+    private readonly lifetime: AbortController,
     private readonly onClose: (session: SshWorkspace) => void,
   ) {
     this.url = `http://127.0.0.1:${port}`;
     this.insightUrl = `http://127.0.0.1:${insightPort}`;
     this.remoteInsightPort = config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT;
-    this.child = spawn(
-      'ssh',
-      [
-        '-T',
-        '-S',
-        'none',
-        '-o',
-        'ForkAfterAuthentication=no',
-        '-o',
-        'BatchMode=yes',
-        '-o',
-        'StrictHostKeyChecking=yes',
-        '-o',
-        'ForwardAgent=no',
-        '-o',
-        'ExitOnForwardFailure=yes',
-        '-o',
-        'ConnectTimeout=8',
-        '-o',
-        'ServerAliveInterval=5',
-        '-o',
-        'ServerAliveCountMax=2',
-        '-L',
-        `127.0.0.1:${port}:127.0.0.1:${config.controllerPort}`,
-        '-L',
-        `127.0.0.1:${insightPort}:127.0.0.1:${this.remoteInsightPort}`,
-        ...(config.sshPort === undefined ? [] : ['-p', String(config.sshPort)]),
-        '--',
-        config.host,
-        HELPER_COMMAND,
-      ],
-      { stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    this.probeTimeout = config.container ? 5000 : 1500;
+    const helperCommand = 'python3 -c ' + shellQuote(scripts.helperBootstrap);
+    const args = config.container
+      ? sshArgs(config, dockerExec(config.container.id, helperCommand))
+      : sshArgs(config, helperCommand, [
+          `127.0.0.1:${port}:127.0.0.1:${config.controllerPort}`,
+          `127.0.0.1:${insightPort}:127.0.0.1:${this.remoteInsightPort}`,
+        ]);
+    this.child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'] });
     this.child.stderr.on('data', (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString()).slice(-2000);
     });
-    this.child.stdin.on('error', () => this.finish());
+    this.child.stdin.on('error', () => {
+      /* The child close event reports the process error. */
+    });
     this.child.once('error', error => this.finish(error));
-    this.child.once('close', () => this.finish());
+    this.child.once('close', () => {
+      if (config.container && /no such container|is not running|is paused/i.test(this.stderr)) {
+        this.finish(
+          new Error('Docker container is unavailable. Reopen the remote workspace and select a running container.'),
+        );
+      } else {
+        this.finish();
+      }
+    });
     createInterface({ input: this.child.stdout, crlfDelay: Infinity }).on('line', line => {
       try {
         const reply = JSON.parse(line) as Reply & Partial<WorkspaceFileChange> & { event?: string };
@@ -176,7 +140,7 @@ export class SshWorkspace {
         );
       }
     });
-    this.child.stdin.write(JSON.stringify(helper) + '\n');
+    this.child.stdin.write(JSON.stringify(scripts.helper) + '\n');
   }
 
   readonly url: string;
@@ -187,23 +151,49 @@ export class SshWorkspace {
 
   static async connect(
     config: RemoteWorkspaceConfig,
-    helper: string,
+    scripts: RemoteWorkspaceScripts,
     onClose: (session: SshWorkspace) => void,
     onStarting?: () => void,
+    signal?: AbortSignal,
   ): Promise<SshWorkspace> {
-    const port = await availablePort();
-    let insightPort = await availablePort();
-    while (insightPort === port) insightPort = await availablePort();
-    const session = new SshWorkspace(config, helper, port, insightPort, onClose);
+    const lifetime = new AbortController();
+    let session: SshWorkspace | undefined;
+    const cancel = (): void => {
+      lifetime.abort(signal?.reason);
+      session?.close();
+    };
+    signal?.addEventListener('abort', cancel, { once: true });
     try {
+      signal?.throwIfAborted();
+      let port: number;
+      let insightPort: number;
+      if (config.container) {
+        [port, insightPort] = await Promise.all([
+          openDockerForward(config, config.container.id, config.controllerPort, scripts.dockerRelay, lifetime.signal),
+          openDockerForward(
+            config,
+            config.container.id,
+            config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT,
+            scripts.dockerRelay,
+            lifetime.signal,
+          ),
+        ]);
+      } else {
+        port = await availablePort();
+        insightPort = await availablePort();
+        while (insightPort === port) insightPort = await availablePort();
+      }
+      signal?.throwIfAborted();
+      const connected = new SshWorkspace(config, scripts, port, insightPort, lifetime, onClose);
+      session = connected;
       if ((await session.request<string>('open', { root: config.root })) !== config.root)
         throw new Error('Unexpected remote workspace path.');
       await session.ensureService(
         'controller',
         config.controllerPort,
         async () => {
-          const response = await fetch(session.url + '/api/v1/runs', {
-            signal: AbortSignal.timeout(1500),
+          const response = await fetch(connected.url + '/api/v1/runs', {
+            signal: AbortSignal.timeout(connected.probeTimeout),
             redirect: 'error',
           }).catch(() => undefined);
           return Boolean(response?.ok && Array.isArray((await response.json().catch(() => null))?.runs));
@@ -213,8 +203,11 @@ export class SshWorkspace {
       if (!session.connected) throw new Error('SSH connection closed.');
       return session;
     } catch (error) {
-      session.close();
+      lifetime.abort(error);
+      session?.close();
       throw error;
+    } finally {
+      signal?.removeEventListener('abort', cancel);
     }
   }
 
@@ -222,7 +215,7 @@ export class SshWorkspace {
     this.startingInsight ??= this.ensureService(
       'insight',
       this.remoteInsightPort,
-      () => probeInsight(this.insightUrl),
+      () => probeInsight(this.insightUrl, this.probeTimeout),
       onStarting,
     ).finally(() => {
       this.startingInsight = undefined;

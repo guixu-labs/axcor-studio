@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('setNativeColorScheme', (scheme: 'light' | 'dark
 });
 
 const workbench: WorkspaceBridge = {
+  listDockerContainers: target => ipcRenderer.invoke('workspace:docker-containers', target),
   listSshHosts: () => ipcRenderer.invoke('workspace:ssh-hosts'),
   saveSshHost: entry => ipcRenderer.invoke('workspace:ssh-host-save', entry),
   reconnect: () => ipcRenderer.invoke('workspace:reconnect'),

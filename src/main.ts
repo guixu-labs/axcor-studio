@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, screen, type WebContents } from 'electron';
 import path from 'node:path';
+import dockerRelay from '../remote/docker-relay.py?raw';
 import workspaceHelper from '../remote/axcor-workspace-helper?raw';
+import helperBootstrap from '../remote/workspace-helper-bootstrap.py?raw';
 import started from 'electron-squirrel-startup';
 import { stopAllExecutionPolls } from './executionBackend/events';
 import { registerExecutionBackendIpc } from './executionBackend/ipc';
@@ -25,7 +27,7 @@ let selectedRemoteWorkspace: RemoteWorkspaceConfig | undefined;
 let workbenchWindow: BrowserWindow | undefined;
 let quitting = false;
 const workspaces = new WorkspaceManager(
-  workspaceHelper,
+  { helper: workspaceHelper, helperBootstrap, dockerRelay },
   id => {
     if (workbenchWindow && !workbenchWindow.isDestroyed()) {
       workbenchWindow.webContents.send('workspace:disconnected', id);

@@ -12,10 +12,10 @@ let child: ChildProcess | undefined;
 let starting: Promise<void> | undefined;
 let stopping = false;
 
-export async function probeInsight(url: string): Promise<boolean> {
+export async function probeInsight(url: string, timeout = 1500): Promise<boolean> {
   try {
     const response = await fetch(url + '/api/observe/data?pageSize=1', {
-      signal: AbortSignal.timeout(1500),
+      signal: AbortSignal.timeout(timeout),
       redirect: 'error',
     });
     if (response.ok) {
