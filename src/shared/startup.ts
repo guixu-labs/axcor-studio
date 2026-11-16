@@ -11,6 +11,7 @@ export function initialStartupState(): StartupState {
 }
 
 export interface StartupBridge {
+  close(): void;
   chooseLocal(): Promise<string | undefined>;
   chooseRemote(english: boolean): Promise<RemoteWorkspaceConfig | undefined>;
   submitRemote(config: RemoteWorkspaceConfig): void;

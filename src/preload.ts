@@ -5,6 +5,9 @@ import type { WorkspaceBridge, WorkspaceFileChange } from './shared/workspace';
 import type { StartupBridge, StartupState } from './shared/startup';
 
 const startup: StartupBridge = {
+  close: () => {
+    ipcRenderer.send('startup:close');
+  },
   chooseLocal: () => ipcRenderer.invoke('startup:choose-local'),
   chooseRemote: english => ipcRenderer.invoke('startup:choose-remote', english),
   submitRemote: config => {

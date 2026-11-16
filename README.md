@@ -43,7 +43,7 @@ Axcor Studio 是用于编写、运行和观察工作流的桌面工作台。你�
 
 - **SSH 断线**。点击「重新连接」。未保存的草稿保留在当前窗口。如果断线时无法确定运行是否已提交，先刷新运行列表，再决定是否重试。
 - **保存冲突**。应用会保留草稿。先复制草稿，再关闭文件并选择放弃修改，重新打开文件即可查看服务器版本。
-- **服务启动失败**。在服务器上查看 `~/.local/state/axcor-studio/controller-<端口>.log` 和 `~/.local/state/axcor-studio/insight-<端口>.log`。
+- **服务启动失败**。在服务器上查看 `~/.local/state/axcor-studio/controller-<端口>.log` 和 `~/.local/state/axcor-studio/insight-<端口>.log`。可在启动页重试失败的服务，或点击右上角「×」退出应用。
 
 ## 后续规划
 
