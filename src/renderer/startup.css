@@ -42,38 +42,20 @@ body.startup-window {
 
 .startup-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   z-index: 1;
   -webkit-app-region: no-drag;
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   padding: 0;
-  border: 1px solid #ffffff40;
-  border-radius: 10px;
-  background: #171b33;
-  color: #f1f3fa;
-  font-size: 22px;
+  border: 0;
+  background: transparent;
+  color: #adb6d0;
+  font-size: 18px;
   line-height: 1;
-  cursor: pointer;
-}
-
-.startup-close:hover {
-  border-color: #e18495;
-  background: #8f2947;
-  color: #fff;
-}
-
-.startup-close:active {
-  background: #702039;
-}
-
-.startup-close:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 6px #171b33;
 }
 
 .startup-heading {
