@@ -1,6 +1,6 @@
 import { DEFAULT_EXECUTION_BACKEND_URL, EXECUTION_BACKEND_NAME } from '../shared/executionBackendConfig';
 import { importInsightTranscript } from '../observability/insightService';
-import type { CreateRunInput, Run } from '../shared/protocol';
+import { REVIEWER_THINKING_MODES, type CreateRunInput, type Run } from '../shared/protocol';
 import {
   mapRun,
   mapSession,
@@ -144,6 +144,18 @@ export async function startSessionRun(input: CreateRunInput): Promise<Run> {
     project_dir: input.workspacePath,
     prompt,
   };
+  const options = input.sessionOptions;
+  if (options) {
+    body.cli_wrapper = options.cli_wrapper;
+    body.evaluator = options.evaluator;
+    if (input.reviewerEnabled !== false) {
+      body.reviewer_model = options.reviewer_model;
+      body.reviewer_provider_index = options.reviewer_provider_index;
+      body.reviewer_task_goal = options.reviewer_task_goal;
+      body.reviewer_thinking_mode = options.reviewer_thinking_mode;
+      body.reviewer_thinking_budget_tokens = options.reviewer_thinking_budget_tokens;
+    }
+  }
   if (input.sessionRuntime) body.runtime = input.sessionRuntime;
   if (input.model?.trim()) body.model = input.model.trim();
   if (input.providerIndex !== undefined) body.provider_index = input.providerIndex;
@@ -295,7 +307,7 @@ export async function listProviders(): Promise<ProviderKey[]> {
   return result.keys ?? [];
 }
 
-export async function listSessionModels(runtime: string): Promise<SessionModelOption[]> {
+export async function listSessionModels(runtime?: string): Promise<SessionModelOption[]> {
   const result = await backendRequest<{
     providers?: Array<{
       index: number;
@@ -304,17 +316,30 @@ export async function listSessionModels(runtime: string): Promise<SessionModelOp
       status: string;
       is_active?: boolean;
       worker_validation?: ProviderValidation;
+      reviewer_validation?: ProviderValidation;
     }>;
   }>('GET', '/api/v1/auth/status');
   const models = new Map<string, SessionModelOption>();
+  const reviewerModels: SessionModelOption[] = [];
   for (const provider of result.providers ?? []) {
     const model = provider.model?.trim();
-    if (provider.runtime !== runtime || !model) continue;
-    if (provider.status !== 'unused' && provider.status !== 'active') continue;
+    if (!model || (provider.status !== 'unused' && provider.status !== 'active')) continue;
+    if (runtime === undefined) {
+      const validation = provider.reviewer_validation;
+      if (validation?.status !== 'valid') continue;
+      const modes =
+        Array.isArray(validation.thinking_modes) && validation.thinking_modes.length
+          ? validation.thinking_modes
+          : [validation.thinking_mode];
+      const thinkingModes = REVIEWER_THINKING_MODES.filter(mode => modes.includes(mode));
+      reviewerModels.push({ model, providerIndex: provider.index, thinkingModes });
+      continue;
+    }
+    if (provider.runtime !== runtime) continue;
     if (provider.worker_validation?.status === 'invalid' || provider.worker_validation?.success === false) continue;
     if (!models.has(model) || provider.is_active) models.set(model, { model, providerIndex: provider.index });
   }
-  return [...models.values()];
+  return runtime === undefined ? reviewerModels : [...models.values()];
 }
 
 export async function saveProviders(keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }> {

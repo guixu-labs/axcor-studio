@@ -78,6 +78,14 @@ test.describe('run configuration', () => {
                   status: 'unused',
                   worker_validation: { status: 'invalid' },
                 },
+                {
+                  index: 5,
+                  runtime: 'claude_sdk',
+                  model: 'reviewer-model',
+                  status: 'unused',
+                  worker_validation: { status: 'invalid' },
+                  reviewer_validation: { status: 'valid', thinking_modes: ['disabled', 'enabled', 'adaptive'] },
+                },
               ],
             }),
           );
@@ -265,7 +273,8 @@ test.describe('run configuration', () => {
     expect(capturedBodies[0]['program_path']).toBe(path.join(workspaceDir, 'notes.md'));
   });
 
-  test('starts a session with prompt and agent options', async () => {
+  test('starts a session with cpx and advanced agent options in a compact window', async () => {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1024, 640));
     await window.locator('.rail-item', { hasText: '运行' }).click();
     await window.getByLabel('运行时', { exact: true }).selectOption('session');
     await window.getByLabel('提示词', { exact: true }).fill('整理当前项目结构');
@@ -285,8 +294,23 @@ test.describe('run configuration', () => {
     await expect(model).toHaveValue('');
     await expect(run).toBeDisabled();
     await model.selectOption('glm-4.7');
+    await window.getByLabel('通过 cpx 捕获').selectOption('cpx');
+    await window.getByText('高级设置', { exact: true }).click();
+    await window.getByLabel('系统提示词').fill('保持简洁');
+    await window.getByLabel('评估器').selectOption('max_iteration');
     await window.getByLabel('最大迭代').fill('20');
+    const reviewerModel = window.getByLabel('Reviewer 模型');
+    const thinkingMode = window.getByLabel('Reviewer 思考', { exact: true });
+    const budget = window.getByLabel('Reviewer 思考预算');
+    await expect(reviewerModel).toBeDisabled();
     await window.getByLabel('启用 Reviewer').check();
+    await expect(reviewerModel.locator('option')).toHaveText(['使用项目配置', 'reviewer-model']);
+    await reviewerModel.selectOption('5');
+    await expect(budget).toBeDisabled();
+    await expect(thinkingMode.locator('option')).toHaveText(['使用项目配置', '禁用', '启用', '自适应']);
+    await thinkingMode.selectOption('enabled');
+    await budget.fill('4096');
+    await window.getByLabel('Reviewer 目标').fill('校验输出结构');
     await run.click();
     await expect(window.getByRole('option', { name: /整理当前项目结构/ })).toBeVisible();
     await expect.poll(() => capturedBodies.length).toBe(1);
@@ -296,6 +320,16 @@ test.describe('run configuration', () => {
     expect(capturedBodies[0]['model']).toBe('glm-4.7');
     expect(capturedBodies[0]['provider_index']).toBe(0);
     expect(capturedBodies[0]['max_iterations']).toBe(20);
-    expect(capturedBodies[0]['reviewer_enabled']).toBe(true);
+    expect(capturedBodies[0]).toMatchObject({
+      cli_wrapper: 'cpx',
+      system_prompt: '保持简洁',
+      evaluator: 'max_iteration',
+      reviewer_enabled: true,
+      reviewer_model: 'reviewer-model',
+      reviewer_provider_index: 5,
+      reviewer_thinking_mode: 'enabled',
+      reviewer_thinking_budget_tokens: 4096,
+      reviewer_task_goal: '校验输出结构',
+    });
   });
 });
