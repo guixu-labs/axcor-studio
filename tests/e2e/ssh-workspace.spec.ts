@@ -494,7 +494,8 @@ net.createServer(socket => {
     const edit = async (value: string): Promise<void> => {
       await page.locator('.monaco-editor').click();
       await page.keyboard.press('ControlOrMeta+a');
-      await page.keyboard.type(value);
+      await page.keyboard.insertText(value);
+      await expect(page.locator('.view-lines')).toHaveText(value);
       await expect(page.getByRole('tab', { name: 'workflow.yaml' })).toHaveAttribute(
         'aria-description',
         '有未保存的修改',
@@ -531,7 +532,7 @@ net.createServer(socket => {
     await expect(page.locator('.status-bar')).toContainText(
       docker ? 'SSH · fixture / dev-container:' : 'SSH · fixture',
     );
-    await expect(page.locator('.view-lines')).toContainText('unsaved draft');
+    await expect(page.locator('.view-lines')).toHaveText('name: unsaved draft');
     await expect.poll(() => cursors.slice(previousPolls)).toContain('first-event');
 
     await page.getByRole('tab', { name: 'Remote Graph' }).click();
