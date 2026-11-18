@@ -539,8 +539,7 @@ export default function App(): JSX.Element {
       const next = await window.workbench.reconnect();
       if (scope !== generation.current) return;
       currentWorkspace.current = next;
-      setWorkspace(next);
-      await Promise.all([
+      const [, files] = await Promise.allSettled([
         refreshRuns().catch(error => {
           if (scope === generation.current) setExecutionError(errorMessage(error));
         }),
@@ -551,6 +550,9 @@ export default function App(): JSX.Element {
           await Promise.all(openFiles.map(tab => readFile(next, tab.resource, scope, true)));
         })(),
       ]);
+      if (scope !== generation.current || currentWorkspace.current !== next) return;
+      setWorkspace(next);
+      if (files.status === 'rejected') throw files.reason;
     } finally {
       changingWorkspace.current = false;
     }
