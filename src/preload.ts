@@ -5,11 +5,10 @@ import type { WorkspaceBridge, WorkspaceFileChange } from './shared/workspace';
 import type { StartupBridge, StartupState } from './shared/startup';
 
 const startup: StartupBridge = {
+  supportsSshPassword: process.platform !== 'win32',
   chooseLocal: () => ipcRenderer.invoke('startup:choose-local'),
   chooseRemote: english => ipcRenderer.invoke('startup:choose-remote', english),
-  submitRemote: config => {
-    ipcRenderer.send('startup:remote-submit', config);
-  },
+  submitRemote: (config, password) => ipcRenderer.invoke('startup:remote-submit', config, password),
   resizeRemote: height => {
     ipcRenderer.send('startup:remote-resize', height);
   },
@@ -39,7 +38,7 @@ contextBridge.exposeInMainWorld('setNativeColorScheme', (scheme: 'light' | 'dark
 });
 
 const workbench: WorkspaceBridge = {
-  listDockerContainers: target => ipcRenderer.invoke('workspace:docker-containers', target),
+  listDockerContainers: (target, password) => ipcRenderer.invoke('workspace:docker-containers', target, password),
   listSshHosts: () => ipcRenderer.invoke('workspace:ssh-hosts'),
   saveSshHost: entry => ipcRenderer.invoke('workspace:ssh-host-save', entry),
   reconnect: () => ipcRenderer.invoke('workspace:reconnect'),

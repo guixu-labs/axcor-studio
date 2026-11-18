@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, screen, type WebContents } from 'electron';
 import path from 'node:path';
+import sshAskpass from '../remote/ssh-askpass.sh?raw';
 import dockerRelay from '../remote/docker-relay.py?raw';
 import workspaceHelper from '../remote/axcor-workspace-helper?raw';
 import helperBootstrap from '../remote/workspace-helper-bootstrap.py?raw';
@@ -27,7 +28,7 @@ let selectedRemoteWorkspace: RemoteWorkspaceConfig | undefined;
 let workbenchWindow: BrowserWindow | undefined;
 let quitting = false;
 const workspaces = new WorkspaceManager(
-  { helper: workspaceHelper, helperBootstrap, dockerRelay },
+  { helper: workspaceHelper, helperBootstrap, dockerRelay, sshAskpass },
   id => {
     if (workbenchWindow && !workbenchWindow.isDestroyed()) {
       workbenchWindow.webContents.send('workspace:disconnected', id);
@@ -170,10 +171,10 @@ app.whenReady().then(() => {
     }
     return chooseRemoteWorkspace(splashWindow, english);
   });
-  ipcMain.on('startup:remote-submit', (event, config: RemoteWorkspaceConfig) => {
+  ipcMain.handle('startup:remote-submit', (event, config: RemoteWorkspaceConfig, password?: string) => {
     if (!remoteWorkspaceWindow || !isRemoteChooser(event.sender) || event.senderFrame !== event.sender.mainFrame)
-      return;
-    selectedRemoteWorkspace = config;
+      throw new Error('Invalid remote workspace request.');
+    selectedRemoteWorkspace = workspaces.prepareRemote(config, password);
     remoteWorkspaceWindow.close();
   });
   ipcMain.on('startup:remote-resize', (event, height: number) => {

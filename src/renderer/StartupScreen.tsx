@@ -146,9 +146,18 @@ export function StartupScreen(): JSX.Element {
           )}
         </div>
         {workspaceLabel && (
-          <p className="startup-workspace-path" title={workspaceLabel}>
-            {workspaceLabel}
-          </p>
+          <div className="startup-workspace-summary">
+            <p className="startup-workspace-path" title={workspaceLabel}>
+              {workspaceLabel}
+            </p>
+            {failed &&
+              choice?.kind === 'ssh' &&
+              (choice.config.container || choice.config.authentication === 'password') && (
+                <button className="startup-retry" type="button" disabled={busy} onClick={() => void chooseRemote()}>
+                  {remoteCopy.open}
+                </button>
+              )}
+          </div>
         )}
         {!choice && (
           <div className="startup-workspace-actions">
@@ -189,11 +198,6 @@ export function StartupScreen(): JSX.Element {
               </span>
             </button>
           </div>
-        )}
-        {failed && choice?.kind === 'ssh' && choice.config.container && (
-          <button className="startup-retry" type="button" disabled={busy} onClick={() => void chooseRemote()}>
-            {remoteCopy.open}
-          </button>
         )}
         {choice && (
           <ul className="startup-services" aria-live="polite">
@@ -271,9 +275,7 @@ export function RemoteWorkspaceScreen(): JSX.Element {
       <RemoteWorkspaceForm
         english={english}
         onCancel={() => window.close()}
-        onConnect={async config => {
-          window.startup.submitRemote(config);
-        }}
+        onConnect={(config, password) => window.startup.submitRemote(config, password)}
       />
     </main>
   );

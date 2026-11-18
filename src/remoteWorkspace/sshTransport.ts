@@ -16,7 +16,7 @@ export function validateSshTarget({ host, sshPort }: SshTarget): SshTarget {
   };
 }
 
-export function sshArgs(target: SshTarget, command: string, forwards: string[] = []): string[] {
+export function sshArgs(target: SshTarget, command: string, forwards: string[] = [], password = false): string[] {
   return [
     '-T',
     '-S',
@@ -24,7 +24,17 @@ export function sshArgs(target: SshTarget, command: string, forwards: string[] =
     '-o',
     'ForkAfterAuthentication=no',
     '-o',
-    'BatchMode=yes',
+    password ? 'BatchMode=no' : 'BatchMode=yes',
+    ...(password
+      ? [
+          '-o',
+          'PreferredAuthentications=password',
+          '-o',
+          'PasswordAuthentication=yes',
+          '-o',
+          'NumberOfPasswordPrompts=1',
+        ]
+      : []),
     '-o',
     'StrictHostKeyChecking=yes',
     '-o',

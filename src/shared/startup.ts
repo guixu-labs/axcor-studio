@@ -11,9 +11,10 @@ export function initialStartupState(): StartupState {
 }
 
 export interface StartupBridge {
+  supportsSshPassword: boolean;
   chooseLocal(): Promise<string | undefined>;
   chooseRemote(english: boolean): Promise<RemoteWorkspaceConfig | undefined>;
-  submitRemote(config: RemoteWorkspaceConfig): void;
+  submitRemote(config: RemoteWorkspaceConfig, password?: string): Promise<void>;
   resizeRemote(height: number): void;
   run(choice: StartupChoice, retry?: StartupService): Promise<StartupState>;
   onProgress(listener: (state: StartupState) => void): () => void;

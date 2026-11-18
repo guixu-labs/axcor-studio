@@ -19,7 +19,7 @@ await build({
     {
       name: 'remote-script-source',
       setup(builder) {
-        builder.onResolve({ filter: /\/remote\/(?:axcor-workspace-helper|[^/]+\.py)\?raw$/ }, args => ({
+        builder.onResolve({ filter: /\/remote\/(?:axcor-workspace-helper|[^/]+\.(?:py|sh))\?raw$/ }, args => ({
           path: path.resolve(args.resolveDir, args.path.slice(0, -4)),
           namespace: 'remote-script',
         }));

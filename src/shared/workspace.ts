@@ -7,6 +7,7 @@ export interface RemoteWorkspaceConfig {
   root: string;
   controllerPort: number;
   sshPort?: number;
+  authentication?: 'password';
   insightPort?: number;
   container?: { id: string; name: string };
 }
@@ -45,7 +46,7 @@ export interface WorkspaceFileChange {
 
 export interface WorkspaceBridge {
   listSshHosts(): Promise<string[]>;
-  listDockerContainers(target: { host: string; sshPort?: number }): Promise<DockerContainer[]>;
+  listDockerContainers(target: { host: string; sshPort?: number }, password?: string): Promise<DockerContainer[]>;
   saveSshHost(entry: SshHostEntry): Promise<string>;
   reconnect(): Promise<Workspace>;
   getWorkspace(): Promise<Workspace | undefined>;

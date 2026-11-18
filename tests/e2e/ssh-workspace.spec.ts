@@ -12,7 +12,7 @@ test('opens an SSH workspace, saves and runs remotely, then reconnects with its 
   await exerciseRemoteWorkspace(false);
 });
 
-test('opens a Docker workspace over SSH and routes files, runs and Insight to the selected container', async () => {
+test('opens a Docker workspace with an SSH password and routes files, runs and Insight', async () => {
   test.setTimeout(90_000);
   await exerciseRemoteWorkspace(true);
 });
@@ -28,6 +28,7 @@ async function exerciseRemoteWorkspace(docker: boolean): Promise<void> {
   const dockerState = path.join(scratch, 'docker-state');
   const containerId = 'a'.repeat(64);
   const otherContainerId = 'b'.repeat(64);
+  const password = "fixture 'quoted' $password \\ test";
   const insightPidFile = path.join(scratch, 'insight.pid');
   const insightImportFile = path.join(scratch, 'insight-import.json');
   const controllerPidFile = path.join(scratch, 'controller.pid');
@@ -82,13 +83,32 @@ child.on('exit', code => process.exit(code ?? 1));
   await writeFile(
     ssh,
     `#!${process.execPath}
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { writeFileSync } = require('node:fs');
 const net = require('node:net');
 const args = process.argv.slice(2);
-if (!args.includes('StrictHostKeyChecking=yes') || !args.includes('BatchMode=yes')
-    || !['fixture', 'lab'].includes(args.at(-2))) process.exit(2);
 const docker = ${docker};
+const host = args[0] === '-G' ? args.at(-1) : args.at(-2);
+if (!['fixture', 'lab'].includes(host)) process.exit(2);
+if (args[0] === '-G') {
+  console.log('user fixture-user\\nhostname ' + host + '.example');
+  process.exit(0);
+}
+if (!args.includes('StrictHostKeyChecking=yes')) process.exit(2);
+if (docker) {
+  if (!args.includes('BatchMode=no') || !args.includes('PreferredAuthentications=password')
+      || process.env.SSH_ASKPASS_REQUIRE !== 'force') process.exit(2);
+  const secret = ${JSON.stringify(password)};
+  if ([...args, ...Object.values(process.env)].some(value => value.includes(secret))) process.exit(2);
+  const askpass = process.env.SSH_ASKPASS;
+  const refused = spawnSync(askpass, ["fixture-user@jump.example's password: "], { encoding: 'utf8' });
+  if (refused.status !== 1 || refused.stdout) process.exit(2);
+  const result = spawnSync(askpass, ["fixture-user@" + host + ".example's password: "], { encoding: 'utf8' });
+  if (result.status !== 0 || result.stdout !== secret + '\\n') {
+    console.error('Permission denied (password).');
+    process.exit(255);
+  }
+} else if (!args.includes('BatchMode=yes')) process.exit(2);
 if (docker ? !args.at(-1).startsWith('docker ') : !args.at(-1).startsWith('python3 -c ')) process.exit(2);
 const forwards = args.flatMap((arg, index) => arg === '-L' ? [args[index + 1]] : []);
 if (forwards.length !== (docker ? 0 : 2)) process.exit(3);
@@ -358,6 +378,8 @@ net.createServer(socket => {
     await expect(form.getByLabel('SSH 主机')).toHaveValue('fixture');
     if (docker) {
       await form.getByLabel('连接类型').selectOption('docker');
+      await form.getByLabel('认证方式').selectOption('password');
+      const passwordField = form.getByLabel('SSH 密码', { exact: true });
       const load = form.getByRole('button', { name: '加载容器', exact: true });
       const container = form.getByLabel('Docker 容器', { exact: true });
       await expect
@@ -366,6 +388,11 @@ net.createServer(socket => {
           return buttonBounds?.height === 28 && buttonBounds.height === selectBounds?.height;
         })
         .toBe(true);
+      await expect(load).toBeDisabled();
+      await passwordField.fill('wrong-password');
+      await load.click();
+      await expect(form.getByRole('alert')).toContainText('Permission denied (password).');
+      await passwordField.fill(password);
       await load.click();
       await expect(form.getByRole('alert')).toContainText('docker: command not found');
       await writeFile(dockerState, 'denied');
@@ -377,10 +404,13 @@ net.createServer(socket => {
       await container.selectOption(containerId);
       await configuredHosts.selectOption('lab');
       await expect(container).toHaveValue('');
+      await expect(passwordField).toHaveValue('');
+      await passwordField.fill(password);
       await load.click();
       await expect(container.locator('option').last()).toContainText('other-container');
       await configuredHosts.selectOption('fixture');
       await expect(container).toHaveValue('');
+      await passwordField.fill(password);
       await load.click();
       await container.selectOption(containerId);
       await expect.poll(fitsWindow).toBe(true);
@@ -394,9 +424,19 @@ net.createServer(socket => {
     const retry = controllerRow.getByRole('button', { name: '重试 Workflow Controller' });
     if (docker) {
       await expect(controllerRow).toContainText('No such file or directory');
+      const reopenButton = startup.getByRole('button', { name: '打开远程工作区' });
+      await expect
+        .poll(async () => {
+          const [reopenBounds, retryBounds] = await Promise.all([reopenButton.boundingBox(), retry.boundingBox()]);
+          if (!reopenBounds || !retryBounds) return false;
+          return Math.abs(reopenBounds.x + reopenBounds.width - retryBounds.x - retryBounds.width) < 1;
+        })
+        .toBe(true);
       const reopen = app.waitForEvent('window');
-      await startup.getByRole('button', { name: '打开远程工作区' }).click();
+      await reopenButton.click();
       const secondForm = await reopen;
+      await expect(secondForm.getByLabel('SSH 密码', { exact: true })).toHaveValue('');
+      await secondForm.getByLabel('SSH 密码', { exact: true }).fill(password);
       await secondForm.getByRole('button', { name: '加载容器', exact: true }).click();
       await expect(secondForm.getByLabel('Docker 容器', { exact: true })).toHaveValue(containerId);
       await secondForm.getByLabel('容器内目录').fill(workspace);
@@ -528,6 +568,11 @@ net.createServer(socket => {
     await expect(reopenedForm.getByLabel('SSH 主机')).toHaveValue('fixture');
     if (docker) {
       await expect(reopenedForm.getByLabel('连接类型')).toHaveValue('docker');
+      const passwordField = reopenedForm.getByLabel('SSH 密码', { exact: true });
+      await expect(passwordField).toHaveValue('');
+      const saved = await reopenedForm.evaluate(() => localStorage.getItem('workbench.remoteWorkspace'));
+      expect(saved).not.toContain(password);
+      await passwordField.fill(password);
       await reopenedForm.getByRole('button', { name: '加载容器', exact: true }).click();
       await expect(reopenedForm.getByLabel('Docker 容器', { exact: true })).toHaveValue(containerId);
     }

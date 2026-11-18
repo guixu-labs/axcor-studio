@@ -15,6 +15,10 @@ export function remoteWorkspaceCopy(english: boolean) {
         open: 'Open remote workspace',
         target: 'Connection type',
         hostTarget: 'SSH host',
+        authentication: 'Authentication',
+        keyAuthentication: 'SSH config / key',
+        passwordAuthentication: 'Password',
+        sshPassword: 'SSH password',
         containerTarget: 'Docker container',
         containerDirectory: 'Directory in container',
         loadContainers: 'Load containers',
@@ -48,6 +52,10 @@ export function remoteWorkspaceCopy(english: boolean) {
         open: '打开远程工作区',
         target: '连接类型',
         hostTarget: 'SSH 主机',
+        authentication: '认证方式',
+        keyAuthentication: 'SSH 配置 / 密钥',
+        passwordAuthentication: '密码',
+        sshPassword: 'SSH 密码',
         containerTarget: 'Docker 容器',
         containerDirectory: '容器内目录',
         loadContainers: '加载容器',
@@ -81,7 +89,7 @@ export function remoteWorkspaceCopy(english: boolean) {
 
 interface Props {
   english: boolean;
-  onConnect: (config: RemoteWorkspaceConfig) => Promise<void>;
+  onConnect: (config: RemoteWorkspaceConfig, password?: string) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -89,6 +97,9 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
   const [saved] = useState(() =>
     loadWorkbenchState<RemoteWorkspaceConfig | undefined>(REMOTE_WORKSPACE_KEY, undefined),
   );
+  const supportsPassword = window.startup.supportsSshPassword;
+  const [usePassword, setUsePassword] = useState(supportsPassword && saved?.authentication === 'password');
+  const [password, setPassword] = useState('');
   const [docker, setDocker] = useState(Boolean(saved?.container));
   const [containers, setContainers] = useState<DockerContainer[]>();
   const [containerId, setContainerId] = useState(saved?.container?.id ?? '');
@@ -109,16 +120,17 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
   const copy = remoteWorkspaceCopy(english);
   const configuredHost = hosts.find(name => name.toLowerCase() === host.trim().toLowerCase());
   const disabled = busy || saving;
+  const missingPassword = usePassword && !password;
   const selectedContainer = containers?.find(container => container.id === containerId);
   const target = {
     host: configuredHost ?? host,
     ...(!configuredHost && sshPort ? { sshPort: Number(sshPort) } : {}),
   };
 
-  const resetContainers = (): void => {
+  const resetContainers = (clearSelection = true): void => {
     containerRequest.current += 1;
     setContainers(undefined);
-    setContainerId('');
+    if (clearSelection) setContainerId('');
     setLoadingContainers(false);
     setError('');
   };
@@ -129,7 +141,7 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
     setContainers(undefined);
     setError('');
     try {
-      const result = await window.workbench.listDockerContainers(target);
+      const result = await window.workbench.listDockerContainers(target, usePassword ? password : undefined);
       if (request === containerRequest.current) setContainers(result);
     } catch (reason) {
       if (request === containerRequest.current) setError(reason instanceof Error ? reason.message : String(reason));
@@ -156,6 +168,7 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
 
   const changeHost = (value: string): void => {
     setHost(value);
+    setPassword('');
     setSshPort('');
     setAlias('');
     setSavedAlias('');
@@ -189,18 +202,22 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
       className="remote-workspace-form"
       onSubmit={event => {
         event.preventDefault();
-        if (disabled || (docker && !selectedContainer)) return;
+        if (disabled || missingPassword || (docker && !selectedContainer)) return;
         setBusy(true);
         setError('');
-        void onConnect({
-          ...target,
-          root,
-          controllerPort: port,
-          insightPort,
-          ...(docker && selectedContainer
-            ? { container: { id: selectedContainer.id, name: selectedContainer.name } }
-            : {}),
-        })
+        void onConnect(
+          {
+            ...target,
+            ...(usePassword ? { authentication: 'password' as const } : {}),
+            root,
+            controllerPort: port,
+            insightPort,
+            ...(docker && selectedContainer
+              ? { container: { id: selectedContainer.id, name: selectedContainer.name } }
+              : {}),
+          },
+          usePassword ? password : undefined,
+        )
           .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))
           .finally(() => setBusy(false));
       }}
@@ -262,6 +279,7 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
             disabled={disabled}
             onChange={event => {
               setSshPort(event.currentTarget.value);
+              setPassword('');
               resetContainers();
             }}
           />
@@ -289,6 +307,42 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
           {copy.hostSaved} · {savedAlias}
         </p>
       )}
+      {supportsPassword && (
+        <div className="remote-service-ports">
+          <label>
+            {copy.authentication}
+            <select
+              aria-label={copy.authentication}
+              value={usePassword ? 'password' : 'key'}
+              disabled={disabled}
+              onChange={event => {
+                setUsePassword(event.currentTarget.value === 'password');
+                setPassword('');
+                resetContainers();
+              }}
+            >
+              <option value="key">{copy.keyAuthentication}</option>
+              <option value="password">{copy.passwordAuthentication}</option>
+            </select>
+          </label>
+          {usePassword && (
+            <label>
+              {copy.sshPassword}
+              <input
+                type="password"
+                required
+                autoComplete="off"
+                disabled={disabled}
+                value={password}
+                onChange={event => {
+                  setPassword(event.currentTarget.value);
+                  resetContainers(false);
+                }}
+              />
+            </label>
+          )}
+        </div>
+      )}
       {docker && (
         <div className="remote-container-select">
           <label>
@@ -309,7 +363,7 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
           </label>
           <button
             type="button"
-            disabled={disabled || loadingContainers || !target.host.trim()}
+            disabled={disabled || loadingContainers || missingPassword || !target.host.trim()}
             aria-busy={loadingContainers}
             onClick={() => void loadContainers()}
           >
@@ -358,7 +412,7 @@ export function RemoteWorkspaceForm({ english, onConnect, onCancel }: Props): JS
         <button type="button" disabled={disabled} onClick={onCancel}>
           {copy.cancel}
         </button>
-        <button type="submit" disabled={disabled || (docker && !selectedContainer)}>
+        <button type="submit" disabled={disabled || missingPassword || (docker && !selectedContainer)}>
           {busy ? copy.connecting : copy.connect}
         </button>
       </div>

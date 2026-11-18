@@ -10,6 +10,7 @@ import {
 import { ServiceStartupError } from '../serviceStartupError';
 import { shellQuote, sshArgs, validateSshTarget } from './sshTransport';
 import { dockerExec, openDockerForward, validateContainerId } from './dockerWorkspace';
+import { resolveSshPassword, startSshAskpass } from './sshPassword';
 import { probeInsight } from '../observability/insightService';
 
 const REQUEST_TIMEOUT = 20_000;
@@ -38,6 +39,7 @@ export function validateRemoteConfig(input: RemoteWorkspaceConfig): RemoteWorksp
     throw new Error('Controller and Context Insight require different ports.');
   return {
     ...target,
+    ...(input.authentication === 'password' ? { authentication: 'password' } : {}),
     root,
     controllerPort,
     ...(input.container === undefined
@@ -67,6 +69,7 @@ export interface RemoteWorkspaceScripts {
   helper: string;
   helperBootstrap: string;
   dockerRelay: string;
+  sshAskpass: string;
 }
 
 type Reply = { value?: unknown; error?: string };
@@ -87,6 +90,7 @@ export class SshWorkspace {
     scripts: RemoteWorkspaceScripts,
     port: number,
     insightPort: number,
+    env: NodeJS.ProcessEnv | undefined,
     private readonly lifetime: AbortController,
     private readonly onClose: (session: SshWorkspace) => void,
   ) {
@@ -96,12 +100,17 @@ export class SshWorkspace {
     this.probeTimeout = config.container ? 5000 : 1500;
     const helperCommand = 'python3 -c ' + shellQuote(scripts.helperBootstrap);
     const args = config.container
-      ? sshArgs(config, dockerExec(config.container.id, helperCommand))
-      : sshArgs(config, helperCommand, [
-          `127.0.0.1:${port}:127.0.0.1:${config.controllerPort}`,
-          `127.0.0.1:${insightPort}:127.0.0.1:${this.remoteInsightPort}`,
-        ]);
-    this.child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      ? sshArgs(config, dockerExec(config.container.id, helperCommand), [], Boolean(env))
+      : sshArgs(
+          config,
+          helperCommand,
+          [
+            `127.0.0.1:${port}:127.0.0.1:${config.controllerPort}`,
+            `127.0.0.1:${insightPort}:127.0.0.1:${this.remoteInsightPort}`,
+          ],
+          Boolean(env),
+        );
+    this.child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'], env });
     this.child.stderr.on('data', (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString()).slice(-2000);
     });
@@ -155,6 +164,7 @@ export class SshWorkspace {
     onClose: (session: SshWorkspace) => void,
     onStarting?: () => void,
     signal?: AbortSignal,
+    password?: string,
   ): Promise<SshWorkspace> {
     const lifetime = new AbortController();
     let session: SshWorkspace | undefined;
@@ -165,17 +175,29 @@ export class SshWorkspace {
     signal?.addEventListener('abort', cancel, { once: true });
     try {
       signal?.throwIfAborted();
+      const auth =
+        config.authentication === 'password'
+          ? await resolveSshPassword(config, password, scripts.sshAskpass, lifetime.signal)
+          : undefined;
       let port: number;
       let insightPort: number;
       if (config.container) {
         [port, insightPort] = await Promise.all([
-          openDockerForward(config, config.container.id, config.controllerPort, scripts.dockerRelay, lifetime.signal),
+          openDockerForward(
+            config,
+            config.container.id,
+            config.controllerPort,
+            scripts.dockerRelay,
+            lifetime.signal,
+            auth,
+          ),
           openDockerForward(
             config,
             config.container.id,
             config.insightPort ?? DEFAULT_REMOTE_INSIGHT_PORT,
             scripts.dockerRelay,
             lifetime.signal,
+            auth,
           ),
         ]);
       } else {
@@ -184,7 +206,8 @@ export class SshWorkspace {
         while (insightPort === port) insightPort = await availablePort();
       }
       signal?.throwIfAborted();
-      const connected = new SshWorkspace(config, scripts, port, insightPort, lifetime, onClose);
+      const askpass = auth ? await startSshAskpass(auth, lifetime.signal) : undefined;
+      const connected = new SshWorkspace(config, scripts, port, insightPort, askpass?.env, lifetime, onClose);
       session = connected;
       if ((await session.request<string>('open', { root: config.root })) !== config.root)
         throw new Error('Unexpected remote workspace path.');

@@ -15,7 +15,8 @@ import {
 import { hideInsight, localInsightTarget, type InsightTarget } from './observability/insightView';
 import { listSshHosts, saveSshHost } from './remoteWorkspace/sshConfig';
 import { listDockerContainers } from './remoteWorkspace/dockerWorkspace';
-import type { SshTarget } from './remoteWorkspace/sshTransport';
+import { resolveSshPassword, validateSshPassword } from './remoteWorkspace/sshPassword';
+import { validateSshTarget, type SshTarget } from './remoteWorkspace/sshTransport';
 import { SshWorkspace, validateRemoteConfig, type RemoteWorkspaceScripts } from './remoteWorkspace/sshWorkspace';
 import { walkWorkspace, type WorkspaceNode } from './workspaceFiles';
 
@@ -31,6 +32,7 @@ export class WorkspaceManager {
   private closed = false;
   private connectionAttempt = 0;
   private connecting?: AbortController;
+  private remoteCredentials?: { target: SshTarget; password: string };
 
   constructor(
     private readonly remoteScripts: RemoteWorkspaceScripts,
@@ -87,6 +89,15 @@ export class WorkspaceManager {
     });
   }
 
+  prepareRemote(input: RemoteWorkspaceConfig, password?: string): RemoteWorkspaceConfig {
+    const config = validateRemoteConfig(input);
+    this.remoteCredentials =
+      config.authentication === 'password'
+        ? { target: validateSshTarget(config), password: validateSshPassword(password) }
+        : undefined;
+    return config;
+  }
+
   connect(input: RemoteWorkspaceConfig, onStarting?: () => void): Promise<Workspace> {
     return this.change(async () => {
       const attempt = ++this.connectionAttempt;
@@ -104,6 +115,11 @@ export class WorkspaceManager {
       if (this.locked && this.current?.id !== id) throw new Error('The workspace is fixed for this window.');
       const connecting = new AbortController();
       this.connecting = connecting;
+      const credentials = this.remoteCredentials;
+      const password =
+        credentials?.target.host === config.host && credentials.target.sshPort === config.sshPort
+          ? credentials.password
+          : undefined;
       const session = await SshWorkspace.connect(
         config,
         this.remoteScripts,
@@ -117,6 +133,7 @@ export class WorkspaceManager {
         },
         onStarting,
         connecting.signal,
+        password,
       ).finally(() => {
         this.connecting = undefined;
       });
@@ -212,6 +229,7 @@ export class WorkspaceManager {
     this.connectionAttempt += 1;
     this.connecting?.abort(new Error('Workbench is closing.'));
     this.current = undefined;
+    this.remoteCredentials = undefined;
     hideInsight();
     setRemoteBackend(false, undefined, true);
     const previous = this.ssh;
@@ -237,13 +255,18 @@ export class WorkspaceManager {
       guardStartup(event);
       return listSshHosts();
     });
-    ipcMain.handle('workspace:docker-containers', async (event, target: SshTarget) => {
+    ipcMain.handle('workspace:docker-containers', async (event, input: SshTarget, password?: string) => {
       guardStartup(event);
       const cancel = new AbortController();
       const abort = (): void => cancel.abort();
       event.sender.once('destroyed', abort);
       try {
-        return await listDockerContainers(target, cancel.signal);
+        const target = validateSshTarget(input);
+        const auth =
+          password === undefined
+            ? undefined
+            : await resolveSshPassword(target, password, this.remoteScripts.sshAskpass, cancel.signal);
+        return await listDockerContainers(target, cancel.signal, auth);
       } finally {
         event.sender.off('destroyed', abort);
       }
