@@ -1,4 +1,4 @@
-import type { CreateRunInput, Run, RunEvent } from './protocol';
+import type { CreateRunInput, ReviewerThinkingMode, Run, RunEvent } from './protocol';
 
 export interface RunSession {
   session_id: string;
@@ -31,6 +31,7 @@ export interface ProviderValidation {
 export interface SessionModelOption {
   model: string;
   providerIndex: number;
+  thinkingModes?: ReviewerThinkingMode[];
 }
 
 export interface ProviderKey {
@@ -71,6 +72,7 @@ export interface ExecutionBackendBridge {
   insightStatus(): Promise<InsightStatusResult>;
   listProviders(): Promise<ProviderKey[]>;
   listSessionModels(runtime: string): Promise<SessionModelOption[]>;
+  listReviewerModels(): Promise<SessionModelOption[]>;
   saveProviders(keys: ProviderKeyInput[]): Promise<{ ok: boolean; error?: string }>;
   deleteProvider(providerIndex: number): Promise<void>;
   activateProvider(providerIndex: number): Promise<{ ok: boolean; activeIndex?: number }>;

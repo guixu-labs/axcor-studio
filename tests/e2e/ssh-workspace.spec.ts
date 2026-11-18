@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { BrowserWindow } from 'electron';
-import type { ElectronApplication } from 'playwright';
+import type { ElectronApplication, Page } from 'playwright';
 import { chmod, mkdir, readFile, readdir, realpath, rename, stat, symlink, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import http from 'node:http';
@@ -16,6 +16,22 @@ test('opens a Docker workspace with an SSH password and routes files, runs and I
   test.setTimeout(90_000);
   await exerciseRemoteWorkspace(true);
 });
+
+async function submitRemoteWorkspace(form: Page): Promise<void> {
+  try {
+    await form.getByRole('button', { name: '连接', exact: true }).click();
+  } catch (error) {
+    // The app can close the connection form before Playwright finishes the click.
+    if (
+      !form.isClosed() ||
+      !(error instanceof Error) ||
+      !error.message.includes('Target page, context or browser has been closed')
+    ) {
+      throw error;
+    }
+  }
+  await expect.poll(() => form.isClosed()).toBe(true);
+}
 
 async function exerciseRemoteWorkspace(docker: boolean): Promise<void> {
   const python = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' });
@@ -418,8 +434,7 @@ net.createServer(socket => {
     await form.getByLabel(docker ? '容器内目录' : '远程目录').fill(docker ? workspace + '/missing' : workspace);
     await form.getByLabel('远程 Insight 端口').fill(insightPort);
     await form.getByLabel('Controller 端口').fill(controllerPort);
-    await form.getByRole('button', { name: '连接', exact: true }).click();
-    await expect.poll(() => form.isClosed()).toBe(true);
+    await submitRemoteWorkspace(form);
     const controllerRow = startup.locator('.startup-services li', { hasText: 'Workflow Controller' });
     const retry = controllerRow.getByRole('button', { name: '重试 Workflow Controller' });
     if (docker) {
@@ -440,7 +455,7 @@ net.createServer(socket => {
       await secondForm.getByRole('button', { name: '加载容器', exact: true }).click();
       await expect(secondForm.getByLabel('Docker 容器', { exact: true })).toHaveValue(containerId);
       await secondForm.getByLabel('容器内目录').fill(workspace);
-      await secondForm.getByRole('button', { name: '连接', exact: true }).click();
+      await submitRemoteWorkspace(secondForm);
     }
     await expect(controllerRow).toContainText('端口已被占用 · ' + controllerPort);
     const [installedHelper] = await readdir(installedHelpers);
@@ -576,7 +591,7 @@ net.createServer(socket => {
       await reopenedForm.getByRole('button', { name: '加载容器', exact: true }).click();
       await expect(reopenedForm.getByLabel('Docker 容器', { exact: true })).toHaveValue(containerId);
     }
-    await reopenedForm.getByRole('button', { name: '连接', exact: true }).click();
+    await submitRemoteWorkspace(reopenedForm);
     const reopened = await workbenchPage(app, false);
     await reopened.getByRole('button', { name: '运行', exact: true }).click();
     await reopened.getByRole('option', { name: /Remote session/ }).click();

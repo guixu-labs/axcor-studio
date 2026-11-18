@@ -138,7 +138,12 @@ test.describe('monaco editor', () => {
     await expect(window.locator('.view-lines', { hasText: '# Notes' })).toBeVisible();
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');
-    await window.keyboard.insertText('# Edited notes');
+    await window.keyboard.type('# Edited notes');
+    await expect(window.locator('.view-lines')).toContainText('# Edited notes');
+    await expect(window.getByRole('tab', { name: 'z-notes.md', exact: true })).toHaveAttribute(
+      'aria-description',
+      '有未保存的修改',
+    );
     await window.keyboard.press('ControlOrMeta+s');
     await expect.poll(() => fs.readFile(path.join(workspaceDir, 'z-notes.md'), 'utf8')).toBe('# Edited notes');
     await window.getByRole('tab', { name: 'workflow.md', exact: true }).click();

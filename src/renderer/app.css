@@ -1555,7 +1555,7 @@ footer {
   padding: 4px 0;
   cursor: pointer;
 }
-.graph-advanced-fields {
+.run-advanced-fields {
   display: grid;
   gap: 8px;
   padding-top: 8px;
