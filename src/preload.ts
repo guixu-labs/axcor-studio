@@ -6,6 +6,9 @@ import type { StartupBridge, StartupState } from './shared/startup';
 
 const startup: StartupBridge = {
   supportsSshPassword: process.platform !== 'win32',
+  close: () => {
+    ipcRenderer.send('startup:close');
+  },
   chooseLocal: () => ipcRenderer.invoke('startup:choose-local'),
   chooseRemote: english => ipcRenderer.invoke('startup:choose-remote', english),
   submitRemote: (config, password) => ipcRenderer.invoke('startup:remote-submit', config, password),

@@ -130,11 +130,16 @@ export function StartupScreen(): JSX.Element {
   const title = !choice ? copy.choose : failed ? copy.blockedTitle : ready ? copy.loadingTitle : copy.title;
   return (
     <main className="startup-screen" aria-labelledby="startup-title">
-      <button className="startup-close" type="button" aria-label={copy.close} onClick={() => window.close()}>
-        ×
-      </button>
       <div className="startup-brand">
         <h1 id="startup-title">Axcor Studio</h1>
+        <button
+          className="startup-close"
+          type="button"
+          aria-label={copy.close}
+          onClick={() => window.startup.close()}
+        >
+          ×
+        </button>
       </div>
       <div className="startup-body">
         <div className="startup-heading">

@@ -12,6 +12,7 @@ export function initialStartupState(): StartupState {
 
 export interface StartupBridge {
   supportsSshPassword: boolean;
+  close(): void;
   chooseLocal(): Promise<string | undefined>;
   chooseRemote(english: boolean): Promise<RemoteWorkspaceConfig | undefined>;
   submitRemote(config: RemoteWorkspaceConfig, password?: string): Promise<void>;

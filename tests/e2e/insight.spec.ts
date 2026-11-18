@@ -320,4 +320,34 @@ http.createServer((req, res) => {
       backend.close();
     }
   });
+
+  test('closes the startup window and stops its local service after a startup failure', async () => {
+    const backend = await startFixtureBackend(() => false);
+    try {
+      await launch(backend.url);
+      page = await app.firstWindow();
+      await page.getByRole('button', { name: '打开本地工作区' }).click();
+      await expect(page.locator('.startup-services li', { hasText: 'Workflow Controller' })).toHaveAttribute(
+        'data-phase',
+        'failed',
+      );
+      await expect(page.locator('.startup-services li', { hasText: 'Context Insight' })).toHaveAttribute(
+        'data-phase',
+        'ready',
+      );
+      const processExited = new Promise(resolve => app.process().once('exit', resolve));
+      await page.getByRole('button', { name: '关闭启动窗口' }).click();
+      expect(await processExited).toBe(0);
+      await expect
+        .poll(() =>
+          fetch(insightOrigin).then(
+            () => true,
+            () => false,
+          ),
+        )
+        .toBe(false);
+    } finally {
+      backend.close();
+    }
+  });
 });
