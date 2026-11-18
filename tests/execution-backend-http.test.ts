@@ -528,6 +528,21 @@ test('execution backend HTTP client', async t => {
     assert.equal(post?.body.base_url, 'https://api.example.com');
   });
 
+  await t.test('provider tests wait up to 30 seconds while ordinary requests wait up to 10', async subtest => {
+    const durations: number[] = [];
+    subtest.mock.method(AbortSignal, 'timeout', (duration: number) => {
+      durations.push(duration);
+      return AbortSignal.abort(new DOMException('deadline exceeded', 'TimeoutError'));
+    });
+    await assert.rejects(() => testProvider(0), /响应超时（30 秒）/);
+    await assert.rejects(
+      () => testProviderKey('sk-candidate', 'model', 'https://api.example.com'),
+      /响应超时（30 秒）/,
+    );
+    await assert.rejects(() => listProviders(), /响应超时（10 秒）/);
+    assert.deepEqual(durations, [30_000, 30_000, 10_000]);
+  });
+
   await t.test('404 surfaces the backend detail message', async () => {
     await assert.rejects(
       () => getRun('missing'),
