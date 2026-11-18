@@ -65,7 +65,7 @@ export function registerExecutionBackendIpc(
     return { running: await probeInsight(url), port: Number(new URL(url).port) };
   });
   ipcMain.handle('execution:list-providers', () => listProviders());
-  ipcMain.handle('execution:list-session-models', (_event, runtime: string) => listSessionModels(runtime));
+  ipcMain.handle('execution:list-session-models', (_event, runtime?: string) => listSessionModels(runtime));
   ipcMain.handle('execution:save-providers', (_event, keys: ProviderKeyInput[]) => saveProviders(keys));
   ipcMain.handle('execution:delete-provider', (_event, providerIndex: number) => deleteProvider(providerIndex));
   ipcMain.handle('execution:activate-provider', (_event, providerIndex: number) => activateProvider(providerIndex));

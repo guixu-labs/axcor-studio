@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import type { SessionModelOption } from '../../shared/executionBackendIpc';
-import type { GraphRunParams, Run, RuntimeId } from '../../shared/protocol';
+import type {
+  GraphRunParams,
+  ReviewerThinkingMode,
+  Run,
+  RuntimeId,
+  SessionStartOptions,
+} from '../../shared/protocol';
 import { RUNTIMES } from '../../shared/protocol';
 
 export interface RunsPanelMessages {
@@ -19,6 +25,14 @@ export interface RunsPanelMessages {
   disabled: string;
   graphAdvanced: string;
   cliWrapper: string;
+  cpxCapture: string;
+  sessionAdvanced: string;
+  sessionDefault: string;
+  reviewerModelsEmpty: string;
+  sessionModelsLoading: string;
+  sessionModelsUnavailable: string;
+  reviewerThinkingAdaptive: string;
+  reviewerThinkingOmitted: string;
   evaluator: string;
   reviewerModel: string;
   reviewerProviderIndex: string;
@@ -53,6 +67,10 @@ const AGENT_RUNTIME_OPTIONS = [
   { id: 'opencode', label: 'OpenCode' },
   { id: 'codex_cli', label: 'Codex CLI' },
 ];
+
+export function supportsCpx(runtime: string): boolean {
+  return ['claude_cli', 'opencode', 'codex_cli'].includes(runtime);
+}
 
 interface RunsListProps {
   runs: Run[];
@@ -90,6 +108,11 @@ interface RunsListProps {
   onSessionMaxIterationsChange: (value: string) => void;
   sessionReviewerEnabled: boolean;
   onSessionReviewerEnabledChange: (value: boolean) => void;
+  sessionOptions: SessionStartOptions;
+  onSessionOptionsChange: (options: SessionStartOptions) => void;
+  reviewerModels: SessionModelOption[] | 'loading' | 'unavailable';
+  reviewerModel?: SessionModelOption;
+  reviewerThinkingMode?: ReviewerThinkingMode;
   messages: RunsPanelMessages;
 }
 
@@ -129,9 +152,21 @@ export function RunsList({
   onSessionMaxIterationsChange,
   sessionReviewerEnabled,
   onSessionReviewerEnabledChange,
+  sessionOptions,
+  onSessionOptionsChange,
+  reviewerModels,
+  reviewerModel,
+  reviewerThinkingMode,
   messages,
 }: RunsListProps): JSX.Element {
   const [configOpen, setConfigOpen] = useState(true);
+  const thinkingModes = reviewerModel?.thinkingModes ?? [];
+  const thinkingLabels: Record<ReviewerThinkingMode, string> = {
+    disabled: messages.disabled,
+    enabled: messages.enabled,
+    adaptive: messages.reviewerThinkingAdaptive,
+    omitted: messages.reviewerThinkingOmitted,
+  };
   return (
     <aside className="runs-panel">
       <div className="explorer-heading">
@@ -383,7 +418,7 @@ export function RunsList({
                 </label>
                 <details>
                   <summary className="run-config-title">{messages.graphAdvanced}</summary>
-                  <div className="graph-advanced-fields">
+                  <div className="run-advanced-fields">
                     {(
                       [
                         ['cli_wrapper', messages.cliWrapper],
@@ -500,36 +535,164 @@ export function RunsList({
                     ))}
                   </select>
                 </label>
-                <label className="run-config-field">
-                  <span className="run-config-title">{messages.sessionSystemPrompt}</span>
-                  <textarea
-                    className="run-config-input run-config-textarea"
-                    rows={3}
-                    value={sessionSystemPrompt}
-                    aria-label={messages.sessionSystemPrompt}
-                    onChange={event => onSessionSystemPromptChange(event.target.value)}
-                  />
-                </label>
-                <label className="run-config-field">
-                  <span className="run-config-title">{messages.sessionMaxIterations}</span>
-                  <input
-                    className="run-config-input"
-                    type="number"
-                    min={1}
-                    value={sessionMaxIterations}
-                    aria-label={messages.sessionMaxIterations}
-                    onChange={event => onSessionMaxIterationsChange(event.target.value)}
-                  />
-                </label>
-                <label className="run-config-field run-config-check">
-                  <input
-                    type="checkbox"
-                    checked={sessionReviewerEnabled}
-                    aria-label={messages.sessionReviewerEnabled}
-                    onChange={event => onSessionReviewerEnabledChange(event.target.checked)}
-                  />
-                  <span className="run-config-title">{messages.sessionReviewerEnabled}</span>
-                </label>
+                {supportsCpx(sessionRuntime) && (
+                  <label className="run-config-field">
+                    <span className="run-config-title">{messages.cpxCapture}</span>
+                    <select
+                      className="run-config-select"
+                      aria-label={messages.cpxCapture}
+                      value={sessionOptions.cli_wrapper ?? 'default'}
+                      onChange={event => {
+                        const value = event.target.value;
+                        onSessionOptionsChange({
+                          ...sessionOptions,
+                          cli_wrapper: value === 'default' ? undefined : value === 'cpx' ? 'cpx' : '',
+                        });
+                      }}
+                    >
+                      <option value="default">{messages.sessionDefault}</option>
+                      <option value="cpx">{messages.enabled}</option>
+                      <option value="">{messages.disabled}</option>
+                    </select>
+                  </label>
+                )}
+                <details>
+                  <summary className="run-config-title">{messages.sessionAdvanced}</summary>
+                  <div className="run-advanced-fields">
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.sessionSystemPrompt}</span>
+                      <textarea
+                        className="run-config-input run-config-textarea"
+                        rows={3}
+                        value={sessionSystemPrompt}
+                        aria-label={messages.sessionSystemPrompt}
+                        onChange={event => onSessionSystemPromptChange(event.target.value)}
+                      />
+                    </label>
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.sessionMaxIterations}</span>
+                      <input
+                        className="run-config-input"
+                        type="number"
+                        min={1}
+                        value={sessionMaxIterations}
+                        aria-label={messages.sessionMaxIterations}
+                        onChange={event => onSessionMaxIterationsChange(event.target.value)}
+                      />
+                    </label>
+                    <label className="run-config-field run-config-check">
+                      <input
+                        type="checkbox"
+                        checked={sessionReviewerEnabled}
+                        aria-label={messages.sessionReviewerEnabled}
+                        onChange={event => onSessionReviewerEnabledChange(event.target.checked)}
+                      />
+                      <span className="run-config-title">{messages.sessionReviewerEnabled}</span>
+                    </label>
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.reviewerModel}</span>
+                      <select
+                        className="run-config-select"
+                        aria-label={messages.reviewerModel}
+                        disabled={!sessionReviewerEnabled || !Array.isArray(reviewerModels) || !reviewerModels.length}
+                        value={reviewerModel?.providerIndex ?? ''}
+                        onChange={event =>
+                          onSessionOptionsChange({
+                            ...sessionOptions,
+                            reviewer_provider_index: event.target.value ? Number(event.target.value) : undefined,
+                            reviewer_thinking_mode: undefined,
+                          })
+                        }
+                      >
+                        <option value="">
+                          {reviewerModels === 'loading'
+                            ? messages.sessionModelsLoading
+                            : reviewerModels === 'unavailable'
+                              ? messages.sessionModelsUnavailable
+                              : reviewerModels.length
+                                ? messages.sessionDefault
+                                : messages.reviewerModelsEmpty}
+                        </option>
+                        {Array.isArray(reviewerModels) &&
+                          reviewerModels.map(option => (
+                            <option key={option.providerIndex} value={option.providerIndex}>
+                              {option.model}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.reviewerThinking}</span>
+                      <select
+                        className="run-config-select"
+                        aria-label={messages.reviewerThinking}
+                        disabled={!sessionReviewerEnabled || !thinkingModes.length}
+                        value={reviewerThinkingMode ?? ''}
+                        onChange={event =>
+                          onSessionOptionsChange({
+                            ...sessionOptions,
+                            reviewer_thinking_mode: thinkingModes.find(mode => mode === event.target.value),
+                          })
+                        }
+                      >
+                        <option value="">{messages.sessionDefault}</option>
+                        {thinkingModes.map(mode => (
+                          <option key={mode} value={mode}>
+                            {thinkingLabels[mode]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.reviewerThinkingBudget}</span>
+                      <input
+                        className="run-config-input"
+                        type="number"
+                        min={1024}
+                        placeholder={messages.sessionDefault}
+                        disabled={!sessionReviewerEnabled || reviewerThinkingMode !== 'enabled'}
+                        value={sessionOptions.reviewer_thinking_budget_tokens ?? ''}
+                        onChange={event =>
+                          onSessionOptionsChange({
+                            ...sessionOptions,
+                            reviewer_thinking_budget_tokens:
+                              event.target.value === '' ? undefined : event.target.valueAsNumber,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.evaluator}</span>
+                      <select
+                        className="run-config-select"
+                        aria-label={messages.evaluator}
+                        value={sessionOptions.evaluator ?? ''}
+                        onChange={event =>
+                          onSessionOptionsChange({ ...sessionOptions, evaluator: event.target.value || undefined })
+                        }
+                      >
+                        <option value="">{messages.sessionDefault}</option>
+                        {['passthrough', 'always_complete', 'feedback', 'max_iteration'].map(evaluator => (
+                          <option key={evaluator} value={evaluator}>
+                            {evaluator}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="run-config-field">
+                      <span className="run-config-title">{messages.reviewerTaskGoal}</span>
+                      <textarea
+                        className="run-config-input run-config-textarea"
+                        rows={3}
+                        disabled={!sessionReviewerEnabled}
+                        value={sessionOptions.reviewer_task_goal ?? ''}
+                        onChange={event =>
+                          onSessionOptionsChange({ ...sessionOptions, reviewer_task_goal: event.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
+                </details>
               </>
             )}
           </>

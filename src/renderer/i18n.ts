@@ -67,6 +67,13 @@ export interface Messages {
   openFileHint: string;
   graphAdvanced: string;
   cliWrapper: string;
+  cpxCapture: string;
+  sessionAdvanced: string;
+  sessionDefault: string;
+  reviewerModelsEmpty: string;
+  reviewerThinkingAdaptive: string;
+  reviewerThinkingOmitted: string;
+  reviewerThinkingBudgetInvalid: string;
   evaluator: string;
   reviewerModel: string;
   reviewerProviderIndex: string;
@@ -224,6 +231,13 @@ export const messages: Record<LocaleId, Messages> = {
     },
     graphAdvanced: '高级参数',
     cliWrapper: 'CLI 包装命令',
+    cpxCapture: '通过 cpx 捕获',
+    sessionAdvanced: '高级设置',
+    sessionDefault: '使用项目配置',
+    reviewerModelsEmpty: '没有可用的 Reviewer 模型',
+    reviewerThinkingAdaptive: '自适应',
+    reviewerThinkingOmitted: '省略',
+    reviewerThinkingBudgetInvalid: 'Reviewer 思考预算必须是至少 1024 的整数。',
     evaluator: '评估器',
     reviewerModel: 'Reviewer 模型',
     reviewerProviderIndex: 'Reviewer 供应商索引',
@@ -398,6 +412,13 @@ export const messages: Record<LocaleId, Messages> = {
     },
     graphAdvanced: 'Advanced parameters',
     cliWrapper: 'CLI wrapper',
+    cpxCapture: 'Capture through cpx',
+    sessionAdvanced: 'Advanced settings',
+    sessionDefault: 'Use project configuration',
+    reviewerModelsEmpty: 'No reviewer models available',
+    reviewerThinkingAdaptive: 'Adaptive',
+    reviewerThinkingOmitted: 'Omitted',
+    reviewerThinkingBudgetInvalid: 'Reviewer thinking budget must be an integer of at least 1024.',
     evaluator: 'Evaluator',
     reviewerModel: 'Reviewer model',
     reviewerProviderIndex: 'Reviewer provider index',

@@ -3,6 +3,7 @@
 Electron、TypeScript 和 React 桌面工作台。环境依赖和启动方式见 [README.md](README.md)。
 
 - 主进程入口是 `src/main.ts`，渲染层在 `src/renderer/`。渲染层通过 `src/preload.ts` 暴露的 IPC 接口访问主进程，共享接口在 `src/shared/`。
+- 每次测试前先在当前工作树的仓库根目录安装并检查 Electron。新工作树或依赖未安装时先运行 `npm ci`。即使已有 `node_modules`，也要运行 `env -u ELECTRON_SKIP_BINARY_DOWNLOAD -u ELECTRON_OVERRIDE_DIST_PATH node node_modules/electron/install.js`，再用 `test -x "$(env -u ELECTRON_OVERRIDE_DIST_PATH node -p 'require("electron")')"` 确认可执行文件已就绪，经检查后再跑测试。
 - 在仓库根目录先跑受影响的测试。单个测试文件用 `node --test --import tsx tests/<name>.test.ts`。改动涉及界面或跨进程行为时，用 `npm run test:e2e -- tests/e2e/<name>.spec.ts` 跑相关用例。完整 E2E 入口为 `npm run test:e2e`。交付前运行 `npm run lint`、`npm run typecheck` 和 `npm test`。
 - CI 运行 `npm run format:check` 检查 Prettier 格式。可用 `npm run format` 修复格式。ESLint 限制每行最多 120 个字符，含 URL 的行按配置豁免。编辑 `src/renderer/i18n.ts` 时，每个翻译条目单独一行。
 - 新增界面入口时，从用户首次打开的默认界面走一遍，检查入口是否容易发现、下一步是否明确，以及常用窗口尺寸下能否完成操作。同一行的控件要检查对齐和加载状态下的布局。修改表单错误反馈时，用较长的实际错误格式验证表单宽度和操作位置，确保能查看完整错误。

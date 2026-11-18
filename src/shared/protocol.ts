@@ -60,6 +60,19 @@ export interface GraphRunParams {
   model_pinned?: boolean;
 }
 
+export const REVIEWER_THINKING_MODES = ['disabled', 'enabled', 'adaptive', 'omitted'] as const;
+export type ReviewerThinkingMode = (typeof REVIEWER_THINKING_MODES)[number];
+
+export interface SessionStartOptions {
+  cli_wrapper?: '' | 'cpx';
+  evaluator?: string;
+  reviewer_model?: string;
+  reviewer_provider_index?: number;
+  reviewer_task_goal?: string;
+  reviewer_thinking_mode?: ReviewerThinkingMode;
+  reviewer_thinking_budget_tokens?: number;
+}
+
 export interface CreateRunInput {
   workflowId: string;
   workspacePath?: string;
@@ -78,6 +91,7 @@ export interface CreateRunInput {
   systemPrompt?: string;
   maxIterations?: number;
   reviewerEnabled?: boolean;
+  sessionOptions?: SessionStartOptions;
 }
 
 export interface RunEvent {

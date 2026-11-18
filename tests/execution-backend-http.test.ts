@@ -390,6 +390,7 @@ test('execution backend HTTP client', async t => {
       systemPrompt: 'be brief',
       maxIterations: 12,
       reviewerEnabled: true,
+      sessionOptions: { cli_wrapper: '', evaluator: 'always_complete', reviewer_thinking_mode: 'disabled' },
     });
     const post = fixture.requests.find(r => r.method === 'POST' && r.url === '/api/v1/sessions/start');
     assert.ok(post);
@@ -400,6 +401,10 @@ test('execution backend HTTP client', async t => {
     assert.equal(post.body.system_prompt, 'be brief');
     assert.equal(post.body.max_iterations, 12);
     assert.equal(post.body.reviewer_enabled, true);
+    assert.equal(post.body.cli_wrapper, '');
+    assert.equal(post.body.evaluator, 'always_complete');
+    assert.equal(post.body.reviewer_thinking_mode, 'disabled');
+    assert.equal(post.body.reviewer_thinking_budget_tokens, undefined);
     assert.equal(run.id, 'sess-new');
     assert.equal(run.runtimeId, 'session');
   });

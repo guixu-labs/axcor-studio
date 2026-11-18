@@ -7,9 +7,9 @@ import {
   type Run,
   type RunEvent,
   type RuntimeId,
+  type SessionStartOptions,
 } from '../shared/protocol';
 import { isTerminalRun, runEventKey } from '../shared/run';
-import type { GraphVariableRow } from './components/RunsPanel';
 import type { WorkspaceNode } from '../workspaceFiles';
 import { remoteWorkspaceLabel, type Workspace, type WorkspaceFileChange } from '../shared/workspace';
 import { remoteWorkspaceCopy } from './components/RemoteWorkspaceForm';
@@ -18,7 +18,7 @@ import { NavigationRail } from './components/NavigationRail';
 import { WorkspaceExplorer } from './components/WorkspaceExplorer';
 import { MonacoEditor } from './components/MonacoEditor';
 import { RunDetail } from './components/RunDetail';
-import { RunsList } from './components/RunsPanel';
+import { RunsList, supportsCpx, type GraphVariableRow } from './components/RunsPanel';
 import { ResizeHandle } from './components/ResizeHandle';
 import { createEditorGroupLayout, splitEditorGroup } from './workbench/layout';
 import type { EditorGroupOrientation } from './workbench/layout';
@@ -147,6 +147,8 @@ export default function App(): JSX.Element {
   const [sessionSystemPrompt, setSessionSystemPrompt] = useState('');
   const [sessionMaxIterations, setSessionMaxIterations] = useState('');
   const [sessionReviewerEnabled, setSessionReviewerEnabled] = useState(false);
+  const [sessionOptions, setSessionOptions] = useState<SessionStartOptions>({});
+  const [reviewerModels, setReviewerModels] = useState<SessionModelOption[] | 'loading' | 'unavailable'>('loading');
   const [insightPath, setInsightPath] = useState('/');
   const [insightFailed, setInsightFailed] = useState<string>();
   const [openingInsight, setOpeningInsight] = useState(false);
@@ -164,6 +166,12 @@ export default function App(): JSX.Element {
   const selectedModel = sessionModelOptions.find(
     option => option.model === (runtime === 'workflow' ? graphModel : sessionModel),
   );
+  const reviewerModel = Array.isArray(reviewerModels)
+    ? reviewerModels.find(option => option.providerIndex === sessionOptions.reviewer_provider_index)
+    : undefined;
+  const thinkingMode = sessionOptions.reviewer_thinking_mode;
+  const reviewerThinkingMode =
+    thinkingMode && reviewerModel?.thinkingModes?.includes(thinkingMode) ? thinkingMode : undefined;
   const sessionModelPlaceholder =
     sessionModels === 'loading'
       ? t.sessionModelsLoading
@@ -274,6 +282,22 @@ export default function App(): JSX.Element {
       cancelled = true;
     };
   }, [runtime, modelRuntime, activeNavigation, settingsOpen, workspace?.id, disconnected]);
+  useEffect(() => {
+    if (runtime !== 'session' || activeNavigation !== 'runs' || settingsOpen || disconnected) return;
+    let cancelled = false;
+    setReviewerModels('loading');
+    void window.executionBackend.listReviewerModels().then(
+      options => {
+        if (!cancelled) setReviewerModels(options);
+      },
+      () => {
+        if (!cancelled) setReviewerModels('unavailable');
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [runtime, activeNavigation, settingsOpen, workspace?.id, disconnected]);
   useEffect(() => {
     if (!selectedRunId) return;
     const scope = generation.current;
@@ -685,6 +709,16 @@ export default function App(): JSX.Element {
           return;
         }
         const parsedMaxIterations = Number.parseInt(sessionMaxIterations, 10);
+        const budget = sessionOptions.reviewer_thinking_budget_tokens;
+        if (
+          sessionReviewerEnabled &&
+          reviewerThinkingMode === 'enabled' &&
+          budget !== undefined &&
+          (!Number.isInteger(budget) || budget < 1024)
+        ) {
+          setExecutionError(t.reviewerThinkingBudgetInvalid);
+          return;
+        }
         submitted = true;
         created = await client.createRun({
           workflowId: '',
@@ -700,6 +734,17 @@ export default function App(): JSX.Element {
             ? { maxIterations: parsedMaxIterations }
             : {}),
           reviewerEnabled: sessionReviewerEnabled,
+          sessionOptions: {
+            cli_wrapper: supportsCpx(sessionRuntime) ? sessionOptions.cli_wrapper : undefined,
+            evaluator: sessionOptions.evaluator,
+            ...(sessionReviewerEnabled && {
+              reviewer_model: reviewerModel?.model,
+              reviewer_provider_index: reviewerModel?.providerIndex,
+              reviewer_task_goal: sessionOptions.reviewer_task_goal?.trim() || undefined,
+              reviewer_thinking_mode: reviewerThinkingMode,
+              reviewer_thinking_budget_tokens: reviewerThinkingMode === 'enabled' ? budget : undefined,
+            }),
+          },
         });
       } else {
         const programPath = runProgramPath.trim() || defaultProgramPath;
@@ -924,6 +969,11 @@ export default function App(): JSX.Element {
             onSessionMaxIterationsChange={setSessionMaxIterations}
             sessionReviewerEnabled={sessionReviewerEnabled}
             onSessionReviewerEnabledChange={setSessionReviewerEnabled}
+            sessionOptions={sessionOptions}
+            onSessionOptionsChange={setSessionOptions}
+            reviewerModels={reviewerModels}
+            reviewerModel={reviewerModel}
+            reviewerThinkingMode={reviewerThinkingMode}
             messages={t}
           />
         )}

@@ -80,6 +80,7 @@ const executionBackend: ExecutionBackendBridge = {
   insightStatus: () => ipcRenderer.invoke('execution:insight-status'),
   listProviders: () => ipcRenderer.invoke('execution:list-providers'),
   listSessionModels: runtime => ipcRenderer.invoke('execution:list-session-models', runtime),
+  listReviewerModels: () => ipcRenderer.invoke('execution:list-session-models'),
   saveProviders: keys => ipcRenderer.invoke('execution:save-providers', keys),
   deleteProvider: providerIndex => ipcRenderer.invoke('execution:delete-provider', providerIndex),
   activateProvider: providerIndex => ipcRenderer.invoke('execution:activate-provider', providerIndex),
