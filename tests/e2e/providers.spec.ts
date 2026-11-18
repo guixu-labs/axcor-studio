@@ -167,8 +167,15 @@ test.describe('provider settings', () => {
     await expect(form.getByRole('button', { name: '测试中…' })).toBeDisabled();
     await expect(form.getByRole('button', { name: '添加', exact: true })).toBeDisabled();
     await expect.poll(() => Boolean(finishCandidateTest)).toBe(true);
-    respondToCandidateTest({ success: false, error: 'Invalid API key' });
-    await expect(form.getByRole('alert')).toHaveText('测试失败：Invalid API key');
+    const longError = 'Controller connection timed out. ' + 'diagnostic'.repeat(200);
+    respondToCandidateTest({ success: false, error: longError });
+    const alert = form.getByRole('alert');
+    await expect(alert).toHaveText('测试失败：' + longError);
+    await expect(alert.locator('..')).toHaveAttribute('title', '测试失败：' + longError);
+    expect(await form.evaluate(element => element.scrollWidth)).toBe(
+      await form.evaluate(element => element.clientWidth),
+    );
+    expect(await alert.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
     expect((await card.boundingBox())?.y).toBe(originalCardY);
     await form.getByRole('button', { name: '测试', exact: true }).click();
     await expect.poll(() => Boolean(finishCandidateTest)).toBe(true);

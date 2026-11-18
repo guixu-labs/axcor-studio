@@ -3,7 +3,7 @@ import { isIP } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { SshHostEntry } from './shared/workspace';
+import type { SshHostEntry } from '../shared/workspace';
 
 const HOST_NAME = /^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/;
 const MAX_INCLUDE_DEPTH = 16;

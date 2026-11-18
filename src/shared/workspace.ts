@@ -7,7 +7,21 @@ export interface RemoteWorkspaceConfig {
   root: string;
   controllerPort: number;
   sshPort?: number;
+  authentication?: 'password';
   insightPort?: number;
+  container?: { id: string; name: string };
+}
+
+export interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+}
+
+export function remoteWorkspaceLabel(config: RemoteWorkspaceConfig, root = config.root): string {
+  const container = config.container;
+  const target = container ? config.host + ' / ' + (container.name || container.id.slice(0, 12)) : config.host;
+  return target + ':' + root;
 }
 
 export interface SshHostEntry {
@@ -32,6 +46,7 @@ export interface WorkspaceFileChange {
 
 export interface WorkspaceBridge {
   listSshHosts(): Promise<string[]>;
+  listDockerContainers(target: { host: string; sshPort?: number }, password?: string): Promise<DockerContainer[]>;
   saveSshHost(entry: SshHostEntry): Promise<string>;
   reconnect(): Promise<Workspace>;
   getWorkspace(): Promise<Workspace | undefined>;

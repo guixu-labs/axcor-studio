@@ -21,6 +21,7 @@ import type {
 } from '../shared/executionBackendIpc';
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const PROVIDER_TEST_TIMEOUT_MS = 30_000;
 
 let remote: { url?: string } | undefined;
 let requests = new AbortController();
@@ -48,11 +49,17 @@ export async function backendRequest<T>(
   method: 'GET' | 'POST' | 'DELETE',
   apiPath: string,
   body?: Record<string, unknown>,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const requestBaseUrl = remote ? remote.url : DEFAULT_EXECUTION_BACKEND_URL;
   if (!requestBaseUrl) throw new ExecutionBackendApiError(0, 'SSH workspace is disconnected. Reconnect and retry.');
   const context = requests.signal;
-  const signal = AbortSignal.any([context, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const signal = AbortSignal.any([context, deadline]);
+  const timeoutMessage = (): string | undefined =>
+    deadline.aborted && signal.reason === deadline.reason
+      ? `等待 ${EXECUTION_BACKEND_NAME} 响应超时（${timeoutMs / 1000} 秒）。`
+      : undefined;
   let response: Response;
   try {
     response = await fetch(requestBaseUrl + apiPath, {
@@ -64,7 +71,8 @@ export async function backendRequest<T>(
   } catch (error) {
     throw new ExecutionBackendApiError(
       0,
-      `无法连接 ${EXECUTION_BACKEND_NAME}（${requestBaseUrl}）：${error instanceof Error ? error.message : String(error)}`,
+      timeoutMessage() ??
+        `无法连接 ${EXECUTION_BACKEND_NAME}（${requestBaseUrl}）：${error instanceof Error ? error.message : String(error)}`,
     );
   }
   let text: string;
@@ -72,7 +80,7 @@ export async function backendRequest<T>(
     text = await response.text();
     signal.throwIfAborted();
   } catch {
-    throw new ExecutionBackendApiError(0, 'Controller response interrupted.');
+    throw new ExecutionBackendApiError(0, timeoutMessage() ?? 'Controller response interrupted.');
   }
   if (!response.ok) {
     if (response.status === 404 && method === 'GET' && apiPath === '/api/v1/runs') {
@@ -326,7 +334,12 @@ export async function activateProvider(providerIndex: number): Promise<{ ok: boo
 }
 
 export async function testProvider(providerIndex: number): Promise<ProviderTestResult> {
-  return backendRequest<ProviderTestResult>('POST', `/api/v1/auth/keys/${providerIndex}/test`);
+  return backendRequest<ProviderTestResult>(
+    'POST',
+    `/api/v1/auth/keys/${providerIndex}/test`,
+    undefined,
+    PROVIDER_TEST_TIMEOUT_MS,
+  );
 }
 
 export async function testProviderKey(
@@ -335,10 +348,10 @@ export async function testProviderKey(
   baseUrl: string,
   runtime?: string,
 ): Promise<ProviderTestResult> {
-  return backendRequest<ProviderTestResult>('POST', '/api/v1/auth/test-key', {
-    key,
-    model,
-    base_url: baseUrl,
-    ...(runtime ? { runtime } : {}),
-  });
+  return backendRequest<ProviderTestResult>(
+    'POST',
+    '/api/v1/auth/test-key',
+    { key, model, base_url: baseUrl, ...(runtime ? { runtime } : {}) },
+    PROVIDER_TEST_TIMEOUT_MS,
+  );
 }

@@ -46,3 +46,26 @@
 .ssh-save-host > button {
   margin-top: 8px;
 }
+.remote-service-ports,
+.remote-container-select {
+  display: grid;
+  gap: 10px;
+}
+.remote-service-ports {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.remote-container-select {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+.remote-container-select label {
+  min-width: 0;
+}
+.remote-container-select select,
+.remote-container-select button {
+  block-size: 28px;
+}
+.remote-container-select button {
+  padding: 0 8px;
+  font-size: 12px;
+}

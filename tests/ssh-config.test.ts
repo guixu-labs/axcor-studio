@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { listSshHosts, saveSshHost, splitSshDestination } from '../src/sshConfig';
+import { listSshHosts, saveSshHost, splitSshDestination } from '../src/remoteWorkspace/sshConfig';
 
 test('lists named SSH hosts from the user config and nested Include files', async t => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'axcor-ssh-config-'));

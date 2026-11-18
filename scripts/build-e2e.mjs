@@ -17,13 +17,13 @@ await build({
   define: { MAIN_WINDOW_VITE_DEV_SERVER_URL: 'undefined', MAIN_WINDOW_VITE_NAME: '"main_window"' },
   plugins: [
     {
-      name: 'workspace-helper-source',
+      name: 'remote-script-source',
       setup(builder) {
-        builder.onResolve({ filter: /axcor-workspace-helper\?raw$/ }, args => ({
+        builder.onResolve({ filter: /\/remote\/(?:axcor-workspace-helper|[^/]+\.(?:py|sh))\?raw$/ }, args => ({
           path: path.resolve(args.resolveDir, args.path.slice(0, -4)),
-          namespace: 'workspace-helper',
+          namespace: 'remote-script',
         }));
-        builder.onLoad({ filter: /.*/, namespace: 'workspace-helper' }, async args => ({
+        builder.onLoad({ filter: /.*/, namespace: 'remote-script' }, async args => ({
           contents: await readFile(args.path),
           loader: 'text',
         }));
