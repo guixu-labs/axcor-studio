@@ -57,7 +57,7 @@ test.describe('monaco editor', () => {
     await expect(tabs.getByRole('tab', { name: 'workflow.md' })).toHaveAttribute('aria-selected', 'true');
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');
-    await window.keyboard.type('# Preserved edit');
+    await window.keyboard.insertText('# Preserved edit');
     const workspace = window.getByRole('button', { name: '工作台', exact: true });
     const explorer = window.locator('.workspace-explorer');
     const dividerX = await explorer.evaluate(node => node.getBoundingClientRect().left);
@@ -96,7 +96,8 @@ test.describe('monaco editor', () => {
     const edit = async (text: string): Promise<void> => {
       await window.locator('.monaco-editor').click();
       await window.keyboard.press('ControlOrMeta+a');
-      await window.keyboard.type(text);
+      await window.keyboard.insertText(text);
+      await expect(window.locator('.view-lines')).toHaveText(text);
       await expect(tab).toHaveAttribute('aria-description', '有未保存的修改');
     };
 
@@ -138,7 +139,7 @@ test.describe('monaco editor', () => {
     await expect(window.locator('.view-lines', { hasText: '# Notes' })).toBeVisible();
     await window.locator('.monaco-editor').click();
     await window.keyboard.press('ControlOrMeta+a');
-    await window.keyboard.type('# Edited notes');
+    await window.keyboard.insertText('# Edited notes');
     await expect(window.locator('.view-lines')).toContainText('# Edited notes');
     await expect(window.getByRole('tab', { name: 'z-notes.md', exact: true })).toHaveAttribute(
       'aria-description',
